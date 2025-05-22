@@ -1,0 +1,74 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id       Int    @id @default(autoincrement())
+  username String @unique
+  password String
+  createdAt DateTime @default(now())
+  
+  @@map("users")
+}
+
+model Receta {
+    id            Int     @id @default(autoincrement())
+    codigo        String
+    nombreProducto String
+    proceso       String
+    tipo          String
+    subCodigo     String
+    descripcion   String
+    unidadMedida  String?
+    porcionBruta  Float
+    porcionNeta   Float
+    MO            Int
+    dueno         String
+
+    @@map("recetas")
+}
+
+model Comanda {
+  id                  Int                     @id @default(autoincrement())
+  salon               String
+  tipo                String
+  fecha               DateTime
+  nombre              String
+  horarioInicio       DateTime
+  horarioFin          DateTime
+  observaciones       String?
+
+  Plato Plato[]
+  
+  @@map("comandas")
+}
+
+model Plato {
+  id        Int     @id @default(autoincrement())
+  nombre    String
+  cantidad  Int
+  comandaId Int
+  comanda   Comanda @relation(fields: [comandaId], references: [id])
+
+  @@map("platos")
+}
+
+model Produccion {
+  id        Int      @id @default(autoincrement())
+  fecha     DateTime
+  plato     String
+  observacion String?
+  cantidad  Int
+  createdAt DateTime @default(now())
+}
+
+model PlatoOculto {
+  id       Int      @id @default(autoincrement())
+  plato    String
+  creadoEn DateTime @default(now())
+}

@@ -1,25 +1,44 @@
 {
-  "name": "tamiz-pro",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev --turbopack",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
-  },
-  "dependencies": {
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "next": "15.3.2"
-  },
-  "devDependencies": {
-    "typescript": "^5",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "15.3.2",
-    "@eslint/eslintrc": "^3"
-  }
+    "name": "tamiz-pro",
+    "version": "0.1.0",
+    "private": true,
+    "scripts": {
+        "dev": "next dev --turbopack",
+        "build": "next build",
+        "start": "next start",
+        "lint": "next lint"
+    },
+    "dependencies": {
+        "@prisma/client": "^6.8.2",
+        "bcrypt": "^6.0.0",
+        "bootstrap": "^5.3.6",
+        "bootstrap-icons": "^1.13.1",
+        "date-fns": "^4.1.0",
+        "dotenv": "^16.5.0",
+        "formidable": "^3.5.4",
+        "jsonwebtoken": "^9.0.2",
+        "multer": "^1.4.5-lts.2",
+        "next": "15.2.2",
+        "puppeteer": "^24.9.0",
+        "react": "^19.0.0",
+        "react-bootstrap": "^2.10.10",
+        "react-bootstrap-icons": "^1.11.6",
+        "react-dom": "^19.0.0",
+        "xlsx": "^0.18.5"
+    },
+    "devDependencies": {
+        "@eslint/eslintrc": "^3",
+        "@types/bcrypt": "^5.0.2",
+        "@types/formidable": "^3.4.5",
+        "@types/jsonwebtoken": "^9.0.9",
+        "@types/multer": "^1.4.12",
+        "@types/node": "^20",
+        "@types/react": "^19",
+        "@types/react-dom": "^19",
+        "eslint": "^9",
+        "eslint-config-next": "15.3.2",
+        "prisma": "^6.8.2",
+        "tsx": "^4.19.4",
+        "typescript": "^5"
+    }
 }
