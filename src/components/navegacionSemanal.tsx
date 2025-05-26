@@ -1,3 +1,4 @@
+'use cliente';
 import { Button } from 'react-bootstrap';
 import { addDays } from 'date-fns';
 

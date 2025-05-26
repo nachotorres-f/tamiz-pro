@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+'use client';
 import Button from 'react-bootstrap/Button';
 import Modal from 'react-bootstrap/Modal';
 
