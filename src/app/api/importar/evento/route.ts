@@ -61,9 +61,27 @@ export async function POST(req: NextRequest) {
                 observaciones.push(observacion);
             }
 
+            const tipo = dato[Object.keys(dato)[1] as keyof typeof dato];
+
+            const tiposOmitir = [
+                'Barra',
+                'Barra Adulto',
+                'Barra de Tragos Mayores',
+                'Barra de Tragos Menores',
+                'Bebida del cliente',
+                'Bebidas sin alcohol',
+                'Cafe',
+                'Cervezas',
+                'Vajilla y Manteleria',
+                'Vino y Champagne',
+                'Vinos',
+            ];
+
             if (
                 typeof dato.__EMPTY === 'string' &&
-                typeof dato.__EMPTY_4 === 'number'
+                typeof dato.__EMPTY_4 === 'number' &&
+                typeof tipo === 'string' &&
+                !tiposOmitir.some((tipoOmitir) => tipo === tipoOmitir)
             ) {
                 menu.push({
                     nombre: dato.__EMPTY,

@@ -81,6 +81,9 @@ export async function GET() {
             fecha: {
                 gte: addDays(startOfWeek, -1),
             },
+            cantidad: {
+                gt: 0,
+            },
         },
         orderBy: {
             plato: 'asc',

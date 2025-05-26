@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { Navbar, Nav, Container, Button } from 'react-bootstrap';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
+import logo from '../../public/logo_white.png'; // Adjust the path as necessary
 
 export default function AppNavbar() {
     const [loggedIn, setLoggedIn] = useState(false);
@@ -14,7 +16,7 @@ export default function AppNavbar() {
             .then((data) => {
                 setLoggedIn(data.loggedIn);
                 if (data.loggedIn) {
-                    router.push('/');
+                    router.push('/planificacion');
                 } else {
                     router.push('/login');
                 }
@@ -37,15 +39,26 @@ export default function AppNavbar() {
             variant="dark"
             expand="lg">
             <Container>
-                <Navbar.Brand>Tamiz Pro</Navbar.Brand>
+                <Navbar.Brand>
+                    <Image
+                        src={logo}
+                        alt="Tamiz Comidas"
+                        style={{
+                            height: '100%',
+                            maxHeight: '50px',
+                            width: 'auto',
+                        }}
+                        className="d-inline-block align-top"
+                    />
+                </Navbar.Brand>
                 <Navbar.Toggle aria-controls="basic-navbar-nav" />
                 <Navbar.Collapse id="basic-navbar-nav">
                     <Nav className="me-auto">
                         {loggedIn && (
                             <>
-                                <Nav.Link onClick={() => router.push('/')}>
+                                {/* <Nav.Link onClick={() => router.push('/')}>
                                     Inicio
-                                </Nav.Link>
+                                </Nav.Link> */}
 
                                 <Nav.Link
                                     onClick={() => router.push('/importar')}>

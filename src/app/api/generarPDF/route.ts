@@ -1,71 +1,116 @@
-import { NextResponse } from 'next/server';
-import puppeteer from 'puppeteer';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { prisma } from '@/lib/prisma';
+import { addDays } from 'date-fns';
+import { NextRequest, NextResponse } from 'next/server';
 
-export async function POST() {
+export async function GET(req: NextRequest) {
     try {
-        //const { platos } = await req.json();
+        const { searchParams } = req.nextUrl;
+        const plato = searchParams.get('plato');
 
-        const browser = await puppeteer.launch({
-            headless: true,
-            args: ['--no-sandbox', '--disable-setuid-sandbox'],
-        });
+        if (plato === '' || plato === null) {
+            return NextResponse.json({
+                json: 400,
+                message: 'Se debe especificar el plato',
+            });
+        }
 
-        const page = await browser.newPage();
+        if (plato === 'todos') {
+        }
 
-        // Crear HTML del PDF
-        const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <style>
-          body { font-family: Arial, sans-serif; margin: 40px; }
-          .header { text-align: center; margin-bottom: 30px; }
-          .evento-info { background: #f5f5f5; padding: 20px; margin-bottom: 30px; }
-          .platos-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-          .plato-card { border: 1px solid #ddd; padding: 15px; border-radius: 8px; }
-          .plato-nombre { font-weight: bold; font-size: 16px; margin-bottom: 5px; }
-          .plato-descripcion { color: #666; font-size: 14px; }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1>Menú del Evento</h1>
-        <h2>Evento Especial</h2>
-        </div>
-        
-        <div class="evento-info">
-          <p><strong>Fecha:</strong> ${'Por definir'}</p>
-          <p><strong>Ubicación:</strong> ${'Por definir'}</p>
-        </div>
-        
-        <div class="platos-grid">
-        </div>
-      </body>
-      </html>
-    `;
+        const startOfWeek = new Date();
+        startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay()); // Ajusta al inicio de la semana (domingo)
+        startOfWeek.setHours(0, 0, 0, 0); // Establece la hora al inicio del día
 
-        await page.setContent(htmlContent);
-
-        const pdf = await page.pdf({
-            format: 'A4',
-            printBackground: true,
-            margin: {
-                top: '20mm',
-                right: '20mm',
-                bottom: '20mm',
-                left: '20mm',
+        const producciones = await prisma.produccion.findMany({
+            where: {
+                plato,
+                fecha: {
+                    gte: addDays(startOfWeek, -1),
+                },
             },
         });
 
-        await browser.close();
+        console.log(producciones);
 
-        return new Response(pdf, {
-            headers: {
-                'Content-Type': 'application/pdf',
-                'Content-Disposition': 'attachment; filename=menu-evento.pdf',
-            },
+        async function fetchIngredientesRecursivos(
+            nombreProducto: string
+        ): Promise<any[]> {
+            const ingredientes = await prisma.receta.findMany({
+                where: {
+                    nombreProducto,
+                },
+            });
+
+            const ingredientesExpandidos = await Promise.all(
+                ingredientes.map(async (ingrediente) => {
+                    if (ingrediente.tipo === 'PT') {
+                        const subIngredientes =
+                            await fetchIngredientesRecursivos(
+                                ingrediente.descripcion
+                            );
+                        return {
+                            ...ingrediente,
+                            subIngredientes,
+                        };
+                    }
+                    return ingrediente;
+                })
+            );
+
+            return ingredientesExpandidos;
+        }
+
+        const ingredientes = await fetchIngredientesRecursivos(plato || '');
+
+        function buildTableData(
+            ingredientes: any[],
+            depth = 0,
+            parentPT = ''
+        ): any[] {
+            return ingredientes.flatMap((ingrediente) => {
+                const currentParentPT =
+                    ingrediente.tipo === 'PT'
+                        ? ingrediente.descripcion
+                        : parentPT;
+
+                const row = {
+                    nombre: ingrediente.descripcion,
+                    porcionBruta: ingrediente.porcionBruta,
+                    unidadMedida: ingrediente.unidadMedida,
+                    tipo: ingrediente.tipo,
+                    cantidad: ingrediente.cantidad,
+                    codigo: ingrediente.codigo,
+                    id: ingrediente.id,
+                    depth,
+                    parentPT: parentPT,
+                };
+
+                if (ingrediente.subIngredientes) {
+                    return [
+                        row,
+                        ...buildTableData(
+                            ingrediente.subIngredientes,
+                            depth + 1,
+                            currentParentPT
+                        ),
+                    ];
+                }
+
+                return [row];
+            });
+        }
+
+        const tableData = buildTableData(ingredientes);
+
+        const data = producciones.map((produccion) => {
+            return {
+                ...produccion,
+                ingredientes: tableData,
+            };
         });
+
+        return NextResponse.json({ data }, { status: 200 });
     } catch {
         return NextResponse.json(
             { success: false, message: 'Error interno' },
