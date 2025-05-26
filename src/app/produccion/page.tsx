@@ -65,160 +65,178 @@ export default function ProduccionPage() {
                         (dato) => dato.plato === plato
                     )?.produccion;
 
-                    produccion.forEach(({ fecha, cantidad }, indexProd) => {
-                        if (indexProd > 0) {
-                            doc.addPage();
-                        }
-
-                        ingredientesAgrupados.forEach(
-                            (ingredientes: any, index: number) => {
-                                if (index !== 0) {
-                                    doc.addPage();
-                                }
-                                const pageWidth =
-                                    doc.internal.pageSize.getWidth();
-                                const pageHeight =
-                                    doc.internal.pageSize.getHeight();
-                                let yPosition = 20;
-
-                                doc.setFontSize(20);
-                                doc.setTextColor(0, 0, 0);
-
-                                const title = 'Produccion';
-                                const titleWidth = doc.getTextWidth(title);
-
-                                const titleX = (pageWidth - titleWidth) / 2;
-                                const titleY = yPosition;
-                                doc.text(title, titleX, titleY);
-
-                                // Agregar una imagen en la esquina superior izquierda
-                                const imgWidth = 20; // Ancho de la imagen
-                                const imgHeight = 20; // Alto de la imagen
-
-                                const imgUrl = '/logo_black.png'; // Ruta de la imagen
-                                const img = new Image();
-                                img.src = imgUrl;
-
-                                doc.addImage(
-                                    img,
-                                    'PNG',
-                                    10,
-                                    10,
-                                    imgWidth,
-                                    imgHeight
-                                );
-
-                                // Fecha de generación
-                                const dateCreate = `Generado el: ${format(
-                                    new Date(),
-                                    'dd/MM/yyyy HH:mm'
-                                )}`;
-                                const dateCreateWidth =
-                                    doc.getTextWidth(dateCreate);
-                                const dateCreateX =
-                                    pageWidth - dateCreateWidth + 35;
-                                const dateCreateY = pageHeight - 10;
-
-                                doc.setFontSize(10);
-                                doc.text(dateCreate, dateCreateX, dateCreateY);
-
-                                yPosition += 10;
-
-                                doc.setLineWidth(0.2); // grosor fino
-
-                                // linea horizontal
-                                doc.line(
-                                    10,
-                                    yPosition,
-                                    doc.internal.pageSize.getWidth() - 10,
-                                    yPosition
-                                );
-
-                                yPosition += 10;
-
-                                // Título de la receta
-                                doc.setFontSize(16);
-                                doc.text(
-                                    index > 0
-                                        ? ingredientes[0].nombre.toString() +
-                                              ' - ' +
-                                              ingredientes[0].codigo
-                                        : plato.toString(),
-                                    14,
-                                    yPosition
-                                );
-
-                                yPosition += 5;
-                                doc.setFontSize(10);
-
-                                if (index > 0) {
-                                    const cantidad = ingredientesAgrupados.find(
-                                        (ingAgr: any) => {
-                                            if (
-                                                ingAgr[0].nombre ===
-                                                ingredientes[0].nombre
-                                            ) {
-                                                return true;
-                                            }
-                                        }
-                                    )[0].porcionBruta;
-
-                                    doc.text(
-                                        'Cantidad: ' + cantidad + ' porciones',
-                                        14,
-                                        yPosition
-                                    );
-                                } else {
-                                    doc.text(
-                                        'Cantidad: ' + cantidad,
-                                        14,
-                                        yPosition
-                                    );
-                                }
-
-                                yPosition += 5;
-                                doc.text(
-                                    'Fecha Produccion: ' +
-                                        format(new Date(fecha), 'dd/MM/yyyy'),
-                                    14,
-                                    yPosition
-                                );
-
-                                const headers = [
-                                    [
-                                        'Código',
-                                        'Descripción',
-                                        'Unidad',
-                                        'Porción Bruta',
-                                    ],
-                                ];
-
-                                const data = ingredientes
-                                    .filter(
-                                        (_ingrediente: any, i: number) =>
-                                            (index > 0 && i !== 0) ||
-                                            index === 0
-                                    )
-                                    .map((ingrediente: any) => [
-                                        ingrediente.codigo,
-                                        ingrediente.nombre,
-                                        ingrediente.unidadMedida,
-                                        ingrediente.porcionBruta * cantidad,
-                                    ]);
-
-                                const tableData = {
-                                    head: headers,
-                                    body: data,
-                                };
-                                autoTable(doc, {
-                                    ...tableData,
-                                    startY: yPosition + 10,
-                                    margin: { left: 10 },
-                                    theme: 'plain',
-                                });
+                    produccion.forEach(
+                        (
+                            {
+                                fecha,
+                                cantidad,
+                            }: { fecha: Date; cantidad: number },
+                            indexProd: number
+                        ) => {
+                            if (indexProd > 0) {
+                                doc.addPage();
                             }
-                        );
-                    });
+
+                            ingredientesAgrupados.forEach(
+                                (ingredientes: any, index: number) => {
+                                    if (index !== 0) {
+                                        doc.addPage();
+                                    }
+                                    const pageWidth =
+                                        doc.internal.pageSize.getWidth();
+                                    const pageHeight =
+                                        doc.internal.pageSize.getHeight();
+                                    let yPosition = 20;
+
+                                    doc.setFontSize(20);
+                                    doc.setTextColor(0, 0, 0);
+
+                                    const title = 'Produccion';
+                                    const titleWidth = doc.getTextWidth(title);
+
+                                    const titleX = (pageWidth - titleWidth) / 2;
+                                    const titleY = yPosition;
+                                    doc.text(title, titleX, titleY);
+
+                                    // Agregar una imagen en la esquina superior izquierda
+                                    const imgWidth = 20; // Ancho de la imagen
+                                    const imgHeight = 20; // Alto de la imagen
+
+                                    const imgUrl = '/logo_black.png'; // Ruta de la imagen
+                                    const img = new Image();
+                                    img.src = imgUrl;
+
+                                    doc.addImage(
+                                        img,
+                                        'PNG',
+                                        10,
+                                        10,
+                                        imgWidth,
+                                        imgHeight
+                                    );
+
+                                    // Fecha de generación
+                                    const dateCreate = `Generado el: ${format(
+                                        new Date(),
+                                        'dd/MM/yyyy HH:mm'
+                                    )}`;
+                                    const dateCreateWidth =
+                                        doc.getTextWidth(dateCreate);
+                                    const dateCreateX =
+                                        pageWidth - dateCreateWidth + 35;
+                                    const dateCreateY = pageHeight - 10;
+
+                                    doc.setFontSize(10);
+                                    doc.text(
+                                        dateCreate,
+                                        dateCreateX,
+                                        dateCreateY
+                                    );
+
+                                    yPosition += 10;
+
+                                    doc.setLineWidth(0.2); // grosor fino
+
+                                    // linea horizontal
+                                    doc.line(
+                                        10,
+                                        yPosition,
+                                        doc.internal.pageSize.getWidth() - 10,
+                                        yPosition
+                                    );
+
+                                    yPosition += 10;
+
+                                    // Título de la receta
+                                    doc.setFontSize(16);
+                                    doc.text(
+                                        index > 0
+                                            ? ingredientes[0].nombre.toString() +
+                                                  ' - ' +
+                                                  ingredientes[0].codigo
+                                            : plato.toString(),
+                                        14,
+                                        yPosition
+                                    );
+
+                                    yPosition += 5;
+                                    doc.setFontSize(10);
+
+                                    if (index > 0) {
+                                        const cantidad =
+                                            ingredientesAgrupados.find(
+                                                (ingAgr: any) => {
+                                                    if (
+                                                        ingAgr[0].nombre ===
+                                                        ingredientes[0].nombre
+                                                    ) {
+                                                        return true;
+                                                    }
+                                                }
+                                            )[0].porcionBruta;
+
+                                        doc.text(
+                                            'Cantidad: ' +
+                                                cantidad +
+                                                ' porciones',
+                                            14,
+                                            yPosition
+                                        );
+                                    } else {
+                                        doc.text(
+                                            'Cantidad: ' + cantidad,
+                                            14,
+                                            yPosition
+                                        );
+                                    }
+
+                                    yPosition += 5;
+                                    doc.text(
+                                        'Fecha Produccion: ' +
+                                            format(
+                                                new Date(fecha),
+                                                'dd/MM/yyyy'
+                                            ),
+                                        14,
+                                        yPosition
+                                    );
+
+                                    const headers = [
+                                        [
+                                            'Código',
+                                            'Descripción',
+                                            'Unidad',
+                                            'Porción Bruta',
+                                        ],
+                                    ];
+
+                                    const data = ingredientes
+                                        .filter(
+                                            (_ingrediente: any, i: number) =>
+                                                (index > 0 && i !== 0) ||
+                                                index === 0
+                                        )
+                                        .map((ingrediente: any) => [
+                                            ingrediente.codigo,
+                                            ingrediente.nombre,
+                                            ingrediente.unidadMedida,
+                                            ingrediente.porcionBruta * cantidad,
+                                        ]);
+
+                                    const tableData = {
+                                        head: headers,
+                                        body: data,
+                                    };
+                                    autoTable(doc, {
+                                        ...tableData,
+                                        startY: yPosition + 10,
+                                        margin: { left: 10 },
+                                        theme: 'plain',
+                                    });
+                                }
+                            );
+                        }
+                    );
                 });
 
                 const fechaHoy = format(new Date(), 'yyyy-MM-dd');
