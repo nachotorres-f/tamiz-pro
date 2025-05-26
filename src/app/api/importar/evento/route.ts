@@ -61,7 +61,18 @@ export async function POST(req: NextRequest) {
                 observaciones.push(observacion);
             }
 
+            const propertyCount = Object.keys(dato).length;
+
+            const plato = dato[Object.keys(dato)[0] as keyof typeof dato];
+
             const tipo = dato[Object.keys(dato)[1] as keyof typeof dato];
+
+            const cantidad =
+                dato[
+                    Object.keys(dato)[
+                        Object.keys(dato).length - 1
+                    ] as keyof typeof dato
+                ];
 
             const tiposOmitir = [
                 'Barra',
@@ -78,14 +89,15 @@ export async function POST(req: NextRequest) {
             ];
 
             if (
-                typeof dato.__EMPTY === 'string' &&
-                typeof dato.__EMPTY_4 === 'number' &&
+                propertyCount === 7 &&
+                typeof plato === 'string' &&
+                typeof cantidad === 'number' &&
                 typeof tipo === 'string' &&
                 !tiposOmitir.some((tipoOmitir) => tipo === tipoOmitir)
             ) {
                 menu.push({
-                    nombre: dato.__EMPTY,
-                    cantidad: dato.__EMPTY_4,
+                    nombre: plato,
+                    cantidad: Number(cantidad),
                 });
             }
         });
