@@ -5,10 +5,10 @@ import { verifyToken } from './src/lib/auth';
 export function middleware(req: NextRequest) {
     const token = req.cookies.get('token')?.value;
     const isLoggedIn = token && verifyToken(token);
-    const isLoginPage = req.nextUrl.pathname === '/login';
+    const isLoginPage = req.nextUrl.pathname === '/acceso';
 
     if (!isLoggedIn && !isLoginPage) {
-        return NextResponse.redirect(new URL('/login', req.url));
+        return NextResponse.redirect(new URL('/acceso', req.url));
     }
 
     if (isLoggedIn && isLoginPage) {

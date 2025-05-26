@@ -18,19 +18,19 @@ export default function AppNavbar() {
                 if (data.loggedIn) {
                     router.push('/planificacion');
                 } else {
-                    router.push('/login');
+                    router.push('/acceso');
                 }
             })
             .catch(() => {
                 setLoggedIn(false);
-                router.push('/login');
+                router.push('/acceso');
             });
     }, [router]);
 
     const handleLogout = async () => {
         await fetch('/api/logout', { method: 'POST' });
         setLoggedIn(false);
-        router.push('/login');
+        router.push('/acceso');
     };
 
     return (
