@@ -66,6 +66,11 @@ export default function AppNavbar() {
                                 </Nav.Link>
 
                                 <Nav.Link
+                                    onClick={() => router.push('/calendario')}>
+                                    Calendario
+                                </Nav.Link>
+
+                                <Nav.Link
                                     onClick={() =>
                                         router.push('/planificacion')
                                     }>
@@ -75,11 +80,6 @@ export default function AppNavbar() {
                                 <Nav.Link
                                     onClick={() => router.push('/produccion')}>
                                     Produccion
-                                </Nav.Link>
-
-                                <Nav.Link
-                                    onClick={() => router.push('/ocultos')}>
-                                    Ocultos
                                 </Nav.Link>
                             </>
                         )}

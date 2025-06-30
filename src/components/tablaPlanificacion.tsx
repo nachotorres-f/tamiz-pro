@@ -6,7 +6,7 @@ import { Button, Table } from 'react-bootstrap';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { PlatoDetalle } from './platoDetalle';
-import { EyeFill, EyeSlashFill, Plus, Dash } from 'react-bootstrap-icons';
+import { /* EyeFill, EyeSlashFill, */ Plus, Dash } from 'react-bootstrap-icons';
 
 export function TablaPlanificacion({
     pageOcultos,
@@ -35,23 +35,23 @@ export function TablaPlanificacion({
             .then((ocultosDB) => setOcultos(new Set(ocultosDB)));
     }, []);
 
-    const ocultarPlato = async (plato: string) => {
-        await fetch('/api/ocultos', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ plato }),
-        });
-        setOcultos(new Set([...ocultos, plato]));
-    };
+    // const ocultarPlato = async (plato: string) => {
+    //     await fetch('/api/ocultos', {
+    //         method: 'POST',
+    //         headers: { 'Content-Type': 'application/json' },
+    //         body: JSON.stringify({ plato }),
+    //     });
+    //     setOcultos(new Set([...ocultos, plato]));
+    // };
 
-    const mostrarPlato = async (plato: string) => {
-        await fetch(`/api/ocultos?plato=${encodeURIComponent(plato)}`, {
-            method: 'DELETE',
-        });
-        const nuevos = new Set(ocultos);
-        nuevos.delete(plato);
-        setOcultos(nuevos);
-    };
+    // const mostrarPlato = async (plato: string) => {
+    //     await fetch(`/api/ocultos?plato=${encodeURIComponent(plato)}`, {
+    //         method: 'DELETE',
+    //     });
+    //     const nuevos = new Set(ocultos);
+    //     nuevos.delete(plato);
+    //     setOcultos(nuevos);
+    // };
 
     const filterPlatos = (plato: string) => {
         if (pageOcultos) {
@@ -79,12 +79,12 @@ export function TablaPlanificacion({
     return (
         <Table
             bordered
-            responsive
             striped>
-            <thead className="table-dark">
+            <thead className="table-dark sticky-top">
                 <tr>
                     <th></th>
                     <th>Plato</th>
+                    <th>Total</th>
                     {diasSemana.filter(filterDias).map((dia, idx) => (
                         <th key={idx}>
                             {format(dia, 'EEEE d MMMM', { locale: es })}
@@ -124,38 +124,13 @@ export function TablaPlanificacion({
                                         <Plus />
                                     )}
                                 </Button>
-
-                                {pageOcultos ? (
-                                    <Button
-                                        size="sm"
-                                        variant="outline-secondary"
-                                        style={{
-                                            width: '2rem',
-                                            height: '2rem',
-                                            display: 'flex',
-                                            justifyContent: 'center',
-                                            alignItems: 'center',
-                                        }}
-                                        onClick={() => mostrarPlato(plato)}>
-                                        <EyeFill />
-                                    </Button>
-                                ) : (
-                                    <Button
-                                        size="sm"
-                                        variant="outline-secondary"
-                                        style={{
-                                            width: '2rem',
-                                            height: '2rem',
-                                            display: 'flex',
-                                            justifyContent: 'center',
-                                            alignItems: 'center',
-                                        }}
-                                        onClick={() => ocultarPlato(plato)}>
-                                        <EyeSlashFill />
-                                    </Button>
-                                )}
                             </td>
                             <td>{plato}</td>
+                            <td>
+                                {datos
+                                    .filter((dato) => dato.plato === plato)
+                                    .reduce((sum, d) => sum + d.cantidad, 0)}
+                            </td>
                             {diasSemana.filter(filterDias).map((dia, i) => {
                                 dia.setHours(0, 0, 0, 0);
                                 const total = datos

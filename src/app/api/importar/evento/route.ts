@@ -75,17 +75,15 @@ export async function POST(req: NextRequest) {
                 ];
 
             const tiposOmitir = [
+                'Vajilla',
+                'Manteleria',
                 'Barra',
-                'Barra Adulto',
-                'Barra de Tragos Mayores',
-                'Barra de Tragos Menores',
-                'Bebida del cliente',
-                'Bebidas sin alcohol',
-                'Cafe',
+                'Bebida',
                 'Cervezas',
-                'Vajilla y Manteleria',
-                'Vino y Champagne',
-                'Vinos',
+                'Fernet',
+                'Champagne',
+                'Vino',
+                'Cafe',
             ];
 
             if (
@@ -93,7 +91,9 @@ export async function POST(req: NextRequest) {
                 typeof plato === 'string' &&
                 typeof cantidad === 'number' &&
                 typeof tipo === 'string' &&
-                !tiposOmitir.some((tipoOmitir) => tipo === tipoOmitir)
+                !tiposOmitir.some((tipoOmitir) =>
+                    tipo.toLowerCase().includes(tipoOmitir.toLowerCase())
+                )
             ) {
                 menu.push({
                     nombre: plato,

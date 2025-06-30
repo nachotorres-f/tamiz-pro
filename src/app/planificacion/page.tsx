@@ -23,6 +23,10 @@ export default function PlanificacionPage() {
     useEffect(() => {
         fetch('/api/planificacion')
             .then((res) => res.json())
+            .then((data) => {
+                console.log('Datos de planificación:', data);
+                return data;
+            })
             .then(setDatos);
     }, []);
 
@@ -63,16 +67,18 @@ export default function PlanificacionPage() {
                 setSemanaBase={setSemanaBase}
             />
 
-            <TablaPlanificacion
-                platosUnicos={platosUnicos}
-                diasSemana={diasSemana}
-                datos={datos}
-                filtro={filtro}
-                diaActivo={diaActivo}
-                platoExpandido={platoExpandido}
-                setPlatoExpandido={setPlatoExpandido}
-                pageOcultos={false}
-            />
+            <div style={{ overflowX: 'auto', height: 'calc(100vh - 300px)' }}>
+                <TablaPlanificacion
+                    platosUnicos={platosUnicos}
+                    diasSemana={diasSemana}
+                    datos={datos}
+                    filtro={filtro}
+                    diaActivo={diaActivo}
+                    platoExpandido={platoExpandido}
+                    setPlatoExpandido={setPlatoExpandido}
+                    pageOcultos={false}
+                />
+            </div>
         </Container>
     );
 }

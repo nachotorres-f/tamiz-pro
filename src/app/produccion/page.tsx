@@ -298,85 +298,96 @@ export default function ProduccionPage() {
                 setSemanaBase={setSemanaBase}
             />
 
-            <Table
-                bordered
-                responsive
-                striped
-                id="tabla-produccion">
-                <thead className="table-dark">
-                    <tr>
-                        <th></th>
-                        <th>Plato</th>
-                        {diasSemana.filter(filterDias).map((dia, idx) => (
-                            <th key={idx}>
-                                {format(dia, 'EEEE d MMMM', { locale: es })}
-                            </th>
-                        ))}
-                    </tr>
-                </thead>
-                <tbody>
-                    {datos &&
-                        datos.filter(filterPlatos).map((dato) => (
-                            <tr key={dato.plato}>
-                                <td>
-                                    <Button
-                                        className="btn-danger"
-                                        size="sm"
-                                        style={{
-                                            width: '2rem',
-                                            height: '2rem',
-                                            display: 'flex',
-                                            justifyContent: 'center',
-                                            alignItems: 'center',
-                                        }}
-                                        onClick={() => {
-                                            generarPDF(dato.plato);
-                                        }}>
-                                        <FiletypePdf />
-                                    </Button>
-                                </td>
-                                <td
-                                    className={
-                                        dato.principal
-                                            ? ''
-                                            : 'bg-primary-subtle'
-                                    }>
-                                    {dato.plato}
-                                </td>
+            <div style={{ overflowY: 'auto', height: 'calc(100vh - 300px)' }}>
+                <Table
+                    bordered
+                    striped
+                    id="tabla-produccion">
+                    <thead className="table-dark sticky-top">
+                        <tr>
+                            <th></th>
+                            <th>Plato</th>
+                            {diasSemana.filter(filterDias).map((dia, idx) => (
+                                <th key={idx}>
+                                    {format(dia, 'EEEE d MMMM', { locale: es })}
+                                </th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {datos &&
+                            datos.filter(filterPlatos).map((dato) => (
+                                <tr key={dato.plato}>
+                                    <td>
+                                        <Button
+                                            className="btn-danger"
+                                            size="sm"
+                                            style={{
+                                                width: '2rem',
+                                                height: '2rem',
+                                                display: 'flex',
+                                                justifyContent: 'center',
+                                                alignItems: 'center',
+                                            }}
+                                            onClick={() => {
+                                                generarPDF(dato.plato);
+                                            }}>
+                                            <FiletypePdf />
+                                        </Button>
+                                    </td>
+                                    <td
+                                        className={
+                                            dato.principal
+                                                ? ''
+                                                : 'bg-primary-subtle'
+                                        }>
+                                        {dato.plato}
+                                    </td>
 
-                                {diasSemana.filter(filterDias).map((dia, i) => {
-                                    dia.setHours(0, 0, 0, 0);
+                                    {diasSemana
+                                        .filter(filterDias)
+                                        .map((dia, i) => {
+                                            dia.setHours(0, 0, 0, 0);
 
-                                    const produccion = dato.produccion.find(
-                                        (prod: any) => {
-                                            const fecha = new Date(prod.fecha);
-                                            fecha.setHours(0, 0, 0, 0);
+                                            const produccion =
+                                                dato.produccion.find(
+                                                    (prod: any) => {
+                                                        const fecha = new Date(
+                                                            prod.fecha
+                                                        );
+                                                        fecha.setHours(
+                                                            0,
+                                                            0,
+                                                            0,
+                                                            0
+                                                        );
 
+                                                        return (
+                                                            fecha.getTime() ===
+                                                            dia.getTime()
+                                                        );
+                                                    }
+                                                );
+                                            const cantidad = produccion
+                                                ? produccion.cantidad
+                                                : 0;
                                             return (
-                                                fecha.getTime() ===
-                                                dia.getTime()
+                                                <td
+                                                    key={i}
+                                                    className={
+                                                        cantidad > 0
+                                                            ? 'bg-danger-subtle'
+                                                            : ''
+                                                    }>
+                                                    {cantidad || ''}
+                                                </td>
                                             );
-                                        }
-                                    );
-                                    const cantidad = produccion
-                                        ? produccion.cantidad
-                                        : 0;
-                                    return (
-                                        <td
-                                            key={i}
-                                            className={
-                                                cantidad > 0
-                                                    ? 'bg-danger-subtle'
-                                                    : ''
-                                            }>
-                                            {cantidad || ''}
-                                        </td>
-                                    );
-                                })}
-                            </tr>
-                        ))}
-                </tbody>
-            </Table>
+                                        })}
+                                </tr>
+                            ))}
+                    </tbody>
+                </Table>
+            </div>
         </Container>
     );
 }

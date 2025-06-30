@@ -30,7 +30,7 @@ export const TableProduccion: React.FC<TableProduccionProps> = ({
             <Table
                 bordered
                 className="mb-3">
-                <thead className="table-dark">
+                <thead className="table-dark sticky-top">
                     <tr>
                         {diasSemana.map((dia, i) => (
                             <th key={i}>
