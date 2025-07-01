@@ -8,9 +8,13 @@ export async function POST(req: NextRequest) {
     if (!apiKey || apiKey !== API_KEY) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const body = await req.json();
 
-    console.log(req);
-    console.log(req.body);
+    console.log('REQUEST', req);
+
+    console.log('BODY', req.body);
+
+    console.log('JSON', body);
 
     // Aquí podés usar Prisma para guardar la info en tu base de datos
     // await prisma.order.create({ data: { ... } })
