@@ -10,6 +10,7 @@ export async function POST(req: NextRequest) {
     }
 
     console.log(req);
+    console.log(req.body);
 
     // Aquí podés usar Prisma para guardar la info en tu base de datos
     // await prisma.order.create({ data: { ... } })
