@@ -34,7 +34,8 @@ model Receta {
 }
 
 model Comanda {
-  id                  Int                     @id @default(autoincrement())
+  id                  Int                     @id
+  lugar               String
   salon               String
   tipo                String
   fecha               DateTime
