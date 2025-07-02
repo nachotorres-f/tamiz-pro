@@ -16,7 +16,7 @@ export default function AppNavbar() {
             .then((data) => {
                 setLoggedIn(data.loggedIn);
                 if (data.loggedIn) {
-                    router.push('/planificacion');
+                    router.push('/calendario');
                 } else {
                     router.push('/acceso');
                 }

@@ -1,0 +1,98 @@
+'use client';
+
+import { useParams } from 'next/navigation';
+import React, { useEffect } from 'react';
+import { Card, Col, Container, ListGroup, Row, Table } from 'react-bootstrap';
+
+type Evento = {
+    nombre: string;
+    lugar: string;
+    salon: string;
+    tipo: string;
+    fecha: string;
+    observaciones: string;
+    Plato: { id: number; nombre: string; cantidad: number }[];
+};
+
+export default function EventoPage() {
+    const params = useParams();
+    const { slug } = params;
+    const [evento, setData] = React.useState<Evento | null>(null);
+
+    useEffect(() => {
+        fetch('/api/evento?id=' + slug)
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error('Evento no encontrado');
+                }
+                return response.json();
+            })
+            .then((data) => {
+                // Aquí puedes manejar los datos del evento, por ejemplo, guardarlos en el estado
+                setData(data);
+                console.log('Detalles del evento:', data);
+            })
+            .catch((error) => {
+                console.error('Error fetching event details:', error);
+                // Aquí puedes redirigir o mostrar un mensaje de error
+            });
+    }, []);
+
+    return (
+        <Container className="my-4">
+            <Row className="justify-content-center">
+                <Col md={8}>
+                    {evento ? (
+                        <>
+                            <Card>
+                                <Card.Header as="h4">
+                                    {evento.nombre}
+                                </Card.Header>
+                                <ListGroup variant="flush">
+                                    <ListGroup.Item>
+                                        <strong>Lugar:</strong> {evento.lugar}
+                                    </ListGroup.Item>
+                                    <ListGroup.Item>
+                                        <strong>Salón:</strong> {evento.salon}
+                                    </ListGroup.Item>
+                                    <ListGroup.Item>
+                                        <strong>Tipo:</strong> {evento.tipo}
+                                    </ListGroup.Item>
+                                    <ListGroup.Item>
+                                        <strong>Fecha:</strong> {evento.fecha}
+                                    </ListGroup.Item>
+                                    <ListGroup.Item>
+                                        <strong>Observaciones:</strong>{' '}
+                                        {evento.observaciones}
+                                    </ListGroup.Item>
+                                </ListGroup>
+                            </Card>
+
+                            <Table
+                                bordered
+                                striped
+                                size="sm">
+                                <thead className="table-dark">
+                                    <tr>
+                                        <th>Plato</th>
+                                        <th>Cantidad</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {evento.Plato.map((plato) => (
+                                        <tr key={plato.nombre}>
+                                            <td>{plato.nombre}</td>
+                                            <td>{plato.cantidad}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </Table>
+                        </>
+                    ) : (
+                        <div>Cargando evento...</div>
+                    )}
+                </Col>
+            </Row>
+        </Container>
+    );
+}

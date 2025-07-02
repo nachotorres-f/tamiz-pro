@@ -62,7 +62,7 @@ export default function ImportarPage() {
                 </Card.Body>
             </Card>
 
-            <Card className="mb-4 shadow-sm">
+            {/* <Card className="mb-4 shadow-sm">
                 <Card.Body>
                     <Card.Title className="mb-3">Evento</Card.Title>
                     <Form.Group controlId="formEvento">
@@ -84,7 +84,7 @@ export default function ImportarPage() {
                         Subir Evento
                     </Button>
                 </Card.Body>
-            </Card>
+            </Card> */}
         </Container>
     );
 }

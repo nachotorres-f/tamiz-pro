@@ -1,6 +1,6 @@
 'use client';
-import PlanificacionPage from './planificacion/page';
+import CalendarioPage from './calendario/page';
 
 export default function Home() {
-    return <PlanificacionPage />;
+    return <CalendarioPage />;
 }

@@ -5,7 +5,7 @@ export async function GET() {
     const comandas = await prisma.comanda.findMany();
 
     const eventos = comandas.map((comanda) => ({
-        title: comanda.nombre,
+        title: comanda.nombre + ' - ' + comanda.salon,
         date: comanda.fecha.toISOString().split('T')[0], // Convert to YYYY-MM-DD format
         id: comanda.id,
     }));
