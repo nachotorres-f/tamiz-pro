@@ -5,11 +5,11 @@ import { Container, Form, Button, Alert, Card } from 'react-bootstrap';
 
 export default function ImportarPage() {
     const [recetaFile, setRecetaFile] = useState<File | null>(null);
-    const [eventoFile, setEventoFile] = useState<File | null>(null);
+    //const [eventoFile, setEventoFile] = useState<File | null>(null);
     const [msg, setMsg] = useState<string>('');
 
     const handleUpload = async (type: 'recetas' | 'evento') => {
-        const file = type === 'recetas' ? recetaFile : eventoFile;
+        const file = type === 'recetas' ? recetaFile : null;
         if (!file) {
             setMsg('Por favor seleccioná un archivo para importar');
             return;

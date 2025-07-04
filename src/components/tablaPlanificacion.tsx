@@ -78,6 +78,7 @@ export function TablaPlanificacion({
 
     return (
         <Table
+            size="sm"
             bordered
             striped>
             <thead className="table-dark sticky-top">

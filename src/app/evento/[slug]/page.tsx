@@ -36,7 +36,7 @@ export default function EventoPage() {
                 console.error('Error fetching event details:', error);
                 // Aquí puedes redirigir o mostrar un mensaje de error
             });
-    }, []);
+    }, [slug]);
 
     return (
         <Container className="my-4">
@@ -71,7 +71,8 @@ export default function EventoPage() {
                             <Table
                                 bordered
                                 striped
-                                size="sm">
+                                size="sm"
+                                className="mt-5">
                                 <thead className="table-dark">
                                     <tr>
                                         <th>Plato</th>

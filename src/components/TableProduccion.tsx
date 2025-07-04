@@ -28,6 +28,7 @@ export const TableProduccion: React.FC<TableProduccionProps> = ({
     return (
         <>
             <Table
+                size="sm"
                 bordered
                 className="mb-3">
                 <thead className="table-dark sticky-top">
