@@ -117,7 +117,7 @@ export default function ProduccionPage() {
                                         doc.internal.pageSize.getWidth();
                                     const pageHeight =
                                         doc.internal.pageSize.getHeight();
-                                    let yPosition = 20;
+                                    let yPosition = 40;
 
                                     doc.setFontSize(20);
                                     doc.setTextColor(0, 0, 0);
@@ -130,8 +130,8 @@ export default function ProduccionPage() {
                                     doc.text(title, titleX, titleY);
 
                                     // Agregar una imagen en la esquina superior izquierda
-                                    const imgWidth = 20; // Ancho de la imagen
-                                    const imgHeight = 20; // Alto de la imagen
+                                    const imgWidth = 40; // Ancho de la imagen
+                                    const imgHeight = 40; // Alto de la imagen
 
                                     const imgUrl = '/logo_black.png'; // Ruta de la imagen
                                     const img = new Image();
