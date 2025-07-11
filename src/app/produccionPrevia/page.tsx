@@ -334,7 +334,7 @@ export default function ProduccionPreviaPage() {
                     id="tabla-produccion"
                     size="sm">
                     <thead className="table-dark sticky-top">
-                        <tr>
+                        <tr style={{ textAlign: 'center' }}>
                             <th></th>
                             {[0, 1, 2, 3, 4, 5, 6].map((i) => {
                                 return (
@@ -358,7 +358,7 @@ export default function ProduccionPreviaPage() {
                                 );
                             })}
                         </tr>
-                        <tr>
+                        <tr style={{ textAlign: 'center' }}>
                             <th>Plato</th>
                             {diasSemana.filter(filterDias).map((dia, idx) => (
                                 <th key={idx}>

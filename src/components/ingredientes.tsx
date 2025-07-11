@@ -188,7 +188,11 @@ export const Ingredientes = ({
                                             ) : (
                                                 <Table striped>
                                                     <thead>
-                                                        <tr>
+                                                        <tr
+                                                            style={{
+                                                                textAlign:
+                                                                    'text-center',
+                                                            }}>
                                                             <th></th>
                                                             <th>Ingrediente</th>
                                                             <th>
@@ -230,7 +234,11 @@ export const Ingredientes = ({
                                                                             key={
                                                                                 i
                                                                             }>
-                                                                            <tr>
+                                                                            <tr
+                                                                                style={{
+                                                                                    textAlign:
+                                                                                        'text-center',
+                                                                                }}>
                                                                                 <td>
                                                                                     {platoExpandido ===
                                                                                         nombre &&

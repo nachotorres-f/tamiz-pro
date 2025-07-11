@@ -360,7 +360,7 @@ export default function ProduccionPage() {
                                 );
                             })}
                         </tr>
-                        <tr>
+                        <tr style={{ textAlign: 'center' }}>
                             <th>Plato</th>
                             {diasSemana.filter(filterDias).map((dia, idx) => (
                                 <th key={idx}>

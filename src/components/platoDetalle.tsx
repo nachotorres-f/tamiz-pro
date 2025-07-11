@@ -87,7 +87,7 @@ export function PlatoDetalle({ plato }: { plato: string }) {
     };
 
     return (
-        <tr>
+        <tr style={{ textAlign: 'center' }}>
             <td colSpan={diasSemana.length + 3}>
                 <div className="bg-success-subtle px-3 py-2 rounded mb-2 fw-semibold text-uppercase">
                     Comanda
@@ -97,7 +97,7 @@ export function PlatoDetalle({ plato }: { plato: string }) {
                     responsive
                     className="mb-5">
                     <thead className="table-dark">
-                        <tr>
+                        <tr style={{ textAlign: 'center' }}>
                             <th>Eventos</th>
                             <th>Fecha</th>
                             <th>Cantidad</th>
@@ -122,7 +122,7 @@ export function PlatoDetalle({ plato }: { plato: string }) {
                             })}
                     </tbody>
                     <tfoot className="table-dark">
-                        <tr>
+                        <tr style={{ textAlign: 'center' }}>
                             <td
                                 colSpan={2}
                                 className="text-center">

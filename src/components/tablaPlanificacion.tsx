@@ -90,7 +90,7 @@ export function TablaPlanificacion({
             bordered
             striped>
             <thead className="table-dark sticky-top">
-                <tr>
+                <tr style={{ textAlign: 'center' }}>
                     {/* <th ref={anchoButton}></th>
                     <th ref={anchoPlato}>Plato</th>
                     <th ref={anchoTotal}>Total</th> */}
@@ -108,7 +108,7 @@ export function TablaPlanificacion({
             <tbody>
                 {platosUnicos.filter(filterPlatos).map((plato) => (
                     <React.Fragment key={plato}>
-                        <tr>
+                        <tr style={{ textAlign: 'center' }}>
                             <td className="d-flex gap-2 align-items-center">
                                 <Button
                                     size="sm"

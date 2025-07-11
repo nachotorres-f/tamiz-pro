@@ -74,7 +74,7 @@ export default function EventoPage() {
                                 size="sm"
                                 className="mt-5">
                                 <thead className="table-dark">
-                                    <tr>
+                                    <tr style={{ textAlign: 'center' }}>
                                         <th>Plato</th>
                                         <th>Cantidad</th>
                                     </tr>

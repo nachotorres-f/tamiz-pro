@@ -99,7 +99,7 @@ export default function ModalEntregaMP({
                     bordered
                     className="text-center">
                     <thead className="table-light">
-                        <tr>
+                        <tr style={{ textAlign: 'center' }}>
                             <th>Total necesario</th>
                             {diasSemana.map((d, i) => (
                                 <th key={i}>
@@ -109,7 +109,7 @@ export default function ModalEntregaMP({
                         </tr>
                     </thead>
                     <tbody>
-                        <tr>
+                        <tr style={{ textAlign: 'center' }}>
                             <td>
                                 <strong>{totalNecesario}</strong>
                             </td>
@@ -117,7 +117,7 @@ export default function ModalEntregaMP({
                                 <td key={i}>{cant.toFixed(2)}</td>
                             ))}
                         </tr>
-                        <tr>
+                        <tr style={{ textAlign: 'center' }}>
                             <td>
                                 <strong>Total</strong>:{' '}
                                 {totalProduccion.toFixed(2)}

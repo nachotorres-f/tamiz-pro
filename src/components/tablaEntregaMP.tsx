@@ -96,7 +96,7 @@ export function TablaEntregaMP({
                 className="mx-auto"
                 style={{ tableLayout: 'auto', width: 'auto' }}>
                 <thead className="table-dark sticky-top">
-                    <tr>
+                    <tr style={{ textAlign: 'center' }}>
                         {/* <th ref={anchoButton}></th>
                     <th ref={anchoPlato}>Plato</th>
                     <th ref={anchoTotal}>Total</th> */}
@@ -113,7 +113,7 @@ export function TablaEntregaMP({
                 <tbody>
                     {platosUnicos.filter(filterPlatos).map((plato) => (
                         <React.Fragment key={plato}>
-                            <tr>
+                            <tr style={{ textAlign: 'center' }}>
                                 <td>{plato}</td>
                                 <td className="d-flex gap-2 align-items-center">
                                     <Button
