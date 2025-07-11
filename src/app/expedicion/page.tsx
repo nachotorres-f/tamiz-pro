@@ -96,6 +96,7 @@ export default function PlanificacionPage() {
             <TablaEventosPlanificacion
                 diasSemana={diasSemana}
                 diaActivo={diaActivo}
+                filtroSalon={''}
                 // anchoColumna={anchoButton + anchoPlato + anchoTotal}
             />
 
