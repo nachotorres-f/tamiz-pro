@@ -6,7 +6,7 @@ import { Table, Form, Button } from 'react-bootstrap';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
-interface TableProduccionProps {
+interface TableProduccionPreviaProps {
     diasSemana: Date[];
     obtenerCantidadProduccion: (dia: Date) => number;
     guardarProduccion: (() => void) | ((arg0: string) => void);
@@ -15,7 +15,7 @@ interface TableProduccionProps {
     plato?: string;
 }
 
-export const TableProduccion: React.FC<TableProduccionProps> = ({
+export const TableProduccionPrevia: React.FC<TableProduccionPreviaProps> = ({
     diasSemana,
     obtenerCantidadProduccion,
     guardarProduccion,
@@ -53,29 +53,15 @@ export const TableProduccion: React.FC<TableProduccionProps> = ({
                                         <Form.Control
                                             size="sm"
                                             type="number"
-                                            step={0.1}
-                                            min={0}
                                             value={
                                                 produccionLocal[key] ||
-                                                obtenerCantidadProduccion(
-                                                    dia
-                                                ) ||
-                                                0
+                                                obtenerCantidadProduccion(dia)
                                             }
                                             onChange={(e) => {
-                                                e.preventDefault();
-                                                console.log(
-                                                    'Produccion Local',
-                                                    e.target.value
+                                                const val = parseInt(
+                                                    e.target.value,
+                                                    10
                                                 );
-                                                let val = parseFloat(
-                                                    e.target.value
-                                                );
-
-                                                if (e.target.value === '') {
-                                                    val = 0;
-                                                }
-
                                                 setProduccionLocal(
                                                     (prev: any) => ({
                                                         ...prev,

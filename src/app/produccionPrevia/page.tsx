@@ -19,7 +19,7 @@ import { FiletypePdf } from 'react-bootstrap-icons';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-export default function ProduccionPage() {
+export default function ProduccionPreviaPage() {
     //const [filtro, setFiltro] = useState('');
     const [filtro] = useState('');
     const [diasSemana, setDiasSemana] = useState<Date[]>([]);
@@ -27,10 +27,8 @@ export default function ProduccionPage() {
     const [semanaBase, setSemanaBase] = useState(new Date());
     const [datos, setDatos] = useState<any[]>([]);
 
-    console.log('datos', datos);
-
     useEffect(() => {
-        fetch('/api/produccion')
+        fetch('/api/produccionPrevia')
             .then((res) => res.json())
             .then((res) => res.data)
             .then(setDatos);
@@ -305,7 +303,7 @@ export default function ProduccionPage() {
 
     return (
         <Container className="mt-5">
-            <h2 className="text-center mb-4">Produccion</h2>
+            <h2 className="text-center mb-4">Produccion Previa</h2>
 
             {/* <Form.Group>
                 <Row>
@@ -333,9 +331,10 @@ export default function ProduccionPage() {
                 <Table
                     bordered
                     striped
-                    id="tabla-produccion">
+                    id="tabla-produccion"
+                    size="sm">
                     <thead className="table-dark sticky-top">
-                        <tr style={{ textAlign: 'center' }}>
+                        <tr>
                             <th></th>
                             {[0, 1, 2, 3, 4, 5, 6].map((i) => {
                                 return (
@@ -349,7 +348,6 @@ export default function ProduccionPage() {
                                                 display: 'flex',
                                                 justifyContent: 'center',
                                                 alignItems: 'center',
-                                                margin: '0 auto',
                                             }}
                                             onClick={() => {
                                                 generarPDFFecha(i);

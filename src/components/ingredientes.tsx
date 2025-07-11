@@ -182,197 +182,195 @@ export const Ingredientes = ({
                                                 </div>
                                             )}
 
-                                            <Table striped>
-                                                <thead>
-                                                    <tr>
-                                                        <th></th>
-                                                        <th>Ingrediente</th>
-                                                        <th>Porcion Bruta</th>
-                                                        <th>Unidad</th>
-                                                        <th>Tipo</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="table-group-divider">
-                                                    {group
-                                                        .filter(
-                                                            (
-                                                                _: any,
-                                                                i: number
-                                                            ) =>
-                                                                (index > 0 &&
-                                                                    i !== 0) ||
-                                                                index === 0
-                                                        )
-                                                        .map(
-                                                            (
-                                                                {
-                                                                    porcionBruta,
-                                                                    nombre,
-                                                                    unidadMedida,
-                                                                    tipo,
-                                                                }: any,
-                                                                i: number
-                                                            ) => {
-                                                                const cantidad =
-                                                                    calcularPorcionBruta(
-                                                                        porcionBruta
-                                                                    );
-                                                                return (
-                                                                    <React.Fragment
-                                                                        key={i}>
-                                                                        <tr>
-                                                                            <td>
-                                                                                {platoExpandido ===
-                                                                                    nombre &&
-                                                                                i ===
-                                                                                    indexExpandido ? (
-                                                                                    <Button
-                                                                                        size="sm"
-                                                                                        variant="outline-secondary"
-                                                                                        style={{
-                                                                                            width: '2rem',
-                                                                                            height: '2rem',
-                                                                                            display:
-                                                                                                'flex',
-                                                                                            justifyContent:
-                                                                                                'center',
-                                                                                            alignItems:
-                                                                                                'center',
-                                                                                        }}
-                                                                                        onClick={() => {
-                                                                                            handleExpandir(
-                                                                                                nombre,
-                                                                                                i
-                                                                                            );
-                                                                                            consultarProduccionesIngrediente(
-                                                                                                nombre
-                                                                                            );
-                                                                                        }}>
-                                                                                        <EyeSlashFill />
-                                                                                    </Button>
-                                                                                ) : (
-                                                                                    <Button
-                                                                                        size="sm"
-                                                                                        variant="outline-secondary"
-                                                                                        style={{
-                                                                                            width: '2rem',
-                                                                                            height: '2rem',
-                                                                                            display:
-                                                                                                'flex',
-                                                                                            justifyContent:
-                                                                                                'center',
-                                                                                            alignItems:
-                                                                                                'center',
-                                                                                        }}
-                                                                                        onClick={() => {
-                                                                                            handleExpandir(
-                                                                                                nombre,
-                                                                                                i
-                                                                                            );
-                                                                                            consultarProduccionesIngrediente(
-                                                                                                nombre
-                                                                                            );
-                                                                                        }}>
-                                                                                        <EyeFill />
-                                                                                    </Button>
-                                                                                )}
-                                                                            </td>
-                                                                            <td>
-                                                                                {
-                                                                                    nombre
-                                                                                }
-                                                                            </td>
-                                                                            <td>
-                                                                                {cantidad <
-                                                                                    1 &&
-                                                                                (unidadMedida ===
-                                                                                    'KG' ||
-                                                                                    unidadMedida ===
-                                                                                        'LT')
-                                                                                    ? cantidad *
-                                                                                      1000
-                                                                                    : cantidad}
-                                                                            </td>
-                                                                            <td>
-                                                                                {cantidad <
-                                                                                1
-                                                                                    ? unidadMedida ===
-                                                                                      'KG'
-                                                                                        ? 'GR'
-                                                                                        : unidadMedida ===
-                                                                                          'LT'
-                                                                                        ? 'ML'
-                                                                                        : unidadMedida
-                                                                                    : unidadMedida}
-                                                                            </td>
-                                                                            <td>
-                                                                                <span
-                                                                                    className={`badge bg-${
-                                                                                        tipo ===
-                                                                                        'MP'
-                                                                                            ? 'info'
-                                                                                            : 'warning'
-                                                                                    }`}>
+                                            {group.length === 1 &&
+                                            index !== 0 ? (
+                                                <></>
+                                            ) : (
+                                                <Table striped>
+                                                    <thead>
+                                                        <tr>
+                                                            <th></th>
+                                                            <th>Ingrediente</th>
+                                                            <th>
+                                                                Porcion Bruta
+                                                            </th>
+                                                            <th>Unidad</th>
+                                                            <th>Tipo</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="table-group-divider">
+                                                        {group
+                                                            .filter(
+                                                                (
+                                                                    _: any,
+                                                                    i: number
+                                                                ) =>
+                                                                    (index >
+                                                                        0 &&
+                                                                        i !==
+                                                                            0) ||
+                                                                    index === 0
+                                                            )
+                                                            .map(
+                                                                (
+                                                                    {
+                                                                        porcionBruta,
+                                                                        nombre,
+                                                                        unidadMedida,
+                                                                        tipo,
+                                                                    }: any,
+                                                                    i: number
+                                                                ) => {
+                                                                    const cantidad =
+                                                                        calcularPorcionBruta(
+                                                                            porcionBruta
+                                                                        );
+                                                                    return (
+                                                                        <React.Fragment
+                                                                            key={
+                                                                                i
+                                                                            }>
+                                                                            <tr>
+                                                                                <td>
+                                                                                    {platoExpandido ===
+                                                                                        nombre &&
+                                                                                    i ===
+                                                                                        indexExpandido ? (
+                                                                                        <Button
+                                                                                            size="sm"
+                                                                                            variant="outline-secondary"
+                                                                                            style={{
+                                                                                                width: '2rem',
+                                                                                                height: '2rem',
+                                                                                                display:
+                                                                                                    'flex',
+                                                                                                justifyContent:
+                                                                                                    'center',
+                                                                                                alignItems:
+                                                                                                    'center',
+                                                                                            }}
+                                                                                            onClick={() => {
+                                                                                                handleExpandir(
+                                                                                                    nombre,
+                                                                                                    i
+                                                                                                );
+                                                                                                consultarProduccionesIngrediente(
+                                                                                                    nombre
+                                                                                                );
+                                                                                            }}>
+                                                                                            <EyeSlashFill />
+                                                                                        </Button>
+                                                                                    ) : (
+                                                                                        <Button
+                                                                                            size="sm"
+                                                                                            variant="outline-secondary"
+                                                                                            style={{
+                                                                                                width: '2rem',
+                                                                                                height: '2rem',
+                                                                                                display:
+                                                                                                    'flex',
+                                                                                                justifyContent:
+                                                                                                    'center',
+                                                                                                alignItems:
+                                                                                                    'center',
+                                                                                            }}
+                                                                                            onClick={() => {
+                                                                                                handleExpandir(
+                                                                                                    nombre,
+                                                                                                    i
+                                                                                                );
+                                                                                                consultarProduccionesIngrediente(
+                                                                                                    nombre
+                                                                                                );
+                                                                                            }}>
+                                                                                            <EyeFill />
+                                                                                        </Button>
+                                                                                    )}
+                                                                                </td>
+                                                                                <td>
                                                                                     {
-                                                                                        tipo
+                                                                                        nombre
                                                                                     }
-                                                                                </span>
-                                                                            </td>
-                                                                        </tr>
-                                                                        {platoExpandido ===
-                                                                            nombre &&
-                                                                            indexExpandido ===
-                                                                                i && (
-                                                                                <tr
-                                                                                    key={
-                                                                                        i
-                                                                                    }>
-                                                                                    <td
-                                                                                        colSpan={
-                                                                                            5
+                                                                                </td>
+                                                                                <td>
+                                                                                    {
+                                                                                        cantidad
+                                                                                    }
+                                                                                </td>
+                                                                                <td>
+                                                                                    {
+                                                                                        unidadMedida
+                                                                                    }
+                                                                                </td>
+                                                                                <td>
+                                                                                    <span
+                                                                                        className={`badge bg-${
+                                                                                            tipo ===
+                                                                                            'MP'
+                                                                                                ? 'info'
+                                                                                                : 'warning'
+                                                                                        }`}>
+                                                                                        {
+                                                                                            tipo
+                                                                                        }
+                                                                                    </span>
+                                                                                </td>
+                                                                            </tr>
+                                                                            {platoExpandido ===
+                                                                                nombre &&
+                                                                                indexExpandido ===
+                                                                                    i && (
+                                                                                    <tr
+                                                                                        key={
+                                                                                            i
                                                                                         }>
-                                                                                        <NavegacionSemanal
-                                                                                            semanaBase={
-                                                                                                semanaBase
-                                                                                            }
-                                                                                            setSemanaBase={
-                                                                                                setSemanaBase
-                                                                                            }
-                                                                                        />
+                                                                                        <td
+                                                                                            colSpan={
+                                                                                                5
+                                                                                            }>
+                                                                                            <NavegacionSemanal
+                                                                                                semanaBase={
+                                                                                                    semanaBase
+                                                                                                }
+                                                                                                setSemanaBase={
+                                                                                                    setSemanaBase
+                                                                                                }
+                                                                                            />
 
-                                                                                        <div className="bg-danger-subtle px-3 py-2 rounded mb-2 fw-semibold text-uppercase">
-                                                                                            Produccion
-                                                                                        </div>
+                                                                                            <div className="bg-danger-subtle px-3 py-2 rounded mb-2 fw-semibold text-uppercase">
+                                                                                                Produccion
+                                                                                            </div>
 
-                                                                                        <TableProduccion
-                                                                                            diasSemana={
-                                                                                                diasSemana
-                                                                                            }
-                                                                                            obtenerCantidadProduccion={
-                                                                                                obtenerCantidadProduccion
-                                                                                            }
-                                                                                            guardarProduccion={
-                                                                                                guardarProduccion
-                                                                                            }
-                                                                                            produccionLocal={
-                                                                                                produccionLocal
-                                                                                            }
-                                                                                            setProduccionLocal={
-                                                                                                setProduccionLocal
-                                                                                            }
-                                                                                            plato={
-                                                                                                nombre
-                                                                                            }
-                                                                                        />
-                                                                                    </td>
-                                                                                </tr>
-                                                                            )}
-                                                                    </React.Fragment>
-                                                                );
-                                                            }
-                                                        )}
-                                                </tbody>
-                                            </Table>
+                                                                                            <TableProduccion
+                                                                                                diasSemana={
+                                                                                                    diasSemana
+                                                                                                }
+                                                                                                obtenerCantidadProduccion={
+                                                                                                    obtenerCantidadProduccion
+                                                                                                }
+                                                                                                guardarProduccion={
+                                                                                                    guardarProduccion
+                                                                                                }
+                                                                                                produccionLocal={
+                                                                                                    produccionLocal
+                                                                                                }
+                                                                                                setProduccionLocal={
+                                                                                                    setProduccionLocal
+                                                                                                }
+                                                                                                plato={
+                                                                                                    nombre
+                                                                                                }
+                                                                                            />
+                                                                                        </td>
+                                                                                    </tr>
+                                                                                )}
+                                                                        </React.Fragment>
+                                                                    );
+                                                                }
+                                                            )}
+                                                    </tbody>
+                                                </Table>
+                                            )}
                                         </Accordion.Body>
                                     </Accordion.Item>
                                 </Accordion>

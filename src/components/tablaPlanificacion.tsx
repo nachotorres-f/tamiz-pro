@@ -17,7 +17,10 @@ export function TablaPlanificacion({
     diaActivo,
     platoExpandido,
     setPlatoExpandido,
-}: {
+}: // anchoButton,
+// anchoPlato,
+// anchoTotal,
+{
     pageOcultos: boolean;
     platosUnicos: string[];
     diasSemana: Date[];
@@ -25,9 +28,14 @@ export function TablaPlanificacion({
     filtro: string;
     diaActivo: string;
     platoExpandido: string | null;
+    // anchoButton: any;
+    // anchoPlato: any;
+    // anchoTotal: any;
     setPlatoExpandido: (value: string | null) => void;
 }) {
     const [ocultos, setOcultos] = React.useState<Set<string>>(new Set());
+
+    console.log(datos);
 
     useEffect(() => {
         fetch('/api/ocultos')
@@ -83,9 +91,13 @@ export function TablaPlanificacion({
             striped>
             <thead className="table-dark sticky-top">
                 <tr>
+                    {/* <th ref={anchoButton}></th>
+                    <th ref={anchoPlato}>Plato</th>
+                    <th ref={anchoTotal}>Total</th> */}
                     <th></th>
                     <th>Plato</th>
                     <th>Total</th>
+                    <th>Gestionado</th>
                     {diasSemana.filter(filterDias).map((dia, idx) => (
                         <th key={idx}>
                             {format(dia, 'EEEE d MMMM', { locale: es })}
@@ -132,6 +144,21 @@ export function TablaPlanificacion({
                                     .filter((dato) => dato.plato === plato)
                                     .reduce((sum, d) => sum + d.cantidad, 0)}
                             </td>
+                            <td>
+                                {(() => {
+                                    const gestionados = datos
+                                        .filter((dato) => dato.plato === plato)
+                                        .map((dato) => dato.gestionado);
+                                    if (
+                                        gestionados.length === 0 ||
+                                        gestionados.every((g) => g === false)
+                                    )
+                                        return 'No gestionado';
+                                    if (gestionados.every((g) => g === true))
+                                        return 'Gestionado';
+                                    return 'Parcialmente gestionado';
+                                })()}
+                            </td>
                             {diasSemana.filter(filterDias).map((dia, i) => {
                                 dia.setHours(0, 0, 0, 0);
                                 const total = datos
@@ -145,15 +172,7 @@ export function TablaPlanificacion({
                                         );
                                     })
                                     .reduce((sum, d) => sum + d.cantidad, 0);
-                                return (
-                                    <td
-                                        key={i}
-                                        className={
-                                            total > 0 ? 'bg-success-subtle' : ''
-                                        }>
-                                        {total || ''}
-                                    </td>
-                                );
+                                return <td key={i}>{total || ''}</td>;
                             })}
                         </tr>
                         {platoExpandido === plato && (

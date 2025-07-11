@@ -7,10 +7,7 @@ import {
     useState,
 } from 'react';
 import {
-    Col,
     Container,
-    Form,
-    Row,
     // Form
 } from 'react-bootstrap';
 // import Row from 'react-bootstrap/Row';
@@ -22,18 +19,15 @@ import React from 'react';
 import { NavegacionSemanal } from '@/components/navegacionSemanal';
 import { TablaPlanificacion } from '@/components/tablaPlanificacion';
 import TablaEventosPlanificacion from '@/components/tablaEventosPlanificacion';
-import AgregarPlato from '@/components/agregarPlato';
 
 export default function PlanificacionPage() {
     const [semanaBase, setSemanaBase] = useState(new Date());
     const [diasSemana, setDiasSemana] = useState<Date[]>([]);
     const [datos, setDatos] = useState<any[]>([]);
-    const [datosFiltrados, setDatosFiltrados] = useState<any[]>([]);
-    // const [filtro, setFiltro] = useState('');
+    //const [filtro, setFiltro] = useState('');
     const [filtro] = useState('');
     const [diaActivo, setDiaActivo] = useState('');
     const [platoExpandido, setPlatoExpandido] = useState<string | null>(null);
-    const [filtroSalon, setFiltroSalon] = useState<string | null>(null);
 
     // Referencias para medir el ancho de las celdas
     // const buttonRef = useRef<HTMLTableCellElement>(null);
@@ -56,7 +50,7 @@ export default function PlanificacionPage() {
     // }, [buttonRef, platoRef, totalRef]);
 
     useEffect(() => {
-        fetch('/api/planificacion')
+        fetch('/api/expedicion')
             .then((res) => res.json())
             .then((data) => {
                 console.log('Datos de planificación:', data);
@@ -74,32 +68,11 @@ export default function PlanificacionPage() {
         setDiaActivo('');
     }, [semanaBase]);
 
-    useEffect(() => {
-        if (filtroSalon) {
-            const datosFiltrados = datos.filter((d) => {
-                if (filtroSalon === 'A') {
-                    return filtroSalon === 'A'
-                        ? d.lugar.toLowerCase() !== 'el central'
-                        : d.lugar.toLowerCase() !== 'la rural';
-                }
-
-                if (filtroSalon === 'B') {
-                    return filtroSalon === 'B'
-                        ? d.lugar.toLowerCase() === 'el central'
-                        : d.lugar.toLowerCase() === 'la rural';
-                }
-            });
-            setDatosFiltrados(datosFiltrados);
-        } else {
-            setDatosFiltrados(datos);
-        }
-    }, [filtroSalon, datos]);
-
-    const platosUnicos = [...new Set(datosFiltrados.map((d) => d.plato))];
+    const platosUnicos = [...new Set(datos.map((d) => d.plato))];
 
     return (
         <Container className="mt-5">
-            <h2 className="text-center mb-4">Planificación</h2>
+            <h2 className="text-center mb-4">Expedicion</h2>
 
             {/* <Form.Group>
                 <Row>
@@ -118,33 +91,11 @@ export default function PlanificacionPage() {
                 </Row>
             </Form.Group> */}
 
-            <AgregarPlato />
-
             {/* EVENTOS */}
-
-            <Container className="mb-3">
-                <Row>
-                    <Col xs={4}>
-                        <Form.Group>
-                            <Form.Label>Filtrar por salón</Form.Label>
-                            <Form.Select
-                                value={filtroSalon || ''}
-                                onChange={(e) =>
-                                    setFiltroSalon(e.target.value)
-                                }>
-                                <option value="">Todos los salones</option>
-                                <option value="A">Rut Haus - Origami</option>
-                                <option value="B">El Central - La Rural</option>
-                            </Form.Select>
-                        </Form.Group>
-                    </Col>
-                </Row>
-            </Container>
 
             <TablaEventosPlanificacion
                 diasSemana={diasSemana}
                 diaActivo={diaActivo}
-                filtroSalon={filtroSalon}
                 // anchoColumna={anchoButton + anchoPlato + anchoTotal}
             />
 
@@ -157,7 +108,7 @@ export default function PlanificacionPage() {
                 <TablaPlanificacion
                     platosUnicos={platosUnicos}
                     diasSemana={diasSemana}
-                    datos={datosFiltrados}
+                    datos={datos}
                     filtro={filtro}
                     diaActivo={diaActivo}
                     platoExpandido={platoExpandido}

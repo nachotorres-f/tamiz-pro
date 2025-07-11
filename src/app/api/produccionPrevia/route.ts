@@ -32,7 +32,6 @@ export async function POST(req: NextRequest) {
                     where: { id: existingProduccion.id },
                     data: { cantidad: produccion[fecha] },
                 });
-                await updateGestionadoPlato(plato);
                 return { ...existingProduccion, cantidad: produccion[fecha] };
             } else {
                 // Creamos una nueva producción si no existe
@@ -43,7 +42,6 @@ export async function POST(req: NextRequest) {
                         cantidad: produccion[fecha],
                     },
                 });
-                await updateGestionadoPlato(plato);
                 return newProduccion;
             }
         })
@@ -101,7 +99,7 @@ export async function GET() {
 
         if (existingPlato) {
             existingPlato.produccion.push({
-                fecha: addDays(produccion.fecha, 1),
+                fecha: produccion.fecha,
                 cantidad: produccion.cantidad,
             });
         } else {
@@ -113,7 +111,7 @@ export async function GET() {
                 principal: isPrincipal,
                 produccion: [
                     {
-                        fecha: addDays(produccion.fecha, 1),
+                        fecha: produccion.fecha,
                         cantidad: produccion.cantidad,
                     },
                 ],
@@ -141,18 +139,5 @@ const platoIsPrincipal = async (plato: string): Promise<boolean> => {
     } catch (error) {
         console.error('Error checking if plato is principal:', error);
         return false;
-    }
-};
-
-const updateGestionadoPlato = async (plato: string) => {
-    try {
-        const updatedPlato = await prisma.plato.updateMany({
-            where: { nombre: plato, gestionado: false },
-            data: { gestionado: true },
-        });
-        return updatedPlato;
-    } catch (error) {
-        console.error('Error updating gestionado for plato:', error);
-        throw new Error('Error updating gestionado');
     }
 };

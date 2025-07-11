@@ -80,7 +80,7 @@ export async function GET(req: NextRequest) {
                     unidadMedida: ingrediente.unidadMedida,
                     tipo: ingrediente.tipo,
                     cantidad: ingrediente.cantidad,
-                    codigo: ingrediente.codigo,
+                    codigo: ingrediente.subCodigo,
                     id: ingrediente.id,
                     depth,
                     parentPT: parentPT,
@@ -109,6 +109,8 @@ export async function GET(req: NextRequest) {
                 ingredientes: tableData,
             };
         });
+
+        console.log(data[0].ingredientes);
 
         return NextResponse.json({ data }, { status: 200 });
     } catch {

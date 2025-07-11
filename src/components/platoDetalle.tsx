@@ -88,7 +88,7 @@ export function PlatoDetalle({ plato }: { plato: string }) {
 
     return (
         <tr>
-            <td colSpan={diasSemana.length + 2}>
+            <td colSpan={diasSemana.length + 3}>
                 <div className="bg-success-subtle px-3 py-2 rounded mb-2 fw-semibold text-uppercase">
                     Comanda
                 </div>

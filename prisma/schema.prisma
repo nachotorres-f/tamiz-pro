@@ -42,7 +42,7 @@ model Comanda {
   nombre              String
   horarioInicio       DateTime
   horarioFin          DateTime
-  observaciones       String?
+  observaciones       String? @db.Text
 
   Plato Plato[]
   
@@ -55,6 +55,7 @@ model Plato {
   cantidad  Int
   comandaId Int
   comanda   Comanda @relation(fields: [comandaId], references: [id])
+  gestionado Boolean @default(false)
 
   @@map("platos")
 }
@@ -64,7 +65,7 @@ model Produccion {
   fecha     DateTime
   plato     String
   observacion String?
-  cantidad  Int
+  cantidad Float 
   createdAt DateTime @default(now())
 }
 

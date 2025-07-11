@@ -108,5 +108,11 @@ export async function GET(req: NextRequest) {
 
     const tableData = buildTableData(ingredientes);
 
-    return NextResponse.json({ plato, producciones, ingredientes: tableData });
+    const tableDataFiltered = tableData.filter((item) => item.tipo === 'PT');
+
+    return NextResponse.json({
+        plato,
+        producciones,
+        ingredientes: tableDataFiltered,
+    });
 }
