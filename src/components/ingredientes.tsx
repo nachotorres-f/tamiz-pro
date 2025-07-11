@@ -191,7 +191,7 @@ export const Ingredientes = ({
                                                         <tr
                                                             style={{
                                                                 textAlign:
-                                                                    'text-center',
+                                                                    'center',
                                                             }}>
                                                             <th></th>
                                                             <th>Ingrediente</th>
@@ -237,7 +237,7 @@ export const Ingredientes = ({
                                                                             <tr
                                                                                 style={{
                                                                                     textAlign:
-                                                                                        'text-center',
+                                                                                        'center',
                                                                                 }}>
                                                                                 <td>
                                                                                     {platoExpandido ===
