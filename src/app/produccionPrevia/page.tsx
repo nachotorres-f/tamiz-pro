@@ -348,6 +348,7 @@ export default function ProduccionPreviaPage() {
                                                 display: 'flex',
                                                 justifyContent: 'center',
                                                 alignItems: 'center',
+                                                margin: '0 auto',
                                             }}
                                             onClick={() => {
                                                 generarPDFFecha(i);
