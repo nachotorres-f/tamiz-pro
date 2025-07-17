@@ -1,11 +1,15 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button, Col, Container, Form, Row } from 'react-bootstrap';
 
+type Plato = { codigo: string | number; nombreProducto: string };
+type Comanda = { id: string | number; nombre: string; tipo: string };
+
 export default function AgregarPlato() {
-    type Plato = { codigo: string | number; nombreProducto: string };
-    const [platos, setPlatos] = React.useState<Plato[]>([]);
-    type Comanda = { id: string | number; nombre: string; tipo: string };
-    const [comandas, setComandas] = React.useState<Comanda[]>([]);
+    const [platos, setPlatos] = useState<Plato[]>([]);
+    const [comandas, setComandas] = useState<Comanda[]>([]);
+    const [selectedPlato, setSelectedPlato] = useState<string>('');
+    const [selectedComanda, setSelectedComanda] = useState<string>('');
+    const [cantidad, setCantidad] = useState<string>('');
 
     useEffect(() => {
         fetch('/api/platos')
@@ -18,16 +22,8 @@ export default function AgregarPlato() {
 
     const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        const plato = (document.getElementById('plato') as HTMLSelectElement)
-            ?.value;
-        const comanda = (
-            document.getElementById('comanda') as HTMLSelectElement
-        )?.value;
-        const cantidad = (
-            document.getElementById('cantidad') as HTMLInputElement
-        )?.value;
 
-        if (!plato || !comanda || !cantidad) {
+        if (!selectedPlato || !selectedComanda || !cantidad) {
             alert('Por favor, completa todos los campos.');
             return;
         }
@@ -38,31 +34,33 @@ export default function AgregarPlato() {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                idComanda: comanda,
-                plato: plato,
+                idComanda: selectedComanda,
+                plato: selectedPlato,
                 cantidad: parseInt(cantidad, 10),
             }),
         })
             .then((res) => res.json())
             .then((data) => {
                 console.log('Plato agregado:', data);
-                // Aquí puedes actualizar el estado o hacer algo más
+                window.location.reload();
             })
             .catch((error) => {
                 console.error('Error al agregar el plato:', error);
             });
-
-        window.location.reload();
     };
 
     return (
-        <Container className="">
+        <Container>
             <Form onSubmit={handleSubmit}>
                 <Row>
                     <Col>
                         <Form.Group controlId="plato">
                             <Form.Label>Plato</Form.Label>
-                            <Form.Select>
+                            <Form.Select
+                                value={selectedPlato}
+                                onChange={(e) =>
+                                    setSelectedPlato(e.target.value)
+                                }>
                                 <option
                                     value=""
                                     disabled>
@@ -83,13 +81,16 @@ export default function AgregarPlato() {
                     <Col>
                         <Form.Group controlId="comanda">
                             <Form.Label>Comanda</Form.Label>
-                            <Form.Select>
+                            <Form.Select
+                                value={selectedComanda}
+                                onChange={(e) =>
+                                    setSelectedComanda(e.target.value)
+                                }>
                                 <option
                                     value=""
                                     disabled>
                                     Selecciona una comanda
                                 </option>
-
                                 {comandas.map((comanda) => (
                                     <option
                                         key={comanda.id}
@@ -107,6 +108,8 @@ export default function AgregarPlato() {
                                 type="number"
                                 step="any"
                                 placeholder="Ingresa la cantidad"
+                                value={cantidad}
+                                onChange={(e) => setCantidad(e.target.value)}
                             />
                         </Form.Group>
                     </Col>

@@ -13,61 +13,53 @@ export async function POST(req: NextRequest) {
 
     body.Id = Number(body.Id);
 
-    for (const key in body) {
+    // Decodifica MomnetoId y MomnetoComidaId en un solo paso
+    Object.keys(body).forEach((key) => {
         const value = body[key];
-
-        try {
-            // Intentamos decodificar si parece un JSON string anidado
-            if (key.includes('MomnetoId')) {
-                const firstParse = JSON.parse(value); // convierte \\u0022 a "
-
-                for (const keyParse in firstParse) {
-                    if (keyParse.includes('MomnetoComidaId')) {
-                        const secondParse = JSON.parse(firstParse[keyParse]); // parsea el JSON final
-                        firstParse[keyParse] = secondParse; // reemplaza el valor original
+        if (key.includes('MomnetoId')) {
+            try {
+                const firstParse = JSON.parse(value);
+                Object.keys(firstParse).forEach((k) => {
+                    if (k.includes('MomnetoComidaId')) {
+                        try {
+                            firstParse[k] = JSON.parse(firstParse[k]);
+                        } catch {}
                     }
-                }
-
+                });
                 body[key] = firstParse;
-            } else {
+            } catch {
                 body[key] = value;
             }
-        } catch {
-            body[key] = value; // si falla, lo dejamos como está
         }
-    }
+    });
 
-    console.log('JSON', body);
-
-    // Aquí podés usar Prisma para guardar la info en tu base de datos
-    // await prisma.order.create({ data: { ... } })
-
-    const horaInicio = body.Inicio.split(': ')[1].split(' a')[0];
-    const horaFin = body.Inicio.split(' a ')[1];
-    console.log('horaFin', horaFin);
-
+    // Extrae horaInicio y horaFin de forma más robusta
+    const [, horaInicio, horaFin] =
+        body.Inicio.match(/: ([^a]+) a ([^]+)$/) || [];
     const ahora = new Date();
+    const [hIni, mIni] = (horaInicio || '00:00').split(':').map(Number);
+    const [hFin, mFin] = (horaFin || '00:00').split(':').map(Number);
 
     const horarioInicio = new Date(
         Date.UTC(
             ahora.getFullYear(),
             ahora.getMonth(),
             ahora.getDate(),
-            parseInt(horaInicio.split(':')[0]),
-            parseInt(horaInicio.split(':')[1])
+            hIni,
+            mIni
         )
     );
-
     const horarioFin = new Date(
         Date.UTC(
             ahora.getFullYear(),
             ahora.getMonth(),
             ahora.getDate(),
-            parseInt(horaFin.split(':')[0]),
-            parseInt(horaFin.split(':')[1])
+            hFin,
+            mFin
         )
     );
 
+    // Upsert comanda
     await prisma.comanda.upsert({
         where: { id: body.Id },
         update: {},
@@ -96,48 +88,87 @@ export async function POST(req: NextRequest) {
         'Cafe',
     ];
 
-    for (const key in body) {
+    // Prepara los platos a upsert en batch
+    const platos: {
+        nombre: string;
+        cantidad: number;
+        comandaId: number;
+    }[] = [];
+
+    Object.keys(body).forEach((key) => {
         if (key.includes('MomnetoId')) {
-            for (const [item] of Object.entries(body[key])) {
+            Object.values(body[key]).forEach((item) => {
+                const platoItem = item as {
+                    ComidaFamilia?: string;
+                    ComidaDescripcion?: string;
+                    ComidaTotal?: number | string;
+                };
                 if (
-                    item.includes('MomnetoComidaId') &&
+                    platoItem.ComidaFamilia &&
                     !tiposOmitir.some((tipo) =>
-                        body[key][item]['ComidaFamilia']
-                            .toLowerCase()
+                        platoItem
+                            .ComidaFamilia!.toLowerCase()
                             .includes(tipo.toLowerCase())
                     )
                 ) {
-                    const existente = await prisma.plato.findFirst({
-                        where: {
-                            nombre: body[key][item]['ComidaDescripcion'],
-                            comandaId: body.Id,
-                        },
+                    platos.push({
+                        nombre: platoItem.ComidaDescripcion!,
+                        cantidad: Number(platoItem.ComidaTotal),
+                        comandaId: body.Id,
                     });
-
-                    if (existente) {
-                        await prisma.plato.update({
-                            where: { id: existente.id },
-                            data: {
-                                cantidad: Number(
-                                    body[key][item]['ComidaTotal']
-                                ),
-                            },
-                        });
-                    } else {
-                        await prisma.plato.create({
-                            data: {
-                                nombre: body[key][item]['ComidaDescripcion'],
-                                cantidad: Number(
-                                    body[key][item]['ComidaTotal']
-                                ),
-                                comandaId: body.Id,
-                            },
-                        });
-                    }
                 }
-            }
+            });
         }
-    }
+    });
+
+    // Busca platos existentes en una sola consulta
+    const nombres = platos.map((p) => p.nombre);
+    const existentes = await prisma.plato.findMany({
+        where: {
+            nombre: { in: nombres },
+            comandaId: body.Id,
+        },
+        select: { id: true, nombre: true },
+    });
+    const existentesMap = new Map(existentes.map((e) => [e.nombre, e.id]));
+
+    // Actualiza o crea platos en paralelo
+    await Promise.all(
+        platos.map(async (plato) => {
+            const existenteId = existentesMap.get(plato.nombre);
+            if (existenteId) {
+                await prisma.plato.update({
+                    where: { id: existenteId },
+                    data: { cantidad: plato.cantidad },
+                });
+            } else {
+                await prisma.plato.create({ data: plato });
+            }
+        })
+    );
 
     return NextResponse.json({ success: true }, { status: 201 });
+}
+
+export async function DELETE(req: NextRequest) {
+    const apiKey = req.headers.get('x-api-key');
+    if (!apiKey || apiKey !== API_KEY) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const id = Number(body.Id);
+
+    console.log(`Eliminando comanda con ID: ${id}`);
+
+    // Elimina la comanda y sus platos asociados
+    await prisma.comanda.delete({
+        where: { id },
+    });
+
+    await prisma.plato.deleteMany({
+        where: { comandaId: id },
+    });
+
+    return NextResponse.json({ success: true }, { status: 200 });
 }
