@@ -162,12 +162,12 @@ export async function DELETE(req: NextRequest) {
     console.log(`Eliminando comanda con ID: ${id}`);
 
     // Elimina la comanda y sus platos asociados
-    await prisma.comanda.delete({
-        where: { id },
-    });
-
     await prisma.plato.deleteMany({
         where: { comandaId: id },
+    });
+
+    await prisma.comanda.delete({
+        where: { id },
     });
 
     return NextResponse.json({ success: true }, { status: 200 });
