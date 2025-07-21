@@ -140,6 +140,7 @@ type Plato = {
     plato: string;
     fecha: string;
     cantidad: number;
+    lugar: string;
 };
 
 type Receta = {
@@ -153,6 +154,7 @@ type Resultado = {
     plato: string;
     fecha: string;
     cantidad: number;
+    lugar: string;
 };
 
 async function calcularIngredientesPT(
@@ -162,7 +164,12 @@ async function calcularIngredientesPT(
     const resultado: Resultado[] = [];
     const visitados = new Set<string>(); // para evitar loops
 
-    async function recorrer(nombre: string, fecha: string, cantidad: number) {
+    async function recorrer(
+        nombre: string,
+        fecha: string,
+        cantidad: number,
+        lugar: string
+    ) {
         const subRecetas = recetas.filter(
             (r) => r.nombreProducto === nombre && r.tipo === 'PT'
         );
@@ -176,6 +183,7 @@ async function calcularIngredientesPT(
                 plato: ingrediente,
                 fecha,
                 cantidad: parseFloat(cantidadTotal.toFixed(2)), // Aseguramos que la cantidad sea un número con dos decimales
+                lugar,
             });
 
             if (!visitados.has(ingrediente)) {
@@ -183,14 +191,15 @@ async function calcularIngredientesPT(
                 await recorrer(
                     ingrediente,
                     fecha,
-                    parseFloat(cantidadTotal.toFixed(2))
+                    parseFloat(cantidadTotal.toFixed(2)),
+                    lugar
                 );
             }
         }
     }
 
     for (const item of platos) {
-        await recorrer(item.plato, item.fecha, item.cantidad);
+        await recorrer(item.plato, item.fecha, item.cantidad, item.lugar);
     }
 
     // Agrupar por ingrediente + fecha y sumar

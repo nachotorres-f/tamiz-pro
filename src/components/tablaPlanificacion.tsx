@@ -276,6 +276,7 @@ export function TablaPlanificacion({
                                             <Form.Control
                                                 type="number"
                                                 className="form-control form-control-sm"
+                                                style={{ width: '5.5rem' }}
                                                 value={cantidad}
                                                 step={0.1}
                                                 min={0}
