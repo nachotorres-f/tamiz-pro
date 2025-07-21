@@ -77,13 +77,10 @@ export async function GET(req: NextRequest) {
     const produccion = await prisma.produccion.findMany({
         where: {
             fecha: { gte: addDays(inicio, -1), lte: addDays(inicio, 9) },
-            plato: { in: Array.from(nombresPT) },
         },
     });
 
     resultado.sort((a, b) => a.plato.localeCompare(b.plato));
-
-    console.log('PRODUCCIOn', produccion);
 
     return NextResponse.json({ planifacion: ingredientes, produccion });
 }
@@ -97,6 +94,8 @@ export async function POST(req: NextRequest) {
             { status: 400 }
         );
     }
+
+    console.log('Producción recibida:', produccion);
 
     for (const item of produccion) {
         if (!item.plato || !item.fecha || typeof item.cantidad !== 'number') {
