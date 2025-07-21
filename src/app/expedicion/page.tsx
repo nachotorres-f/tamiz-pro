@@ -115,6 +115,10 @@ export default function PlanificacionPage() {
                     platoExpandido={platoExpandido}
                     setPlatoExpandido={setPlatoExpandido}
                     pageOcultos={false}
+                    produccion={[]}
+                    setProduccion={() => {}}
+                    produccionUpdate={[]}
+                    setProduccionUpdate={() => {}}
                     // anchoButton={anchoButton}
                     // anchoPlato={anchoPlato}
                     // anchoTotal={anchoTotal}
