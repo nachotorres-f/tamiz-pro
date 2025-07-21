@@ -1,12 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { prisma } from '@/lib/prisma';
-import { addDays } from 'date-fns';
+import { addDays, startOfWeek } from 'date-fns';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(req: NextRequest) {
     try {
         const { searchParams } = req.nextUrl;
         const plato = searchParams.get('plato');
+        const fechaInicio = searchParams.get('fechaInicio');
 
         if (plato === '' || plato === null) {
             return NextResponse.json({
@@ -15,18 +16,20 @@ export async function GET(req: NextRequest) {
             });
         }
 
-        if (plato === 'todos') {
+        if (!fechaInicio) {
+            return NextResponse.json(
+                { error: 'fechaInicio es requerido' },
+                { status: 400 }
+            );
         }
 
-        const startOfWeek = new Date();
-        startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay()); // Ajusta al inicio de la semana (domingo)
-        startOfWeek.setHours(0, 0, 0, 0); // Establece la hora al inicio del día
+        const inicio = startOfWeek(new Date(fechaInicio), { weekStartsOn: 4 });
 
         const producciones = await prisma.produccion.findMany({
             where: {
                 plato,
                 fecha: {
-                    gte: addDays(startOfWeek, -1),
+                    gte: addDays(inicio, -1),
                 },
             },
         });
@@ -109,8 +112,6 @@ export async function GET(req: NextRequest) {
                 ingredientes: tableData,
             };
         });
-
-        console.log(data[0].ingredientes);
 
         return NextResponse.json({ data }, { status: 200 });
     } catch {

@@ -44,3 +44,21 @@ a {
 tr {
     text-align: center;
 }
+
+.floating-btn {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    z-index: 1050;
+    border-radius: 50px !important;
+    width: 70px;
+    height: 70px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s ease;
+    border: none !important;
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%) !important;
+}

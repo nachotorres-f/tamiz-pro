@@ -1,7 +1,6 @@
 import { format } from 'date-fns';
 import React, { useEffect } from 'react';
-import { Table } from 'react-bootstrap';
-import { es } from 'date-fns/locale';
+// import { ListGroup } from 'react-bootstrap';
 
 interface EventoPlanificacion {
     fecha: string;
@@ -76,47 +75,47 @@ export default function TablaEventosPlanificacion({
     };
 
     return (
-        <Table
-            size="sm"
-            bordered
-            striped>
-            <thead className="table-dark">
-                <tr style={{ textAlign: 'center' }}>
-                    {/* <th style={{ width: anchoColumna + 'px' }}></th> */}
-                    {diasSemana.filter(filterDias).map((dia, idx) => (
-                        <th key={idx}>
-                            {format(dia, 'EEEE d MMMM', { locale: es })}
-                        </th>
-                    ))}
-                </tr>
-            </thead>
-            <tbody>
-                {eventosFiltrados.map((evento, idx) => (
-                    <tr key={idx}>
-                        {diasSemana.filter(filterDias).map((dia, diaIdx) => {
-                            const fechaEvento = format(
-                                new Date(evento.fecha),
-                                'yyyy-MM-dd'
-                            );
-                            const fechaDia = format(dia, 'yyyy-MM-dd');
+        <ul style={{ fontSize: '0.8rem' }}>
+            {eventosFiltrados.map((evento, idx) =>
+                diasSemana.filter(filterDias).map((dia, diaIdx) => {
+                    const fechaEvento = format(
+                        new Date(evento.fecha),
+                        'yyyy-MM-dd'
+                    );
+                    const fechaDia = format(dia, 'yyyy-MM-dd');
 
-                            return (
-                                <td key={diaIdx}>
-                                    {fechaEvento === fechaDia ? (
-                                        <div>
-                                            <strong>{evento.nombre}</strong>
-                                            <br />
-                                            {evento.lugar} - {evento.salon}
-                                        </div>
-                                    ) : (
-                                        ''
-                                    )}
-                                </td>
-                            );
-                        })}
-                    </tr>
-                ))}
-            </tbody>
-        </Table>
+                    if (fechaEvento !== fechaDia) return null;
+
+                    return (
+                        <li key={idx + diaIdx}>
+                            {evento.fecha.split('T')[0]}
+                            {' - '}
+                            <strong>{evento.nombre}</strong>
+                            {' - '}
+                            {evento.lugar}
+                            {' - '}
+                            {evento.salon}
+                        </li>
+                    );
+                })
+            )}
+        </ul>
+        // <Table
+        //     size="sm"
+        //     bordered
+        //     striped>
+        //     <thead className="table-dark">
+        //         <tr style={{ textAlign: 'center' }}>
+        //             {/* <th style={{ width: anchoColumna + 'px' }}></th> */}
+        //             {diasSemana.filter(filterDias).map((dia, idx) => (
+        //                 <th key={idx}>
+        //                     {format(dia, 'EEEE d MMMM', { locale: es })}
+        //                 </th>
+        //             ))}
+        //         </tr>
+        //     </thead>
+        //     <tbody>
+        //     </tbody>
+        // </Table>
     );
 }

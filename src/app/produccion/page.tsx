@@ -30,15 +30,18 @@ export default function ProduccionPage() {
     console.log('datos', datos);
 
     useEffect(() => {
-        fetch('/api/produccion')
+        fetch(
+            '/api/produccion?fechaInicio=' +
+                startOfWeek(semanaBase, { weekStartsOn: 4 }).toISOString()
+        )
             .then((res) => res.json())
             .then((res) => res.data)
             .then(setDatos);
-    }, []);
+    }, [semanaBase]);
 
     useEffect(() => {
-        const inicioSemana = startOfWeek(semanaBase, { weekStartsOn: 0 }); // domingo
-        const dias = Array.from({ length: 7 }, (_, i) =>
+        const inicioSemana = startOfWeek(semanaBase, { weekStartsOn: 4 }); // jueves
+        const dias = Array.from({ length: 10 }, (_, i) =>
             addDays(inicioSemana, i)
         );
         setDiasSemana(dias);
@@ -63,6 +66,9 @@ export default function ProduccionPage() {
         const dia = diasSemana[i];
         const fecha = format(dia, 'yyyy-MM-dd');
         const fechaMasUno = format(addDays(fecha, 2), 'yyyy-MM-dd');
+        if (i === 0) {
+            console.log(dia, fecha, fechaMasUno);
+        }
 
         const platosEnFecha = datos
             .filter((item) =>
@@ -74,6 +80,8 @@ export default function ProduccionPage() {
             )
             .map((item) => item.plato);
 
+        console.log('platosEnFecha', platosEnFecha);
+
         for (let index = 0; index < platosEnFecha.length; index++) {
             const element = platosEnFecha[index];
             generarPDF(element);
@@ -83,7 +91,12 @@ export default function ProduccionPage() {
     const generarPDF = async (plato: string) => {
         const doc = new jsPDF();
 
-        await fetch('api/generarPDF?plato=' + plato)
+        await fetch(
+            'api/generarPDF?plato=' +
+                plato +
+                '&fechaInicio=' +
+                startOfWeek(semanaBase, { weekStartsOn: 4 }).toISOString()
+        )
             .then((res) => res.json())
             .then((res) => {
                 const data = res.data;
@@ -337,7 +350,7 @@ export default function ProduccionPage() {
                     <thead className="table-dark sticky-top">
                         <tr style={{ textAlign: 'center' }}>
                             <th></th>
-                            {[0, 1, 2, 3, 4, 5, 6].map((i) => {
+                            {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => {
                                 return (
                                     <th key={i}>
                                         <Button
@@ -390,10 +403,7 @@ export default function ProduccionPage() {
                                             <FiletypePdf />
                                         </Button>
                                     </td> */}
-                                    <td>
-                                        {dato.plato}
-                                        {!dato.principal && ' (SEMI)'}
-                                    </td>
+                                    <td>{dato.plato}</td>
 
                                     {diasSemana
                                         .filter(filterDias)

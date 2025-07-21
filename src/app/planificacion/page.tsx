@@ -28,12 +28,14 @@ export default function PlanificacionPage() {
     const [semanaBase, setSemanaBase] = useState(new Date());
     const [diasSemana, setDiasSemana] = useState<Date[]>([]);
     const [datos, setDatos] = useState<any[]>([]);
+    const [produccion, setProduccion] = useState<any[]>([]);
     const [datosFiltrados, setDatosFiltrados] = useState<any[]>([]);
     // const [filtro, setFiltro] = useState('');
     const [filtro] = useState('');
     const [diaActivo, setDiaActivo] = useState('');
     const [platoExpandido, setPlatoExpandido] = useState<string | null>(null);
     const [filtroSalon, setFiltroSalon] = useState<string | null>(null);
+    const [produccionUpdate, setProduccionUpdate] = React.useState<any[]>([]);
 
     // Referencias para medir el ancho de las celdas
     // const buttonRef = useRef<HTMLTableCellElement>(null);
@@ -56,18 +58,20 @@ export default function PlanificacionPage() {
     // }, [buttonRef, platoRef, totalRef]);
 
     useEffect(() => {
-        fetch('/api/planificacion')
+        fetch(
+            '/api/planificacion?fechaInicio=' +
+                startOfWeek(semanaBase, { weekStartsOn: 4 }).toISOString()
+        ) // jueves
             .then((res) => res.json())
             .then((data) => {
-                console.log('Datos de planificación:', data);
-                return data;
-            })
-            .then(setDatos);
-    }, []);
+                setDatos(data.planifacion || []);
+                setProduccion(data.produccion || []);
+            });
+    }, [semanaBase]);
 
     useEffect(() => {
-        const inicioSemana = startOfWeek(semanaBase, { weekStartsOn: 0 }); // domingo
-        const dias = Array.from({ length: 7 }, (_, i) =>
+        const inicioSemana = startOfWeek(semanaBase, { weekStartsOn: 4 }); // jueves
+        const dias = Array.from({ length: 10 }, (_, i) =>
             addDays(inicioSemana, i)
         );
         setDiasSemana(dias);
@@ -94,6 +98,15 @@ export default function PlanificacionPage() {
             setDatosFiltrados(datos);
         }
     }, [filtroSalon, datos]);
+
+    const handleGuardarProduccion = async () => {
+        await fetch('/api/planificacion', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(produccionUpdate),
+        });
+        setProduccionUpdate([]);
+    };
 
     const platosUnicos = [...new Set(datosFiltrados.map((d) => d.plato))];
 
@@ -153,6 +166,15 @@ export default function PlanificacionPage() {
                 setSemanaBase={setSemanaBase}
             />
 
+            <button
+                type="button"
+                id="saveFloatingBtn"
+                className="btn btn-success floating-btn mb-3"
+                onClick={handleGuardarProduccion}
+                title="Guardar cambios">
+                Guardar Cambios
+            </button>
+
             <div style={{ overflowX: 'auto', height: 'calc(100vh - 300px)' }}>
                 <TablaPlanificacion
                     platosUnicos={platosUnicos}
@@ -163,6 +185,10 @@ export default function PlanificacionPage() {
                     platoExpandido={platoExpandido}
                     setPlatoExpandido={setPlatoExpandido}
                     pageOcultos={false}
+                    produccion={produccion}
+                    setProduccion={setProduccion}
+                    produccionUpdate={produccionUpdate}
+                    setProduccionUpdate={setProduccionUpdate}
                     // anchoButton={anchoButton}
                     // anchoPlato={anchoPlato}
                     // anchoTotal={anchoTotal}

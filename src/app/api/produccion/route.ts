@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { addDays } from 'date-fns';
+import { addDays, startOfWeek } from 'date-fns';
 
 export async function POST(req: NextRequest) {
     const body = await req.json();
@@ -73,15 +73,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, data });
 }
 
-export async function GET() {
-    const startOfWeek = new Date();
-    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay()); // Ajusta al inicio de la semana (domingo)
-    startOfWeek.setHours(0, 0, 0, 0); // Establece la hora al inicio del día
+export async function GET(req: NextRequest) {
+    const { searchParams } = req.nextUrl;
+    const fechaInicio = searchParams.get('fechaInicio');
+
+    if (!fechaInicio) {
+        return NextResponse.json(
+            { error: 'fechaInicio es requerido' },
+            { status: 400 }
+        );
+    }
+
+    const inicio = startOfWeek(new Date(fechaInicio), { weekStartsOn: 4 });
 
     const producciones = await prisma.produccion.findMany({
         where: {
             fecha: {
-                gte: addDays(startOfWeek, -1),
+                gte: inicio,
             },
             cantidad: {
                 gt: 0,
