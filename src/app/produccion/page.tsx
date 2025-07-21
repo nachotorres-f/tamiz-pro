@@ -41,7 +41,7 @@ export default function ProduccionPage() {
 
     useEffect(() => {
         const inicioSemana = startOfWeek(semanaBase, { weekStartsOn: 4 }); // jueves
-        const dias = Array.from({ length: 10 }, (_, i) =>
+        const dias = Array.from({ length: 11 }, (_, i) =>
             addDays(inicioSemana, i)
         );
         setDiasSemana(dias);
@@ -350,7 +350,7 @@ export default function ProduccionPage() {
                     <thead className="table-dark sticky-top">
                         <tr style={{ textAlign: 'center' }}>
                             <th></th>
-                            {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => {
+                            {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => {
                                 return (
                                     <th key={i}>
                                         <Button

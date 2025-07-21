@@ -39,7 +39,7 @@ export default function ProduccionPreviaPage() {
 
     useEffect(() => {
         const inicioSemana = startOfWeek(semanaBase, { weekStartsOn: 4 }); // jueves
-        const dias = Array.from({ length: 10 }, (_, i) =>
+        const dias = Array.from({ length: 11 }, (_, i) =>
             addDays(inicioSemana, i)
         );
         setDiasSemana(dias);

@@ -72,7 +72,7 @@ export default function PlanificacionPage() {
 
     useEffect(() => {
         const inicioSemana = startOfWeek(semanaBase, { weekStartsOn: 4 }); // jueves
-        const dias = Array.from({ length: 10 }, (_, i) =>
+        const dias = Array.from({ length: 11 }, (_, i) =>
             addDays(inicioSemana, i)
         );
         setDiasSemana(dias);
@@ -188,7 +188,7 @@ export default function PlanificacionPage() {
                 Guardar Cambios
             </Button>
 
-            <div style={{ overflowX: 'auto', height: 'calc(100vh - 300px)' }}>
+            <div style={{ overflowX: 'auto', height: 'calc(100vh)' }}>
                 <TablaPlanificacion
                     platosUnicos={platosUnicos}
                     diasSemana={diasSemana}
