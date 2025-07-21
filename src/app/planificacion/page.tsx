@@ -107,6 +107,18 @@ export default function PlanificacionPage() {
             body: JSON.stringify(produccionUpdate),
         });
         setProduccionUpdate([]);
+
+        fetch(
+            '/api/planificacion?fechaInicio=' +
+                startOfWeek(semanaBase, {
+                    weekStartsOn: 4,
+                }).toISOString()
+        ) // jueves
+            .then((res) => res.json())
+            .then((data) => {
+                setDatos(data.planifacion || []);
+                setProduccion(data.produccion || []);
+            });
     };
 
     const platosUnicos = [...new Set(datosFiltrados.map((d) => d.plato))];
