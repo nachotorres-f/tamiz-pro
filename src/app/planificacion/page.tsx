@@ -169,7 +169,7 @@ export default function PlanificacionPage() {
 
             <Button
                 type="button"
-                className="btn btn-success"
+                className="btn btn-success mb-3"
                 onClick={handleGuardarProduccion}>
                 Guardar Cambios
             </Button>
