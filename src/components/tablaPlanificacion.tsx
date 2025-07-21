@@ -148,12 +148,16 @@ export function TablaPlanificacion({
                                 </td>
                                 <td rowSpan={2}>{plato}</td>
                                 <td rowSpan={2}>
-                                    {datos
-                                        .filter((dato) => dato.plato === plato)
-                                        .reduce(
-                                            (sum, d) => sum + d.cantidad,
-                                            0
-                                        )}
+                                    {parseFloat(
+                                        datos
+                                            .filter(
+                                                (dato) => dato.plato === plato
+                                            )
+                                            .reduce(
+                                                (sum, d) => sum + d.cantidad,
+                                                0
+                                            )
+                                    ).toFixed(2)}
                                 </td>
                                 <td rowSpan={2}>
                                     {(() => {

@@ -59,6 +59,21 @@ export async function GET(req: NextRequest) {
         }
     }
 
+    const recetasRaw = await prisma.receta.findMany({});
+    const recetas: Receta[] = recetasRaw.map((r) => ({
+        nombreProducto: r.nombreProducto,
+        descripcion: r.descripcion,
+        tipo: r.tipo as 'PT' | 'MP',
+        porcionBruta: r.porcionBruta,
+    }));
+
+    const ingredientes = (await calcularIngredientesPT(resultado, recetas)).map(
+        (i) => ({
+            ...i,
+            cantidad: parseFloat(i.cantidad.toFixed(2)), // Aseguramos que la cantidad sea un número con dos decimales
+        })
+    );
+
     const produccion = await prisma.produccion.findMany({
         where: {
             fecha: { gte: addDays(inicio, -1), lte: addDays(inicio, 9) },
@@ -70,7 +85,7 @@ export async function GET(req: NextRequest) {
 
     console.log('PRODUCCIOn', produccion);
 
-    return NextResponse.json({ planifacion: resultado, produccion });
+    return NextResponse.json({ planifacion: ingredientes, produccion });
 }
 
 export async function POST(req: NextRequest) {
@@ -120,4 +135,76 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ message: 'Producción actualizada' });
+}
+
+type Plato = {
+    plato: string;
+    fecha: string;
+    cantidad: number;
+};
+
+type Receta = {
+    nombreProducto: string;
+    descripcion: string;
+    tipo: 'PT' | 'MP';
+    porcionBruta: number;
+};
+
+type Resultado = {
+    plato: string;
+    fecha: string;
+    cantidad: number;
+};
+
+async function calcularIngredientesPT(
+    platos: Plato[],
+    recetas: Receta[]
+): Promise<Resultado[]> {
+    const resultado: Resultado[] = [];
+    const visitados = new Set<string>(); // para evitar loops
+
+    async function recorrer(nombre: string, fecha: string, cantidad: number) {
+        const subRecetas = recetas.filter(
+            (r) => r.nombreProducto === nombre && r.tipo === 'PT'
+        );
+
+        for (const receta of subRecetas) {
+            const ingrediente = receta.descripcion;
+            const porcion = receta.porcionBruta || 1;
+            const cantidadTotal = cantidad * porcion;
+
+            resultado.push({
+                plato: ingrediente,
+                fecha,
+                cantidad: parseFloat(cantidadTotal.toFixed(2)), // Aseguramos que la cantidad sea un número con dos decimales
+            });
+
+            if (!visitados.has(ingrediente)) {
+                visitados.add(ingrediente);
+                await recorrer(
+                    ingrediente,
+                    fecha,
+                    parseFloat(cantidadTotal.toFixed(2))
+                );
+            }
+        }
+    }
+
+    for (const item of platos) {
+        await recorrer(item.plato, item.fecha, item.cantidad);
+    }
+
+    // Agrupar por ingrediente + fecha y sumar
+    const agrupado = new Map<string, Resultado>();
+
+    for (const item of resultado) {
+        const key = `${item.plato}_${item.fecha}`;
+        if (!agrupado.has(key)) {
+            agrupado.set(key, { ...item });
+        } else {
+            agrupado.get(key)!.cantidad += item.cantidad;
+        }
+    }
+
+    return Array.from(agrupado.values());
 }
