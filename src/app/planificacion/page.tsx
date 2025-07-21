@@ -7,6 +7,7 @@ import {
     useState,
 } from 'react';
 import {
+    Button,
     Col,
     Container,
     Form,
@@ -166,14 +167,12 @@ export default function PlanificacionPage() {
                 setSemanaBase={setSemanaBase}
             />
 
-            <button
+            <Button
                 type="button"
-                id="saveFloatingBtn"
-                className="btn btn-success floating-btn mb-3"
-                onClick={handleGuardarProduccion}
-                title="Guardar cambios">
+                className="btn btn-success"
+                onClick={handleGuardarProduccion}>
                 Guardar Cambios
-            </button>
+            </Button>
 
             <div style={{ overflowX: 'auto', height: 'calc(100vh - 300px)' }}>
                 <TablaPlanificacion
