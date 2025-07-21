@@ -108,6 +108,8 @@ export default function PlanificacionPage() {
         });
         setProduccionUpdate([]);
 
+        alert('Producción actualizada correctamente');
+
         fetch(
             '/api/planificacion?fechaInicio=' +
                 startOfWeek(semanaBase, {
