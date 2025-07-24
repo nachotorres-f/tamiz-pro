@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { startOfWeek } from 'date-fns';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(req: NextRequest) {
@@ -13,7 +14,10 @@ export async function GET(req: NextRequest) {
         );
     }
 
-    const inicio = new Date(fechaInicio);
+    const inicio = startOfWeek(new Date(fechaFinal), {
+        weekStartsOn: 0,
+    }); //lunes
+
     const final = new Date(fechaFinal);
 
     const eventos = await prisma.comanda.findMany({

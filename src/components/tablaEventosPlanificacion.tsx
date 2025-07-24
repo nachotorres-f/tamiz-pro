@@ -75,7 +75,25 @@ export default function TablaEventosPlanificacion({
     };
 
     return (
-        <ul style={{ fontSize: '0.8rem' }}>
+        <ul style={{ fontSize: '0.8rem', maxWidth: 'max-content' }}>
+            {diasSemana && diasSemana.length > 0 && (
+                <li
+                    className="mb-2"
+                    style={{
+                        textAlign: 'center',
+                        listStyle: 'none',
+                        borderBottom: '.05rem solid',
+                    }}>
+                    <strong>
+                        {diasSemana[4].toISOString().split('T')[0]} -{' '}
+                        {
+                            diasSemana[diasSemana.length - 1]
+                                .toISOString()
+                                .split('T')[0]
+                        }
+                    </strong>
+                </li>
+            )}
             {eventosFiltrados.map((evento, idx) =>
                 diasSemana.filter(filterDias).map((dia, diaIdx) => {
                     const fechaEvento = format(

@@ -325,7 +325,10 @@ export function TablaPlanificacion({
                                 })}
                             </tr>
                             {platoExpandido === plato && (
-                                <PlatoDetalle plato={plato} />
+                                <PlatoDetalle
+                                    plato={plato}
+                                    diasSemanaProp={diasSemana}
+                                />
                             )}
                         </React.Fragment>
                     ))}

@@ -5,9 +5,9 @@ import { addDays, format, startOfWeek } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useEffect, useState } from 'react';
 import { Table } from 'react-bootstrap';
-import Ingredientes from './ingredientes';
-import { TableProduccion } from './TableProduccion';
-import { NavegacionSemanal } from './navegacionSemanal';
+// import Ingredientes from './ingredientes';
+// import { TableProduccion } from './TableProduccion';
+// import { NavegacionSemanal } from './navegacionSemanal';
 
 interface Plato {
     cantidad: number;
@@ -19,20 +19,36 @@ interface Comanda {
     fecha: string;
 }
 
-export function PlatoDetalle({ plato }: { plato: string }) {
+export function PlatoDetalle({
+    plato,
+    diasSemanaProp,
+}: {
+    plato: string;
+    diasSemanaProp: Date[];
+}) {
     const [datos, setDatos] = useState<any>({});
     // const [isEditar, setIsEditar] = useState(false);
-    const [produccionLocal, setProduccionLocal] = useState<{
-        [key: string]: number;
-    }>({});
-    const [semanaBase, setSemanaBase] = useState(new Date());
+    // const [produccionLocal, setProduccionLocal] = useState<{
+    //     [key: string]: number;
+    // }>({});
+    const [semanaBase] = useState(new Date());
+    // const [semanaBase, setSemanaBase] = useState(new Date());
     const [diasSemana, setDiasSemana] = useState<Date[]>([]);
 
     useEffect(() => {
-        fetch('/api/platoDetalle?nombrePlato=' + plato)
+        fetch(
+            '/api/platoDetalle?nombrePlato=' +
+                plato +
+                '&fechaInicio=' +
+                diasSemanaProp[4].toISOString()
+        )
             .then((res) => res.json())
+            .then((d) => {
+                console.log(d);
+                return d;
+            })
             .then(setDatos);
-    }, [plato]);
+    }, [plato, diasSemanaProp]);
 
     useEffect(() => {
         const inicioSemana = startOfWeek(semanaBase, { weekStartsOn: 0 }); // domingo
@@ -42,56 +58,56 @@ export function PlatoDetalle({ plato }: { plato: string }) {
         setDiasSemana(dias);
     }, [semanaBase]);
 
-    const guardarProduccion = async () => {
-        const res = await fetch('/api/produccion', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                plato: plato,
-                produccion: produccionLocal,
-            }),
-        });
+    // const guardarProduccion = async () => {
+    //     const res = await fetch('/api/produccion', {
+    //         method: 'POST',
+    //         headers: { 'Content-Type': 'application/json' },
+    //         body: JSON.stringify({
+    //             plato: plato,
+    //             produccion: produccionLocal,
+    //         }),
+    //     });
 
-        const result = await res.json();
+    //     const result = await res.json();
 
-        if (!result.success) {
-            // TODO MODAL
-            alert('Error al guardar la producción');
-            return;
-        }
+    //     if (!result.success) {
+    //         // TODO MODAL
+    //         alert('Error al guardar la producción');
+    //         return;
+    //     }
 
-        setProduccionLocal({});
-        setDatos({ ...datos, producciones: result.data });
+    //     setProduccionLocal({});
+    //     setDatos({ ...datos, producciones: result.data });
 
-        // TODO MODAL
-        alert('Producción guardada con éxito');
-    };
+    //     // TODO MODAL
+    //     alert('Producción guardada con éxito');
+    // };
 
-    const obtenerCantidadProduccion = (dia: Date) => {
-        if (!datos.producciones) {
-            return '';
-        }
+    // const obtenerCantidadProduccion = (dia: Date) => {
+    //     if (!datos.producciones) {
+    //         return '';
+    //     }
 
-        const produccion = datos.producciones.find((produccion: any) => {
-            const fecha = new Date(produccion.fecha);
-            fecha.setHours(0, 0, 0, 0);
+    //     const produccion = datos.producciones.find((produccion: any) => {
+    //         const fecha = new Date(produccion.fecha);
+    //         fecha.setHours(0, 0, 0, 0);
 
-            return fecha.getTime() === dia.getTime();
-        });
+    //         return fecha.getTime() === dia.getTime();
+    //     });
 
-        if (!produccion) {
-            return '';
-        }
+    //     if (!produccion) {
+    //         return '';
+    //     }
 
-        return produccion.cantidad > 0 ? produccion.cantidad : '';
-    };
+    //     return produccion.cantidad > 0 ? produccion.cantidad : '';
+    // };
 
     return (
         <tr style={{ textAlign: 'center' }}>
-            <td colSpan={diasSemana.length + 3}>
-                <div className="bg-success-subtle px-3 py-2 rounded mb-2 fw-semibold text-uppercase">
+            <td colSpan={diasSemana.length + 8}>
+                {/* <div className="bg-success-subtle px-3 py-2 rounded mb-2 fw-semibold text-uppercase">
                     Comanda
-                </div>
+                </div> */}
                 <Table
                     striped
                     responsive
@@ -140,7 +156,7 @@ export function PlatoDetalle({ plato }: { plato: string }) {
                     </tfoot>
                 </Table>
 
-                <NavegacionSemanal
+                {/* <NavegacionSemanal
                     semanaBase={semanaBase}
                     setSemanaBase={setSemanaBase}
                 />
@@ -159,7 +175,7 @@ export function PlatoDetalle({ plato }: { plato: string }) {
 
                 <Ingredientes
                     datos={datos}
-                    plato={plato}></Ingredientes>
+                    plato={plato}></Ingredientes> */}
             </td>
         </tr>
     );

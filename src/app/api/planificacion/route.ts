@@ -13,7 +13,9 @@ export async function GET(req: NextRequest) {
         );
     }
 
-    const inicio = startOfWeek(new Date(fechaInicio), { weekStartsOn: 4 });
+    const inicio = startOfWeek(new Date(addDays(fechaInicio, 7)), {
+        weekStartsOn: 0,
+    }); //lunes
 
     // Obtener todos los nombres de recetas PT de una vez
     const recetasPT = await prisma.receta.findMany({
@@ -25,7 +27,7 @@ export async function GET(req: NextRequest) {
     // Traer solo los eventos/platos que coinciden con recetas PT
     const eventos = await prisma.comanda.findMany({
         where: {
-            fecha: { gte: inicio, lte: addDays(inicio, 9) },
+            fecha: { gte: inicio, lte: addDays(inicio, 7) },
             Plato: {
                 some: {
                     nombre: { in: Array.from(nombresPT) },
@@ -50,7 +52,7 @@ export async function GET(req: NextRequest) {
             if (nombresPT.has(plato.nombre)) {
                 resultado.push({
                     plato: plato.nombre,
-                    fecha: format(addDays(evento.fecha, 1), 'yyyy-MM-dd'),
+                    fecha: format(addDays(evento.fecha, 2), 'yyyy-MM-dd'),
                     cantidad: plato.cantidad,
                     gestionado: plato.gestionado || false,
                     lugar: evento.lugar,
