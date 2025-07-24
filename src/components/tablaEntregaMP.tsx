@@ -156,7 +156,10 @@ export function TablaEntregaMP({
                             })} */}
                             </tr>
                             {platoExpandido === plato && (
-                                <PlatoDetalle plato={plato} />
+                                <PlatoDetalle
+                                    plato={plato}
+                                    diasSemanaProp={[]}
+                                />
                             )}
                         </React.Fragment>
                     ))}
