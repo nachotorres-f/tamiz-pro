@@ -2,6 +2,8 @@ import { prisma } from '@/lib/prisma';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET() {
+    process.env.TZ = 'America/Argentina/Buenos_Aires';
+
     const platos = await prisma.receta.findMany({
         distinct: ['nombreProducto'],
         select: {
@@ -22,6 +24,8 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+    process.env.TZ = 'America/Argentina/Buenos_Aires';
+
     const {
         idComanda,
         plato,

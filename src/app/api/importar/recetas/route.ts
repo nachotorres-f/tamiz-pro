@@ -5,6 +5,8 @@ import { prisma } from '@/lib/prisma';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
+    process.env.TZ = 'America/Argentina/Buenos_Aires';
+
     try {
         const formData = await req.formData();
         const file = formData.get('file') as File;

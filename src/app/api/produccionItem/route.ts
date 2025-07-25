@@ -4,6 +4,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { addDays, startOfWeek } from 'date-fns';
 
 export async function GET(req: NextRequest) {
+    process.env.TZ = 'America/Argentina/Buenos_Aires';
+
     const { searchParams } = req.nextUrl;
     const nombrePlato = searchParams.get('nombrePlato');
 
@@ -28,6 +30,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+    process.env.TZ = 'America/Argentina/Buenos_Aires';
+
     try {
         const body = await req.json();
         const { nombrePlato, fecha, cantidad } = body;

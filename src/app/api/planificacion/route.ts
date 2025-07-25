@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { format, startOfWeek, addDays } from 'date-fns';
 
 export async function GET(req: NextRequest) {
+    process.env.TZ = 'America/Argentina/Buenos_Aires';
+
     const { searchParams } = req.nextUrl;
     const fechaInicio = searchParams.get('fechaInicio');
 
@@ -88,6 +90,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+    process.env.TZ = 'America/Argentina/Buenos_Aires';
+
     const produccion = await req.json();
 
     if (!Array.isArray(produccion)) {

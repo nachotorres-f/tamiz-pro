@@ -71,6 +71,8 @@ async function calcularIngredientesPT(
 }
 
 export async function GET() {
+    process.env.TZ = 'America/Argentina/Buenos_Aires';
+
     const fechaBase = new Date();
     const inicio = startOfWeek(fechaBase, { weekStartsOn: 0 });
 
@@ -128,6 +130,8 @@ interface BODY {
 }
 
 export async function POST(req: NextRequest) {
+    process.env.TZ = 'America/Argentina/Buenos_Aires';
+
     const body: BODY = await req.json();
 
     for (const { fecha, cantidad } of body.produccion) {

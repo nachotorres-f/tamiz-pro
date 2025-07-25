@@ -4,6 +4,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { addDays, startOfWeek } from 'date-fns';
 
 export async function GET(req: NextRequest) {
+    process.env.TZ = 'America/Argentina/Buenos_Aires';
+
     const { searchParams } = req.nextUrl;
     const nombrePlato = searchParams.get('nombrePlato');
     const fechaInicio = searchParams.get('fechaInicio');

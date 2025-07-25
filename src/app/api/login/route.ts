@@ -4,6 +4,8 @@ import bcrypt from 'bcrypt';
 import { generateToken } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
+    process.env.TZ = 'America/Argentina/Buenos_Aires';
+
     const { username, password } = await req.json();
 
     try {

@@ -3,6 +3,8 @@ import { startOfWeek } from 'date-fns';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(req: NextRequest) {
+    process.env.TZ = 'America/Argentina/Buenos_Aires';
+
     const { searchParams } = req.nextUrl;
     const fechaInicio = searchParams.get('fechaInicio');
     const fechaFinal = searchParams.get('fechaFinal');

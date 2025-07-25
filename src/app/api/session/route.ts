@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 
 export async function GET(req: Request) {
+    process.env.TZ = 'America/Argentina/Buenos_Aires';
+
     const cookies = req.headers.get('cookie') || '';
     const token = cookies
         .split('; ')

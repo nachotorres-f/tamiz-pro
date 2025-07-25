@@ -5,6 +5,8 @@ import { prisma } from '@/lib/prisma';
 import { addDays, startOfWeek } from 'date-fns';
 
 export async function POST(req: NextRequest) {
+    process.env.TZ = 'America/Argentina/Buenos_Aires';
+
     const body = await req.json();
     const { plato, produccion } = body;
 
@@ -74,6 +76,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
+    process.env.TZ = 'America/Argentina/Buenos_Aires';
+
     const { searchParams } = req.nextUrl;
     const fechaInicio = searchParams.get('fechaInicio');
 

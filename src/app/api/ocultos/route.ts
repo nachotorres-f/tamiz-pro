@@ -2,6 +2,8 @@ import { prisma } from '@/lib/prisma';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(req: NextRequest) {
+    process.env.TZ = 'America/Argentina/Buenos_Aires';
+
     const { plato } = await req.json();
     if (!plato)
         return NextResponse.json({ error: 'Plato requerido' }, { status: 400 });

@@ -5,6 +5,8 @@ import { prisma } from '@/lib/prisma';
 const API_KEY = process.env.API_KEY;
 
 export async function POST(req: NextRequest) {
+    process.env.TZ = 'America/Argentina/Buenos_Aires';
+
     const apiKey = req.headers.get('x-api-key');
     if (!apiKey || apiKey !== API_KEY) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -151,6 +153,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+    process.env.TZ = 'America/Argentina/Buenos_Aires';
+
     const apiKey = req.headers.get('x-api-key');
     if (!apiKey || apiKey !== API_KEY) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

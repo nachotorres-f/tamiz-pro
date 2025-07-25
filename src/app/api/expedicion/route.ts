@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server';
 import { format, startOfWeek, addDays } from 'date-fns';
 
 export async function GET() {
+    process.env.TZ = 'America/Argentina/Buenos_Aires';
+
     const fechaBase = new Date();
     const inicio = startOfWeek(fechaBase, { weekStartsOn: 0 });
 
