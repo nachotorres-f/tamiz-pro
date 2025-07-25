@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { prisma } from '@/lib/prisma';
 import { NextRequest, NextResponse } from 'next/server';
 import { addDays, startOfWeek } from 'date-fns';
@@ -41,7 +40,6 @@ export async function GET(req: NextRequest) {
     //     },
     // });
 
-    console.log('LLEGO');
     const plato = await buscarPlato(nombrePlato, inicio, fin);
 
     // const produccionesSelect = await prisma.produccion.findMany({
@@ -159,6 +157,11 @@ const buscarPlato = async (nombrePlato: string, inicio: Date, fin: Date) => {
             continue;
         }
 
+        if (producto.nombre === 'Tapeo de Quesos Y Fiambres') {
+            console.log('Cantidad de tapeo: ', producto.cantidad);
+            console.log('Cantidad de la receta x 1', cantidad);
+            console.log('RSULTADO', producto.cantidad * cantidad);
+        }
         listProducto.push({
             ...producto,
             cantidad: producto.cantidad * cantidad,
@@ -205,7 +208,8 @@ const buscarIngredientes = async (
 
     const existe = ingredientes.some((ingrediente) => {
         if (ingrediente.descripcion === ingredienteBuscar) {
-            cantidad += ingrediente.porcionBruta;
+            console.log('\n', ingredientes, '\n');
+
             // console.log('');
             // console.log(
             //     `ID ${ingrediente.id} - Ingrediente encontrado: ${ingrediente.nombreProducto}, cantidad: ${ingrediente.porcionBruta})`
@@ -229,7 +233,6 @@ const buscarIngredientes = async (
     if (existe) {
         const ingrediente = ingredientes.find((ingrediente) => {
             if (ingrediente.descripcion === ingredienteBuscar) {
-                cantidad += ingrediente.porcionBruta;
                 return true; // Encontrado, salir del bucle
             }
             return false; // Continuar buscando
