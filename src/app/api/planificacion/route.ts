@@ -64,6 +64,7 @@ async function obtenerEventosSemana(inicio: Date, nombresPT: Set<string>) {
                     nombre: { in: Array.from(nombresPT) },
                 },
             },
+            // TODO - Agregar OR con ID = 1
         },
         include: {
             Plato: true,
@@ -82,6 +83,10 @@ function procesarEventosAPlatos(
             if (nombresPT.has(plato.nombre)) {
                 resultado.push({
                     plato: plato.nombre,
+                    // Para los platos que son agregados
+                    // Hay que agregar una columna en la tabla platos
+                    // que sea de fecha_agregado
+                    // y si el plato proviene de esa evento, usar la fecha del plato, en vez del evento
                     fecha: format(addDays(evento.fecha, 2), 'yyyy-MM-dd'),
                     cantidad: plato.cantidad,
                     gestionado: plato.gestionado || false,

@@ -2,13 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { Button, Col, Container, Form, Row } from 'react-bootstrap';
 
 type Plato = { codigo: string | number; nombreProducto: string };
-type Comanda = { id: string | number; nombre: string; tipo: string };
 
 export default function AgregarPlato() {
     const [platos, setPlatos] = useState<Plato[]>([]);
-    const [comandas, setComandas] = useState<Comanda[]>([]);
     const [selectedPlato, setSelectedPlato] = useState<string>('');
-    const [selectedComanda, setSelectedComanda] = useState<string>('');
     const [cantidad, setCantidad] = useState<string>('');
 
     useEffect(() => {
@@ -16,14 +13,13 @@ export default function AgregarPlato() {
             .then((res) => res.json())
             .then((data) => {
                 setPlatos(data.platos);
-                setComandas(data.comandas);
             });
     }, []);
 
     const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
 
-        if (!selectedPlato || !selectedComanda || !cantidad) {
+        if (!selectedPlato || !cantidad) {
             alert('Por favor, completa todos los campos.');
             return;
         }
@@ -34,7 +30,6 @@ export default function AgregarPlato() {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                idComanda: selectedComanda,
                 plato: selectedPlato,
                 cantidad: parseInt(cantidad, 10),
             }),
@@ -73,29 +68,6 @@ export default function AgregarPlato() {
                                         {plato.codigo +
                                             ' - ' +
                                             plato.nombreProducto}
-                                    </option>
-                                ))}
-                            </Form.Select>
-                        </Form.Group>
-                    </Col>
-                    <Col>
-                        <Form.Group controlId="comanda">
-                            <Form.Label>Comanda</Form.Label>
-                            <Form.Select
-                                value={selectedComanda}
-                                onChange={(e) =>
-                                    setSelectedComanda(e.target.value)
-                                }>
-                                <option
-                                    value=""
-                                    disabled>
-                                    Selecciona una comanda
-                                </option>
-                                {comandas.map((comanda) => (
-                                    <option
-                                        key={comanda.id}
-                                        value={comanda.id}>
-                                        {comanda.nombre + ' - ' + comanda.tipo}
                                     </option>
                                 ))}
                             </Form.Select>
