@@ -69,8 +69,9 @@ export default function ProduccionPreviaPage() {
             .filter((item) =>
                 item.produccion.some(
                     (p: { fecha: string }) =>
-                        (p.fecha.startsWith(fecha) && !item.principal) ||
-                        (p.fecha.startsWith(fechaMasUno) && item.principal)
+                        // (p.fecha.startsWith(fecha) && !item.principal) ||
+                        p.fecha.startsWith(fechaMasUno)
+                    //&& item.principal
                 )
             )
             .map((item) => item.plato);
@@ -257,7 +258,12 @@ export default function ProduccionPreviaPage() {
                                             ingrediente.codigo,
                                             ingrediente.nombre,
                                             ingrediente.unidadMedida,
-                                            ingrediente.porcionBruta * cantidad,
+                                            parseFloat(
+                                                (
+                                                    ingrediente.porcionBruta *
+                                                    cantidad
+                                                ).toFixed(2)
+                                            ),
                                         ]);
 
                                     const tableData = {
@@ -344,7 +350,7 @@ export default function ProduccionPreviaPage() {
                     <thead className="table-dark sticky-top">
                         <tr style={{ textAlign: 'center' }}>
                             <th></th>
-                            {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => {
+                            {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => {
                                 return (
                                     <th key={i}>
                                         <Button

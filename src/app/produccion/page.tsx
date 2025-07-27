@@ -70,12 +70,17 @@ export default function ProduccionPage() {
             console.log(dia, fecha, fechaMasUno);
         }
 
+        console.log('DIA', dia);
+        console.log('FECHA', fecha);
+        console.log('FECHA MAS UNO', fechaMasUno);
+
         const platosEnFecha = datos
             .filter((item) =>
                 item.produccion.some(
                     (p: { fecha: string }) =>
-                        (p.fecha.startsWith(fecha) && !item.principal) ||
-                        (p.fecha.startsWith(fechaMasUno) && item.principal)
+                        // (p.fecha.startsWith(fecha) && !item.principal) ||
+                        p.fecha.startsWith(fechaMasUno)
+                    //&& item.principal
                 )
             )
             .map((item) => item.plato);
@@ -264,7 +269,12 @@ export default function ProduccionPage() {
                                             ingrediente.codigo,
                                             ingrediente.nombre,
                                             ingrediente.unidadMedida,
-                                            ingrediente.porcionBruta * cantidad,
+                                            parseFloat(
+                                                (
+                                                    ingrediente.porcionBruta *
+                                                    cantidad
+                                                ).toFixed(2)
+                                            ),
                                         ]);
 
                                     const tableData = {
