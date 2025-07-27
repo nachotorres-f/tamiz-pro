@@ -6,28 +6,28 @@ import { generateToken } from '@/lib/auth';
 export async function POST(req: NextRequest) {
     process.env.TZ = 'America/Argentina/Buenos_Aires';
 
-    // const { username, password } = await req.json();
+    const { username, password } = await req.json();
 
     try {
-        // const user = await prisma.user.findUnique({ where: { username } });
+        const user = await prisma.user.findUnique({ where: { username } });
 
-        // if (!user) {
-        //     return NextResponse.json(
-        //         { success: false, message: 'Usuario no encontrado' },
-        //         { status: 401 }
-        //     );
-        // }
+        if (!user) {
+            return NextResponse.json(
+                { success: false, message: 'Usuario no encontrado' },
+                { status: 401 }
+            );
+        }
 
-        // const isValid = await bcrypt.compare(password, user.password);
+        const isValid = await bcrypt.compare(password, user.password);
 
-        // if (!isValid) {
-        //     return NextResponse.json(
-        //         { success: false, message: 'Contraseña incorrecta' },
-        //         { status: 401 }
-        //     );
-        // }
+        if (!isValid) {
+            return NextResponse.json(
+                { success: false, message: 'Contraseña incorrecta' },
+                { status: 401 }
+            );
+        }
 
-        const token = generateToken({ id: 1, username: 'admin' });
+        const token = generateToken({ id: user.id, username: user.username });
 
         const res = NextResponse.json({ success: true });
 
