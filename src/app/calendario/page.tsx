@@ -7,8 +7,7 @@ import bootstrap5Plugin from '@fullcalendar/bootstrap5';
 import esLocale from '@fullcalendar/core/locales/es';
 import '@fullcalendar/bootstrap5';
 import { useEffect, useState } from 'react';
-import { startOfWeek, endOfWeek, format, addWeeks } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { startOfWeek, addWeeks } from 'date-fns';
 import { useRouter } from 'next/navigation';
 // import timeGridPlugin from '@fullcalendar/timegrid';
 // import interactionPlugin from '@fullcalendar/interaction';
@@ -20,25 +19,9 @@ export default function CalendarioPage() {
     const router = useRouter();
 
     useEffect(() => {
-        const hoy = new Date();
-
-        const lunes = startOfWeek(hoy, { weekStartsOn: 1 }); // lunes
-        const domingo = endOfWeek(hoy, { weekStartsOn: 2 }); // domingo
-
         fetch('/api/calendario')
             .then((response) => response.json())
             .then((data) => {
-                data.push({
-                    title: 'Semana actual',
-                    start: lunes
-                        ? format(lunes, 'yyyy-MM-dd', { locale: es })
-                        : '',
-                    end: domingo
-                        ? format(domingo, 'yyyy-MM-dd', { locale: es })
-                        : '',
-                    display: 'background',
-                    color: '#fff3cd',
-                });
                 setEvents(data);
             })
             .catch((error) => {
