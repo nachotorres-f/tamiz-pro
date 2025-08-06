@@ -103,12 +103,44 @@ export function TablaPlanificacion({
                         {/* <th ref={anchoButton}></th>
                     <th ref={anchoPlato}>Plato</th>
                     <th ref={anchoTotal}>Total</th> */}
-                        <th style={{ minWidth: '3rem' }}></th>
-                        <th style={{ minWidth: '2rem' }}>Plato</th>
-                        <th>Total</th>
+                        <th
+                            style={{
+                                minWidth: '3rem',
+                                position: 'sticky',
+                                left: 0,
+                                zIndex: 4,
+                            }}></th>
+                        <th
+                            style={{
+                                minWidth: '2rem',
+                                position: 'sticky',
+                                left: '2.8rem',
+                                zIndex: 4,
+                            }}>
+                            Plato
+                        </th>
+                        <th
+                            style={{
+                                minWidth: '2rem',
+                                position: 'sticky',
+                                left: '9.8rem',
+                                zIndex: 4,
+                            }}>
+                            Total
+                        </th>
                         {diasSemana.filter(filterDias).map((dia, idx) => (
                             <th key={idx}>
-                                {format(dia, 'EEEE d MMMM', { locale: es })}
+                                {
+                                    //                                     const nombreDia = format(dia, 'EEEE', { locale: es }); // "sábado"
+                                    // const letraDia = nombreDia.charAt(0).toUpperCase();    // "S"
+                                    // const diaNumero = format(dia, 'd');                    // "5"
+                                    // const mesNumero = format(dia, 'M');                    // "7"
+                                    // const resultado = `${letraDia} ${diaNumero}-${mesNumero}`;
+                                }
+                                {format(dia, 'EEE d-M', {
+                                    locale: es,
+                                })}{' '}
+                                {/* "Sáb 5-7" */}
                             </th>
                         ))}
                     </tr>
@@ -165,7 +197,14 @@ export function TablaPlanificacion({
                                     }}>
                                     {plato}
                                 </td>
-                                <td rowSpan={2}>
+                                <td
+                                    rowSpan={2}
+                                    style={{
+                                        minWidth: '2rem',
+                                        position: 'sticky',
+                                        left: '9.8rem',
+                                        zIndex: 4,
+                                    }}>
                                     {parseFloat(
                                         datos
                                             .filter(

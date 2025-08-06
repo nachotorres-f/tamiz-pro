@@ -13,17 +13,20 @@ export function NavegacionSemanal({
     const [contador, setContador] = React.useState(0);
     return (
         <div className="d-flex justify-content-end mb-3">
-            {true && (
-                <Button
-                    size="sm"
-                    className="me-2"
-                    onClick={() => {
-                        setSemanaBase(addDays(semanaBase, -7));
-                        setContador(contador - 1);
-                    }}>
-                    ⬅ Semana anterior
-                </Button>
-            )}
+            {
+                // contador > 0 && (
+                true && (
+                    <Button
+                        size="sm"
+                        className="me-2"
+                        onClick={() => {
+                            setSemanaBase(addDays(semanaBase, -7));
+                            setContador(contador - 1);
+                        }}>
+                        ⬅ Semana anterior
+                    </Button>
+                )
+            }
 
             <Button
                 size="sm"

@@ -190,7 +190,7 @@ export default function PlanificacionPage() {
 
             <div
                 className="mb-3"
-                style={{ overflowX: 'auto', height: 'calc(100vh)' }}>
+                style={{ overflow: 'auto', height: 'calc(100vh)' }}>
                 <TablaPlanificacion
                     platosUnicos={platosUnicos}
                     diasSemana={diasSemana}
