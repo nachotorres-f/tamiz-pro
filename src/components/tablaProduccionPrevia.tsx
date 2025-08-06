@@ -35,7 +35,7 @@ export const TableProduccionPrevia: React.FC<TableProduccionPreviaProps> = ({
                     <tr style={{ textAlign: 'center' }}>
                         {diasSemana.map((dia, i) => (
                             <th key={i}>
-                                {format(dia, 'EEEE d MMMM', { locale: es })}
+                                {format(dia, 'EEE d-M ', { locale: es })}
                             </th>
                         ))}
                     </tr>

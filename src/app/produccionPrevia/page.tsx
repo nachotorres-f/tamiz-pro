@@ -476,7 +476,7 @@ export default function ProduccionPreviaPage() {
                             <th>Plato</th>
                             {diasSemana.filter(filterDias).map((dia, idx) => (
                                 <th key={idx}>
-                                    {format(dia, 'EEEE d MMMM', {
+                                    {format(dia, 'EEE d-M', {
                                         locale: es,
                                     })}
                                 </th>
