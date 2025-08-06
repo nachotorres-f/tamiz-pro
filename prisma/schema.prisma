@@ -67,6 +67,7 @@ model Produccion {
   plato     String
   observacion String?
   cantidad Float 
+  salon String?
   createdAt DateTime @default(now())
 }
 

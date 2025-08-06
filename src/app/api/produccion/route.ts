@@ -129,6 +129,7 @@ export async function GET(req: NextRequest) {
                         cantidad: produccion.cantidad,
                     },
                 ],
+                salon: produccion.salon,
             });
         }
     }

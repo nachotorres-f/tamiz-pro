@@ -35,7 +35,7 @@ export default function PlanificacionPage() {
     const [filtro] = useState('');
     const [diaActivo, setDiaActivo] = useState('');
     const [platoExpandido, setPlatoExpandido] = useState<string | null>(null);
-    const [filtroSalon, setFiltroSalon] = useState<string | null>(null);
+    const [filtroSalon, setFiltroSalon] = useState<string | null>('A');
     const [produccionUpdate, setProduccionUpdate] = React.useState<any[]>([]);
 
     // Referencias para medir el ancho de las celdas
@@ -104,7 +104,10 @@ export default function PlanificacionPage() {
         await fetch('/api/planificacion', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(produccionUpdate),
+            body: JSON.stringify({
+                salon: filtroSalon,
+                produccion: produccionUpdate,
+            }),
         });
         setProduccionUpdate([]);
 
@@ -158,7 +161,6 @@ export default function PlanificacionPage() {
                                 onChange={(e) =>
                                     setFiltroSalon(e.target.value)
                                 }>
-                                <option value="">Todos los salones</option>
                                 <option value="A">Rut Haus - Origami</option>
                                 <option value="B">El Central - La Rural</option>
                             </Form.Select>

@@ -9,9 +9,12 @@ import { es } from 'date-fns/locale';
 import React, { useEffect, useState } from 'react';
 import {
     Button,
+    Col,
     // Col,
     Container,
+    Form,
     Modal,
+    Row,
     // Form,
     // Row,
     Table,
@@ -29,6 +32,7 @@ export default function ProduccionPage() {
     const [datos, setDatos] = useState<any[]>([]);
     const [showModal, setShowModal] = useState(false);
     const [platos, setPlatos] = useState<string[]>([]);
+    const [filtroSalon, setFiltroSalon] = useState<string>('A');
 
     console.log('datos', datos);
 
@@ -370,6 +374,12 @@ export default function ProduccionPage() {
         setShowModal(false);
     };
 
+    const filterSalon = (dato: any) => {
+        if (!filtroSalon) return true;
+
+        return dato.salon === filtroSalon;
+    };
+
     return (
         <Container className="mt-5">
             <h2 className="text-center mb-4">Produccion</h2>
@@ -413,6 +423,24 @@ export default function ProduccionPage() {
                     </Button>
                 </Modal.Footer>
             </Modal>
+
+            <Container className="mb-3">
+                <Row>
+                    <Col xs={4}>
+                        <Form.Group>
+                            <Form.Label>Filtrar por salón</Form.Label>
+                            <Form.Select
+                                value={filtroSalon || ''}
+                                onChange={(e) =>
+                                    setFiltroSalon(e.target.value)
+                                }>
+                                <option value="A">Rut Haus - Origami</option>
+                                <option value="B">El Central - La Rural</option>
+                            </Form.Select>
+                        </Form.Group>
+                    </Col>
+                </Row>
+            </Container>
 
             <NavegacionSemanal
                 semanaBase={semanaBase}
@@ -461,9 +489,12 @@ export default function ProduccionPage() {
                     </thead>
                     <tbody>
                         {datos &&
-                            datos.filter(filterPlatos).map((dato) => (
-                                <tr key={dato.plato}>
-                                    {/* <td>
+                            datos
+                                .filter(filterPlatos)
+                                .filter(filterSalon)
+                                .map((dato) => (
+                                    <tr key={dato.plato}>
+                                        {/* <td>
                                         <Button
                                             className="btn-danger"
                                             size="sm"
@@ -480,43 +511,44 @@ export default function ProduccionPage() {
                                             <FiletypePdf />
                                         </Button>
                                     </td> */}
-                                    <td>{dato.plato}</td>
+                                        <td>{dato.plato}</td>
 
-                                    {diasSemana
-                                        .filter(filterDias)
-                                        .map((dia, i) => {
-                                            dia.setHours(0, 0, 0, 0);
+                                        {diasSemana
+                                            .filter(filterDias)
+                                            .map((dia, i) => {
+                                                dia.setHours(0, 0, 0, 0);
 
-                                            const produccion =
-                                                dato.produccion.find(
-                                                    (prod: any) => {
-                                                        const fecha = new Date(
-                                                            prod.fecha
-                                                        );
-                                                        fecha.setHours(
-                                                            0,
-                                                            0,
-                                                            0,
-                                                            0
-                                                        );
+                                                const produccion =
+                                                    dato.produccion.find(
+                                                        (prod: any) => {
+                                                            const fecha =
+                                                                new Date(
+                                                                    prod.fecha
+                                                                );
+                                                            fecha.setHours(
+                                                                0,
+                                                                0,
+                                                                0,
+                                                                0
+                                                            );
 
-                                                        return (
-                                                            fecha.getTime() ===
-                                                            dia.getTime()
-                                                        );
-                                                    }
+                                                            return (
+                                                                fecha.getTime() ===
+                                                                dia.getTime()
+                                                            );
+                                                        }
+                                                    );
+                                                const cantidad = produccion
+                                                    ? produccion.cantidad
+                                                    : 0;
+                                                return (
+                                                    <td key={i}>
+                                                        {cantidad || ''}
+                                                    </td>
                                                 );
-                                            const cantidad = produccion
-                                                ? produccion.cantidad
-                                                : 0;
-                                            return (
-                                                <td key={i}>
-                                                    {cantidad || ''}
-                                                </td>
-                                            );
-                                        })}
-                                </tr>
-                            ))}
+                                            })}
+                                    </tr>
+                                ))}
                     </tbody>
                 </Table>
             </div>
