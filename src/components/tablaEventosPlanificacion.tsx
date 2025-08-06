@@ -49,15 +49,15 @@ export default function TablaEventosPlanificacion({
         if (filtroSalon) {
             const eventosFiltrados = eventos.filter((d) => {
                 if (filtroSalon === 'A') {
-                    return filtroSalon === 'A'
-                        ? d.lugar.toLowerCase() !== 'el central'
-                        : d.lugar.toLowerCase() !== 'la rural';
+                    return !['el central', 'la rural'].includes(
+                        d.lugar.toLowerCase()
+                    );
                 }
 
                 if (filtroSalon === 'B') {
-                    return filtroSalon === 'B'
-                        ? d.lugar.toLowerCase() === 'el central'
-                        : d.lugar.toLowerCase() === 'la rural';
+                    return ['el central', 'la rural'].includes(
+                        d.lugar.toLowerCase()
+                    );
                 }
             });
             setEventosFiltrados(eventosFiltrados);

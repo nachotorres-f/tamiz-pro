@@ -84,14 +84,14 @@ export default function PlanificacionPage() {
             const datosFiltrados = datos.filter((d) => {
                 if (filtroSalon === 'A') {
                     return filtroSalon === 'A'
-                        ? d.lugar.toLowerCase() !== 'el central'
-                        : d.lugar.toLowerCase() !== 'la rural';
+                        ? d.lugar.toLowerCase().trim() !== 'el central'
+                        : d.lugar.toLowerCase().trim() !== 'la rural';
                 }
 
                 if (filtroSalon === 'B') {
                     return filtroSalon === 'B'
-                        ? d.lugar.toLowerCase() === 'el central'
-                        : d.lugar.toLowerCase() === 'la rural';
+                        ? d.lugar.toLowerCase().trim() === 'el central'
+                        : d.lugar.toLowerCase().trim() === 'la rural';
                 }
             });
             setDatosFiltrados(datosFiltrados);
