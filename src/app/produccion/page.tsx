@@ -11,6 +11,7 @@ import {
     Button,
     // Col,
     Container,
+    Modal,
     // Form,
     // Row,
     Table,
@@ -26,6 +27,8 @@ export default function ProduccionPage() {
     const [diaActivo, setDiaActivo] = useState('');
     const [semanaBase, setSemanaBase] = useState(new Date());
     const [datos, setDatos] = useState<any[]>([]);
+    const [showModal, setShowModal] = useState(false);
+    const [platos, setPlatos] = useState<string[]>([]);
 
     console.log('datos', datos);
 
@@ -65,227 +68,262 @@ export default function ProduccionPage() {
     const generarPDFFecha = async (i: number) => {
         const dia = diasSemana[i];
         const fecha = format(dia, 'yyyy-MM-dd');
-        const fechaMasUno = format(addDays(fecha, 2), 'yyyy-MM-dd');
-        if (i === 0) {
-            console.log(dia, fecha, fechaMasUno);
-        }
 
         const platosEnFecha = datos
+            .map((item) => {
+                return {
+                    ...item,
+                    produccion: item.produccion.map((p: { fecha: string }) => ({
+                        ...p,
+                        fecha: format(new Date(p.fecha), 'yyyy-MM-dd'),
+                    })),
+                };
+            })
             .filter((item) =>
-                item.produccion.some(
-                    (p: { fecha: string }) =>
-                        (p.fecha.startsWith(fecha) && !item.principal) ||
-                        (p.fecha.startsWith(fechaMasUno) && item.principal)
+                item.produccion.some((p: { fecha: string }) =>
+                    p.fecha.startsWith(fecha)
                 )
             )
             .map((item) => item.plato);
 
-        console.log('platosEnFecha', platosEnFecha);
+        // for (let index = 0; index < platosEnFecha.length; index++) {
+        //     const element = platosEnFecha[index];
+        //     await generarPDF(element);
+        // }
 
-        for (let index = 0; index < platosEnFecha.length; index++) {
-            const element = platosEnFecha[index];
-            generarPDF(element);
-        }
+        setPlatos(platosEnFecha);
+        setShowModal(true);
     };
 
-    const generarPDF = async (plato: string) => {
+    const generarPDF = async (platosList: string[]) => {
         const doc = new jsPDF();
 
-        await fetch(
-            'api/generarPDF?plato=' +
-                plato +
-                '&fechaInicio=' +
-                startOfWeek(semanaBase, { weekStartsOn: 4 }).toISOString()
-        )
-            .then((res) => res.json())
-            .then((res) => {
-                const data = res.data;
-                data.forEach((platoGrupo: any) => {
-                    const ingredientesAgrupados = agruparIngredientes(
-                        platoGrupo.ingredientes
-                    );
+        for (let index = 0; index < platosList.length; index++) {
+            if (index > 0) {
+                doc.addPage();
+            }
 
-                    const produccion: any = datos.find(
-                        (dato) => dato.plato === plato
-                    )?.produccion;
+            const plato = platos[index];
 
-                    produccion.forEach(
-                        (
-                            {
-                                fecha,
-                                cantidad,
-                            }: { fecha: Date; cantidad: number },
-                            indexProd: number
-                        ) => {
-                            if (indexProd > 0) {
-                                doc.addPage();
-                            }
+            await fetch(
+                'api/generarPDF?plato=' +
+                    plato +
+                    '&fechaInicio=' +
+                    startOfWeek(semanaBase, { weekStartsOn: 4 }).toISOString()
+            )
+                .then((res) => res.json())
+                .then((res) => {
+                    const data = res.data;
+                    data.forEach((platoGrupo: any) => {
+                        const ingredientesAgrupados = agruparIngredientes(
+                            platoGrupo.ingredientes
+                        );
 
-                            ingredientesAgrupados.forEach(
-                                (ingredientes: any, index: number) => {
-                                    if (index !== 0) {
-                                        doc.addPage();
-                                    }
-                                    const pageWidth =
-                                        doc.internal.pageSize.getWidth();
-                                    const pageHeight =
-                                        doc.internal.pageSize.getHeight();
-                                    let yPosition = 40;
+                        const produccion: any = datos.find(
+                            (dato) => dato.plato === plato
+                        )?.produccion;
 
-                                    doc.setFontSize(20);
-                                    doc.setTextColor(0, 0, 0);
-
-                                    const title = 'Produccion';
-                                    const titleWidth = doc.getTextWidth(title);
-
-                                    const titleX = (pageWidth - titleWidth) / 2;
-                                    const titleY = yPosition;
-                                    doc.text(title, titleX, titleY);
-
-                                    // Agregar una imagen en la esquina superior izquierda
-                                    const imgWidth = 40; // Ancho de la imagen
-                                    const imgHeight = 40; // Alto de la imagen
-
-                                    const imgUrl = '/logo_black.png'; // Ruta de la imagen
-                                    const img = new Image();
-                                    img.src = imgUrl;
-
-                                    doc.addImage(
-                                        img,
-                                        'PNG',
-                                        10,
-                                        10,
-                                        imgWidth,
-                                        imgHeight
-                                    );
-
-                                    // Fecha de generación
-                                    const dateCreate = `Generado el: ${format(
-                                        new Date(),
-                                        'dd/MM/yyyy HH:mm'
-                                    )}`;
-                                    const dateCreateWidth =
-                                        doc.getTextWidth(dateCreate);
-                                    const dateCreateX =
-                                        pageWidth - dateCreateWidth + 35;
-                                    const dateCreateY = pageHeight - 10;
-
-                                    doc.setFontSize(10);
-                                    doc.text(
-                                        dateCreate,
-                                        dateCreateX,
-                                        dateCreateY
-                                    );
-
-                                    yPosition += 10;
-
-                                    doc.setLineWidth(0.2); // grosor fino
-
-                                    // linea horizontal
-                                    doc.line(
-                                        10,
-                                        yPosition,
-                                        doc.internal.pageSize.getWidth() - 10,
-                                        yPosition
-                                    );
-
-                                    yPosition += 10;
-
-                                    // Título de la receta
-                                    doc.setFontSize(16);
-                                    doc.text(
-                                        index > 0
-                                            ? ingredientes[0].nombre.toString() +
-                                                  ' - ' +
-                                                  ingredientes[0].codigo
-                                            : plato.toString(),
-                                        14,
-                                        yPosition
-                                    );
-
-                                    yPosition += 5;
-                                    doc.setFontSize(10);
-
-                                    if (index > 0) {
-                                        const cantidad =
-                                            ingredientesAgrupados.find(
-                                                (ingAgr: any) => {
-                                                    if (
-                                                        ingAgr[0].nombre ===
-                                                        ingredientes[0].nombre
-                                                    ) {
-                                                        return true;
-                                                    }
-                                                }
-                                            )[0].porcionBruta;
-
-                                        doc.text(
-                                            'Cantidad a producir: ' +
-                                                cantidad +
-                                                ' porciones',
-                                            14,
-                                            yPosition
-                                        );
-                                    } else {
-                                        doc.text(
-                                            'Cantidad: ' + cantidad,
-                                            14,
-                                            yPosition
-                                        );
-                                    }
-
-                                    yPosition += 5;
-                                    doc.text(
-                                        'Fecha Produccion: ' +
-                                            format(
-                                                new Date(fecha),
-                                                'dd/MM/yyyy'
-                                            ),
-                                        14,
-                                        yPosition
-                                    );
-
-                                    const headers = [
-                                        [
-                                            'Código',
-                                            'Descripción',
-                                            'Unidad',
-                                            'Porción Bruta',
-                                        ],
-                                    ];
-
-                                    const data = ingredientes
-                                        .filter(
-                                            (_ingrediente: any, i: number) =>
-                                                (index > 0 && i !== 0) ||
-                                                index === 0
-                                        )
-                                        .map((ingrediente: any) => [
-                                            ingrediente.codigo,
-                                            ingrediente.nombre,
-                                            ingrediente.unidadMedida,
-                                            ingrediente.porcionBruta * cantidad,
-                                        ]);
-
-                                    const tableData = {
-                                        head: headers,
-                                        body: data,
-                                    };
-                                    autoTable(doc, {
-                                        ...tableData,
-                                        startY: yPosition + 10,
-                                        margin: { left: 10 },
-                                        theme: 'plain',
-                                    });
+                        produccion.forEach(
+                            (
+                                {
+                                    fecha,
+                                    cantidad,
+                                }: { fecha: Date; cantidad: number },
+                                indexProd: number
+                            ) => {
+                                if (indexProd > 0) {
+                                    doc.addPage();
                                 }
-                            );
-                        }
-                    );
-                });
 
-                const fechaHoy = format(new Date(), 'yyyy-MM-dd');
-                doc.save(fechaHoy + ' ' + plato + '.pdf');
-            });
+                                ingredientesAgrupados.forEach(
+                                    (ingredientes: any, index: number) => {
+                                        if (index !== 0) {
+                                            doc.addPage();
+                                        }
+                                        const pageWidth =
+                                            doc.internal.pageSize.getWidth();
+                                        const pageHeight =
+                                            doc.internal.pageSize.getHeight();
+                                        let yPosition = 40;
+
+                                        doc.setFontSize(20);
+                                        doc.setTextColor(0, 0, 0);
+
+                                        const title = 'Produccion';
+                                        const titleWidth =
+                                            doc.getTextWidth(title);
+
+                                        const titleX =
+                                            (pageWidth - titleWidth) / 2;
+                                        const titleY = yPosition;
+                                        doc.text(title, titleX, titleY);
+
+                                        // Agregar una imagen en la esquina superior izquierda
+                                        const imgWidth = 40; // Ancho de la imagen
+                                        const imgHeight = 40; // Alto de la imagen
+
+                                        const imgUrl = '/logo_black.png'; // Ruta de la imagen
+                                        const img = new Image();
+                                        img.src = imgUrl;
+
+                                        doc.addImage(
+                                            img,
+                                            'PNG',
+                                            10,
+                                            10,
+                                            imgWidth,
+                                            imgHeight
+                                        );
+
+                                        // Fecha de generación
+                                        const dateCreate = `Generado el: ${format(
+                                            new Date(),
+                                            'dd/MM/yyyy HH:mm'
+                                        )}`;
+                                        const dateCreateWidth =
+                                            doc.getTextWidth(dateCreate);
+                                        const dateCreateX =
+                                            pageWidth - dateCreateWidth + 35;
+                                        const dateCreateY = pageHeight - 10;
+
+                                        doc.setFontSize(10);
+                                        doc.text(
+                                            dateCreate,
+                                            dateCreateX,
+                                            dateCreateY
+                                        );
+
+                                        yPosition += 10;
+
+                                        doc.setLineWidth(0.2); // grosor fino
+
+                                        // linea horizontal
+                                        doc.line(
+                                            10,
+                                            yPosition,
+                                            doc.internal.pageSize.getWidth() -
+                                                10,
+                                            yPosition
+                                        );
+
+                                        yPosition += 10;
+
+                                        // Título de la receta
+                                        doc.setFontSize(16);
+                                        doc.text(
+                                            index > 0
+                                                ? ingredientes[0].nombre.toString() +
+                                                      ' - ' +
+                                                      ingredientes[0].codigo
+                                                : plato.toString(),
+                                            14,
+                                            yPosition
+                                        );
+
+                                        yPosition += 5;
+                                        doc.setFontSize(10);
+
+                                        if (index > 0) {
+                                            const cantidad =
+                                                ingredientesAgrupados.find(
+                                                    (ingAgr: any) => {
+                                                        if (
+                                                            ingAgr[0].nombre ===
+                                                            ingredientes[0]
+                                                                .nombre
+                                                        ) {
+                                                            return true;
+                                                        }
+                                                    }
+                                                )[0].porcionBruta;
+
+                                            doc.text(
+                                                'Cantidad a producir: ' +
+                                                    cantidad +
+                                                    ' porciones',
+                                                14,
+                                                yPosition
+                                            );
+                                        } else {
+                                            doc.text(
+                                                'Cantidad: ' + cantidad,
+                                                14,
+                                                yPosition
+                                            );
+                                        }
+
+                                        yPosition += 5;
+                                        doc.text(
+                                            'Fecha Produccion: ' +
+                                                format(
+                                                    new Date(fecha),
+                                                    'dd/MM/yyyy'
+                                                ),
+                                            14,
+                                            yPosition
+                                        );
+
+                                        const headers = [
+                                            [
+                                                'Código',
+                                                'Descripción',
+                                                'Unidad',
+                                                'Porción Bruta',
+                                            ],
+                                        ];
+
+                                        const data = ingredientes
+                                            .filter(
+                                                (
+                                                    _ingrediente: any,
+                                                    i: number
+                                                ) =>
+                                                    (index > 0 && i !== 0) ||
+                                                    index === 0
+                                            )
+                                            .map(
+                                                (ingrediente: {
+                                                    codigo: string;
+                                                    nombre: string;
+                                                    unidadMedida: string;
+                                                    porcionBruta: number;
+                                                }) => [
+                                                    ingrediente.codigo,
+                                                    ingrediente.nombre,
+                                                    ingrediente.unidadMedida,
+                                                    (
+                                                        ingrediente.porcionBruta *
+                                                        cantidad
+                                                    ).toFixed(2),
+                                                ]
+                                            );
+
+                                        const tableData = {
+                                            head: headers,
+                                            body: data,
+                                        };
+                                        autoTable(doc, {
+                                            ...tableData,
+                                            startY: yPosition + 10,
+                                            margin: { left: 10 },
+                                            theme: 'plain',
+                                        });
+                                    }
+                                );
+                            }
+                        );
+                    });
+
+                    if (platosList.length === 1) {
+                        const fechaHoy = format(new Date(), 'yyyy-MM-dd');
+                        doc.save(fechaHoy + ' ' + plato + '.pdf');
+                    }
+                });
+        }
+
+        if (platosList.length > 1) {
+            doc.save(format(new Date(), 'yyyy-MM-dd') + ' Produccion.pdf');
+        }
     };
 
     const agruparIngredientes = (ingredientes: any) => {
@@ -316,6 +354,22 @@ export default function ProduccionPage() {
         return ingredientesAgrupados;
     };
 
+    const handleClose = () => setShowModal(false);
+
+    const handleImprimirJuntas = () => {
+        generarPDF(platos);
+        setShowModal(false);
+    };
+
+    const handleImprimirSeparadas = async () => {
+        for (let index = 0; index < platos.length; index++) {
+            const list = [];
+            list.push(platos[index]);
+            await generarPDF(list);
+        }
+        setShowModal(false);
+    };
+
     return (
         <Container className="mt-5">
             <h2 className="text-center mb-4">Produccion</h2>
@@ -336,6 +390,29 @@ export default function ProduccionPage() {
                     </Col>
                 </Row>
             </Form.Group> */}
+
+            <Modal
+                show={showModal}
+                onHide={handleClose}>
+                <Modal.Header closeButton>
+                    <Modal.Title>Imprimir recetas</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    ¿Quieres imprimir las recetas separadas o juntas?
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button
+                        variant="primary"
+                        onClick={handleImprimirJuntas}>
+                        Imprimir juntas
+                    </Button>
+                    <Button
+                        variant="primary"
+                        onClick={handleImprimirSeparadas}>
+                        Imprimir separadas
+                    </Button>
+                </Modal.Footer>
+            </Modal>
 
             <NavegacionSemanal
                 semanaBase={semanaBase}

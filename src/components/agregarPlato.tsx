@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Button, Col, Container, Form, Row } from 'react-bootstrap';
+import DatePicker from 'react-datepicker';
+
+import 'react-datepicker/dist/react-datepicker.css';
 
 type Plato = { codigo: string | number; nombreProducto: string };
 
@@ -7,6 +10,7 @@ export default function AgregarPlato() {
     const [platos, setPlatos] = useState<Plato[]>([]);
     const [selectedPlato, setSelectedPlato] = useState<string>('');
     const [cantidad, setCantidad] = useState<string>('');
+    const [startDate, setStartDate] = useState(new Date());
 
     useEffect(() => {
         fetch('/api/platos')
@@ -32,6 +36,7 @@ export default function AgregarPlato() {
             body: JSON.stringify({
                 plato: selectedPlato,
                 cantidad: parseInt(cantidad, 10),
+                fecha: startDate.toISOString(),
             }),
         })
             .then((res) => res.json())
@@ -82,6 +87,18 @@ export default function AgregarPlato() {
                                 placeholder="Ingresa la cantidad"
                                 value={cantidad}
                                 onChange={(e) => setCantidad(e.target.value)}
+                            />
+                        </Form.Group>
+                    </Col>
+                    <Col>
+                        <Form.Group controlId="fecha">
+                            <Form.Label>Fecha</Form.Label>
+                            <DatePicker
+                                className="form-control"
+                                selected={startDate}
+                                onChange={(date) => {
+                                    if (date) setStartDate(date);
+                                }}
                             />
                         </Form.Group>
                     </Col>

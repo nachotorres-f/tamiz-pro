@@ -40,7 +40,7 @@ function validarFechaInicio(fechaInicio: string | null): Date {
 
 function calcularRangoSemana(fechaInicio: string): Date {
     const fechaBase = validarFechaInicio(fechaInicio);
-    return startOfWeek(addDays(fechaBase, DIAS_SEMANA), { weekStartsOn: 0 });
+    return startOfWeek(addDays(fechaBase, DIAS_SEMANA), { weekStartsOn: 1 }); // Lunes como inicio de semana
 }
 
 async function obtenerNombresRecetasPT(): Promise<Set<string>> {
@@ -55,16 +55,24 @@ async function obtenerNombresRecetasPT(): Promise<Set<string>> {
 async function obtenerEventosSemana(inicio: Date, nombresPT: Set<string>) {
     return prisma.comanda.findMany({
         where: {
-            fecha: {
-                gte: inicio,
-                lte: addDays(inicio, DIAS_SEMANA),
-            },
-            Plato: {
-                some: {
-                    nombre: { in: Array.from(nombresPT) },
+            OR: [
+                {
+                    // condición 1: fecha + plato
+                    fecha: {
+                        gte: inicio,
+                        lte: addDays(inicio, DIAS_SEMANA),
+                    },
+                    Plato: {
+                        some: {
+                            nombre: { in: Array.from(nombresPT) },
+                        },
+                    },
                 },
-            },
-            // TODO - Agregar OR con ID = 1
+                {
+                    // condición 2: id = 1
+                    id: 1,
+                },
+            ],
         },
         include: {
             Plato: true,
@@ -81,20 +89,31 @@ function procesarEventosAPlatos(
     for (const evento of eventos) {
         for (const plato of evento.Plato) {
             if (nombresPT.has(plato.nombre)) {
-                resultado.push({
-                    plato: plato.nombre,
-                    // Para los platos que son agregados
-                    // Hay que agregar una columna en la tabla platos
-                    // que sea de fecha_agregado
-                    // y si el plato proviene de esa evento, usar la fecha del plato, en vez del evento
-                    fecha: format(addDays(evento.fecha, 2), 'yyyy-MM-dd'),
-                    cantidad: plato.cantidad,
-                    gestionado: plato.gestionado || false,
-                    lugar: evento.lugar,
-                });
+                if (evento.id === 1) {
+                    // Si el plato tiene una fecha específica, usarla
+                    const fecha = format(new Date(plato.fecha), 'yyyy-MM-dd');
+                    console.log(fecha);
+                    resultado.push({
+                        plato: plato.nombre,
+                        fecha: format(addDays(fecha, 1), 'yyyy-MM-dd'),
+                        cantidad: plato.cantidad,
+                        gestionado: false,
+                        lugar: '',
+                    });
+                } else {
+                    resultado.push({
+                        plato: plato.nombre,
+                        fecha: format(addDays(evento.fecha, 1), 'yyyy-MM-dd'),
+                        cantidad: plato.cantidad,
+                        gestionado: plato.gestionado || false,
+                        lugar: evento.lugar,
+                    });
+                }
             }
         }
     }
+
+    console.log('Platos procesados:', resultado);
 
     return resultado.sort((a, b) => a.plato.localeCompare(b.plato));
 }
@@ -381,6 +400,7 @@ async function calcularIngredientesPT(
     }
 
     for (const item of platos) {
+        if (item.fecha === '2025-07-30') console.log(item);
         await recorrer(item.plato, item.fecha, item.cantidad, item.lugar);
     }
 

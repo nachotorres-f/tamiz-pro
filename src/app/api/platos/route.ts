@@ -18,8 +18,13 @@ export async function GET() {
 export async function POST(request: NextRequest) {
     process.env.TZ = 'America/Argentina/Buenos_Aires';
 
-    const { plato, cantidad }: { plato: string; cantidad: number } =
+    const {
+        plato,
+        cantidad,
+        fecha,
+    }: { plato: string; cantidad: number; fecha: string } =
         await request.json();
+    console.log('Datos recibidos:', plato, cantidad, fecha);
 
     if (!plato || !cantidad) {
         return NextResponse.json({ error: 'Faltan datos' }, { status: 400 });
@@ -33,6 +38,7 @@ export async function POST(request: NextRequest) {
                 comanda: {
                     connect: { id: 1 },
                 },
+                fecha: new Date(fecha),
             },
         });
 

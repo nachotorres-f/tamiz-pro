@@ -92,6 +92,9 @@ export function TablaPlanificacion({
     return (
         <>
             <Table
+                style={{
+                    width: 'max-content',
+                }}
                 size="sm"
                 bordered
                 striped>
@@ -100,8 +103,8 @@ export function TablaPlanificacion({
                         {/* <th ref={anchoButton}></th>
                     <th ref={anchoPlato}>Plato</th>
                     <th ref={anchoTotal}>Total</th> */}
-                        <th></th>
-                        <th>Plato</th>
+                        <th style={{ minWidth: '3rem' }}></th>
+                        <th style={{ minWidth: '2rem' }}>Plato</th>
                         <th>Total</th>
                         <th>Gestionado</th>
                         {diasSemana.filter(filterDias).map((dia, idx) => (
@@ -117,7 +120,13 @@ export function TablaPlanificacion({
                             <tr style={{ textAlign: 'center' }}>
                                 <td
                                     rowSpan={2}
-                                    className="align-items-center">
+                                    className="align-items-center"
+                                    style={{
+                                        minWidth: '3rem',
+                                        position: 'sticky',
+                                        left: '0',
+                                        zIndex: 4,
+                                    }}>
                                     <Button
                                         size="sm"
                                         variant={
@@ -146,7 +155,17 @@ export function TablaPlanificacion({
                                         )}
                                     </Button>
                                 </td>
-                                <td rowSpan={2}>{plato}</td>
+                                <td
+                                    rowSpan={2}
+                                    style={{
+                                        minWidth: '2rem',
+                                        position: 'sticky',
+                                        left: '2.9rem',
+                                        width: '3rem',
+                                        zIndex: 4,
+                                    }}>
+                                    {plato}
+                                </td>
                                 <td rowSpan={2}>
                                     {parseFloat(
                                         datos

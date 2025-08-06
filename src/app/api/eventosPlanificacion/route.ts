@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { startOfWeek } from 'date-fns';
+import { addDays, startOfWeek } from 'date-fns';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(req: NextRequest) {
@@ -17,8 +17,8 @@ export async function GET(req: NextRequest) {
     }
 
     const inicio = startOfWeek(new Date(fechaFinal), {
-        weekStartsOn: 0,
-    }); //lunes
+        weekStartsOn: 1, // Lunes como inicio de semana
+    });
 
     const final = new Date(fechaFinal);
 
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
         where: {
             fecha: {
                 gte: inicio,
-                lte: final,
+                lte: addDays(final, 1),
             },
         },
         orderBy: {
