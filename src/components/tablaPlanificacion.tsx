@@ -106,7 +106,6 @@ export function TablaPlanificacion({
                         <th style={{ minWidth: '3rem' }}></th>
                         <th style={{ minWidth: '2rem' }}>Plato</th>
                         <th>Total</th>
-                        <th>Gestionado</th>
                         {diasSemana.filter(filterDias).map((dia, idx) => (
                             <th key={idx}>
                                 {format(dia, 'EEEE d MMMM', { locale: es })}
@@ -178,7 +177,7 @@ export function TablaPlanificacion({
                                             )
                                     ).toFixed(2)}
                                 </td>
-                                <td rowSpan={2}>
+                                {/* <td rowSpan={2}>
                                     {(() => {
                                         const gestionados = datos
                                             .filter(
@@ -198,7 +197,7 @@ export function TablaPlanificacion({
                                             return 'Gestionado';
                                         return 'Parcialmente gestionado';
                                     })()}
-                                </td>
+                                </td> */}
                                 {diasSemana
                                     .filter(filterDias)
                                     .map((diaS, i) => {
