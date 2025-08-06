@@ -13,7 +13,7 @@ export function NavegacionSemanal({
     const [contador, setContador] = React.useState(0);
     return (
         <div className="d-flex justify-content-end mb-3">
-            {contador > 0 && (
+            {true && (
                 <Button
                     size="sm"
                     className="me-2"
