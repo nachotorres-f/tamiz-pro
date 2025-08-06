@@ -55,6 +55,7 @@ model Plato {
   cantidad  Int
   comandaId Int
   comanda   Comanda @relation(fields: [comandaId], references: [id])
+  fecha     DateTime? 
   gestionado Boolean @default(false)
 
   @@map("platos")

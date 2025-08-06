@@ -12,28 +12,21 @@ export async function GET() {
         },
     });
 
-    const comandas = await prisma.comanda.findMany({
-        where: {
-            fecha: {
-                gte: new Date(new Date().setHours(0, 0, 0, 0)),
-            },
-        },
-    });
-
-    return NextResponse.json({ platos, comandas });
+    return NextResponse.json({ platos });
 }
 
 export async function POST(request: NextRequest) {
     process.env.TZ = 'America/Argentina/Buenos_Aires';
 
     const {
-        idComanda,
         plato,
         cantidad,
-    }: { idComanda: string; plato: string; cantidad: number } =
+        fecha,
+    }: { plato: string; cantidad: number; fecha: string } =
         await request.json();
+    console.log('Datos recibidos:', plato, cantidad, fecha);
 
-    if (!idComanda || !plato || !cantidad) {
+    if (!plato || !cantidad) {
         return NextResponse.json({ error: 'Faltan datos' }, { status: 400 });
     }
 
@@ -43,8 +36,9 @@ export async function POST(request: NextRequest) {
                 nombre: plato,
                 cantidad: cantidad,
                 comanda: {
-                    connect: { id: parseInt(idComanda) },
+                    connect: { id: 1 },
                 },
+                fecha: new Date(fecha),
             },
         });
 

@@ -1,29 +1,29 @@
 import React, { useEffect, useState } from 'react';
 import { Button, Col, Container, Form, Row } from 'react-bootstrap';
+import DatePicker from 'react-datepicker';
+
+import 'react-datepicker/dist/react-datepicker.css';
 
 type Plato = { codigo: string | number; nombreProducto: string };
-type Comanda = { id: string | number; nombre: string; tipo: string };
 
 export default function AgregarPlato() {
     const [platos, setPlatos] = useState<Plato[]>([]);
-    const [comandas, setComandas] = useState<Comanda[]>([]);
     const [selectedPlato, setSelectedPlato] = useState<string>('');
-    const [selectedComanda, setSelectedComanda] = useState<string>('');
     const [cantidad, setCantidad] = useState<string>('');
+    const [startDate, setStartDate] = useState(new Date());
 
     useEffect(() => {
         fetch('/api/platos')
             .then((res) => res.json())
             .then((data) => {
                 setPlatos(data.platos);
-                setComandas(data.comandas);
             });
     }, []);
 
     const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
 
-        if (!selectedPlato || !selectedComanda || !cantidad) {
+        if (!selectedPlato || !cantidad) {
             alert('Por favor, completa todos los campos.');
             return;
         }
@@ -34,9 +34,9 @@ export default function AgregarPlato() {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                idComanda: selectedComanda,
                 plato: selectedPlato,
                 cantidad: parseInt(cantidad, 10),
+                fecha: startDate.toISOString(),
             }),
         })
             .then((res) => res.json())
@@ -79,29 +79,6 @@ export default function AgregarPlato() {
                         </Form.Group>
                     </Col>
                     <Col>
-                        <Form.Group controlId="comanda">
-                            <Form.Label>Comanda</Form.Label>
-                            <Form.Select
-                                value={selectedComanda}
-                                onChange={(e) =>
-                                    setSelectedComanda(e.target.value)
-                                }>
-                                <option
-                                    value=""
-                                    disabled>
-                                    Selecciona una comanda
-                                </option>
-                                {comandas.map((comanda) => (
-                                    <option
-                                        key={comanda.id}
-                                        value={comanda.id}>
-                                        {comanda.nombre + ' - ' + comanda.tipo}
-                                    </option>
-                                ))}
-                            </Form.Select>
-                        </Form.Group>
-                    </Col>
-                    <Col>
                         <Form.Group controlId="cantidad">
                             <Form.Label>Cantidad</Form.Label>
                             <Form.Control
@@ -110,6 +87,18 @@ export default function AgregarPlato() {
                                 placeholder="Ingresa la cantidad"
                                 value={cantidad}
                                 onChange={(e) => setCantidad(e.target.value)}
+                            />
+                        </Form.Group>
+                    </Col>
+                    <Col>
+                        <Form.Group controlId="fecha">
+                            <Form.Label>Fecha</Form.Label>
+                            <DatePicker
+                                className="form-control"
+                                selected={startDate}
+                                onChange={(date) => {
+                                    if (date) setStartDate(date);
+                                }}
                             />
                         </Form.Group>
                     </Col>

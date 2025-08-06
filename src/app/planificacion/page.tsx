@@ -146,8 +146,6 @@ export default function PlanificacionPage() {
                 </Row>
             </Form.Group> */}
 
-            <AgregarPlato />
-
             {/* EVENTOS */}
 
             <Container className="mb-3">
@@ -188,7 +186,9 @@ export default function PlanificacionPage() {
                 Guardar Cambios
             </Button>
 
-            <div style={{ overflowX: 'auto', height: 'calc(100vh)' }}>
+            <div
+                className="mb-3"
+                style={{ overflowX: 'auto', height: 'calc(100vh)' }}>
                 <TablaPlanificacion
                     platosUnicos={platosUnicos}
                     diasSemana={diasSemana}
@@ -207,6 +207,8 @@ export default function PlanificacionPage() {
                     // anchoTotal={anchoTotal}
                 />
             </div>
+
+            <AgregarPlato />
         </Container>
     );
 }
