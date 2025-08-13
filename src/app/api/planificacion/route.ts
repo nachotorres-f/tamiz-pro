@@ -59,7 +59,7 @@ async function obtenerEventosSemana(
     salon: string
 ) {
     const lugares = ['El Central', 'La Rural'];
-    const usarNotIn = salon === 'B';
+    const usarNotIn = salon === 'A';
     console.log('Obteniendo eventos para la semana:', { inicio, salon });
 
     return prisma.comanda.findMany({
