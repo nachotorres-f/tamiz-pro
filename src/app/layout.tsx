@@ -26,7 +26,14 @@ export default function RootLayout({
 }>) {
     return (
         <html lang="en">
-            <body className={`${geistSans.variable} ${geistMono.variable}`}>
+            <title>Tamiz</title>
+            <body
+                style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    minHeight: '100vh',
+                }}
+                className={`${geistSans.variable} ${geistMono.variable}`}>
                 <AppNavbar />
                 {children}
             </body>

@@ -3,6 +3,8 @@
 import { useParams } from 'next/navigation';
 import React, { useEffect } from 'react';
 import { Card, Col, Container, ListGroup, Row, Table } from 'react-bootstrap';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 type Evento = {
     nombre: string;
@@ -59,7 +61,12 @@ export default function EventoPage() {
                                         <strong>Tipo:</strong> {evento.tipo}
                                     </ListGroup.Item>
                                     <ListGroup.Item>
-                                        <strong>Fecha:</strong> {evento.fecha}
+                                        <strong>Fecha:</strong>{' '}
+                                        {format(
+                                            new Date(evento.fecha),
+                                            'EEEE dd MMMM yyyy',
+                                            { locale: es }
+                                        )}
                                     </ListGroup.Item>
                                     <ListGroup.Item>
                                         <strong>Observaciones:</strong>{' '}
@@ -86,6 +93,15 @@ export default function EventoPage() {
                                             <td>{plato.cantidad}</td>
                                         </tr>
                                     ))}
+                                    {evento.Plato.length === 0 && (
+                                        <tr>
+                                            <td
+                                                colSpan={2}
+                                                className="text-center">
+                                                No hay platos asignados.
+                                            </td>
+                                        </tr>
+                                    )}
                                 </tbody>
                             </Table>
                         </>

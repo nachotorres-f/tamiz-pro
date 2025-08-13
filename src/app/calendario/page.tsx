@@ -9,6 +9,7 @@ import '@fullcalendar/bootstrap5';
 import { useEffect, useState } from 'react';
 import { startOfWeek, addWeeks } from 'date-fns';
 import { useRouter } from 'next/navigation';
+import { MoonLoader } from 'react-spinners';
 // import timeGridPlugin from '@fullcalendar/timegrid';
 // import interactionPlugin from '@fullcalendar/interaction';
 // import '@fullcalendar/core/index.css';
@@ -16,9 +17,11 @@ import { useRouter } from 'next/navigation';
 
 export default function CalendarioPage() {
     const [events, setEvents] = useState([]);
+    const [loading, setLoading] = useState(false);
     const router = useRouter();
 
     useEffect(() => {
+        setLoading(true);
         fetch('/api/calendario')
             .then((response) => response.json())
             .then((data) => {
@@ -26,11 +29,38 @@ export default function CalendarioPage() {
             })
             .catch((error) => {
                 console.error('Error fetching events:', error);
+            })
+            .finally(() => {
+                setLoading(false);
             });
     }, []);
 
     const baseDate = startOfWeek(new Date(), { weekStartsOn: 1 });
     const weeks = [0, 1, 2, 3].map((offset) => addWeeks(baseDate, offset));
+
+    if (loading) {
+        return (
+            <div
+                style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    width: '100vw',
+                    height: '100vh',
+                    backgroundColor: 'rgba(0,0,0,0.5)',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    zIndex: 9999,
+                }}>
+                <MoonLoader
+                    color="#fff"
+                    size={100}
+                    speedMultiplier={0.5}
+                />
+            </div>
+        );
+    }
 
     return (
         <Container className="py-4">

@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { addDays, startOfWeek } from 'date-fns';
+import { addDays } from 'date-fns';
 
 export async function POST(req: NextRequest) {
     process.env.TZ = 'America/Argentina/Buenos_Aires';
@@ -88,12 +88,10 @@ export async function GET(req: NextRequest) {
         );
     }
 
-    const inicio = startOfWeek(new Date(fechaInicio), { weekStartsOn: 4 });
-
     const producciones = await prisma.produccion.findMany({
         where: {
             fecha: {
-                gte: inicio,
+                gte: addDays(new Date(fechaInicio), -5),
             },
             cantidad: {
                 gt: 0,
@@ -103,6 +101,7 @@ export async function GET(req: NextRequest) {
             plato: 'asc',
         },
     });
+    console.log('Producciones obtenidas:', producciones);
 
     const groupedProducciones: any[] = [];
 
@@ -117,12 +116,8 @@ export async function GET(req: NextRequest) {
                 cantidad: produccion.cantidad,
             });
         } else {
-            const isPrincipal = await platoIsPrincipal(produccion.plato).catch(
-                () => false
-            );
             groupedProducciones.push({
                 plato: produccion.plato,
-                principal: isPrincipal,
                 produccion: [
                     {
                         fecha: addDays(produccion.fecha, 1),
@@ -136,26 +131,6 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ success: true, data: groupedProducciones });
 }
-
-const platoIsPrincipal = async (plato: string): Promise<boolean> => {
-    try {
-        const exist = await prisma.plato.findFirst({
-            where: {
-                nombre: plato,
-            },
-            orderBy: {
-                comanda: {
-                    fecha: 'desc',
-                },
-            },
-        });
-
-        return !!exist;
-    } catch (error) {
-        console.error('Error checking if plato is principal:', error);
-        return false;
-    }
-};
 
 const updateGestionadoPlato = async (plato: string) => {
     try {

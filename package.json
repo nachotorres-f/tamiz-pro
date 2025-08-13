@@ -38,6 +38,9 @@
         "react-bootstrap-icons": "^1.11.6",
         "react-datepicker": "^8.4.0",
         "react-dom": "^19.0.0",
+        "react-select": "^5.10.2",
+        "react-spinners": "^0.17.0",
+        "react-toastify": "^11.0.5",
         "xlsx": "^0.18.5"
     },
     "devDependencies": {

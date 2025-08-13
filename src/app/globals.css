@@ -62,3 +62,7 @@ tr {
     border: none !important;
     background: linear-gradient(135deg, #28a745 0%, #20c997 100%) !important;
 }
+
+.fc-event:hover {
+    cursor: pointer /* o url('cursor-hover.png'), pointer */ !important;
+}

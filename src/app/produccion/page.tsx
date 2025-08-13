@@ -22,6 +22,7 @@ import {
 import { FiletypePdf } from 'react-bootstrap-icons';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { MoonLoader } from 'react-spinners';
 
 export default function ProduccionPage() {
     //const [filtro, setFiltro] = useState('');
@@ -33,22 +34,30 @@ export default function ProduccionPage() {
     const [showModal, setShowModal] = useState(false);
     const [platos, setPlatos] = useState<string[]>([]);
     const [filtroSalon, setFiltroSalon] = useState<string>('A');
+    const [loading, setLoading] = useState(false);
 
     console.log('datos', datos);
 
     useEffect(() => {
+        setLoading(true);
         fetch(
             '/api/produccion?fechaInicio=' +
-                startOfWeek(semanaBase, { weekStartsOn: 4 }).toISOString()
+                startOfWeek(semanaBase, { weekStartsOn: 1 }).toISOString()
         )
             .then((res) => res.json())
             .then((res) => res.data)
-            .then(setDatos);
+            .then(setDatos)
+            .finally(() => {
+                setLoading(false);
+            });
     }, [semanaBase]);
 
     useEffect(() => {
-        const inicioSemana = startOfWeek(semanaBase, { weekStartsOn: 4 }); // jueves
-        const dias = Array.from({ length: 11 }, (_, i) =>
+        const inicioSemana = addDays(
+            startOfWeek(semanaBase, { weekStartsOn: 1 }),
+            -4
+        ); // jueves
+        const dias = Array.from({ length: 13 }, (_, i) =>
             addDays(inicioSemana, i)
         );
         setDiasSemana(dias);
@@ -360,18 +369,22 @@ export default function ProduccionPage() {
 
     const handleClose = () => setShowModal(false);
 
-    const handleImprimirJuntas = () => {
-        generarPDF(platos);
+    const handleImprimirJuntas = async () => {
         setShowModal(false);
+        setLoading(true);
+        await generarPDF(platos);
+        setLoading(false);
     };
 
     const handleImprimirSeparadas = async () => {
+        setShowModal(false);
+        setLoading(true);
         for (let index = 0; index < platos.length; index++) {
             const list = [];
             list.push(platos[index]);
             await generarPDF(list);
         }
-        setShowModal(false);
+        setLoading(false);
     };
 
     const filterSalon = (dato: any) => {
@@ -380,11 +393,44 @@ export default function ProduccionPage() {
         return dato.salon === filtroSalon;
     };
 
-    return (
-        <Container className="mt-5">
-            <h2 className="text-center mb-4">Produccion</h2>
+    const formatFecha = (dia: Date) => {
+        const nombreDia = format(dia, 'EEEE', { locale: es }); // "lunes"
+        const letraDia = nombreDia.charAt(0).toUpperCase(); // "L"
+        const diaNumero = format(dia, 'd'); // "5"
+        const mesNumero = format(dia, 'M'); // "8"
+        return `${letraDia} ${diaNumero}-${mesNumero}`;
+    };
 
-            {/* <Form.Group>
+    if (loading) {
+        return (
+            <div
+                style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    width: '100vw',
+                    height: '100vh',
+                    backgroundColor: 'rgba(0,0,0,0.5)',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    zIndex: 9999,
+                }}>
+                <MoonLoader
+                    color="#fff"
+                    size={100}
+                    speedMultiplier={0.5}
+                />
+            </div>
+        );
+    }
+
+    return (
+        <>
+            <Container className="mt-5">
+                <h2 className="text-center mb-4">Produccion</h2>
+
+                {/* <Form.Group>
                 <Row>
                     <Col>
                         <FiltroPlatos
@@ -401,53 +447,64 @@ export default function ProduccionPage() {
                 </Row>
             </Form.Group> */}
 
-            <Modal
-                show={showModal}
-                onHide={handleClose}>
-                <Modal.Header closeButton>
-                    <Modal.Title>Imprimir recetas</Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    ¿Quieres imprimir las recetas separadas o juntas?
-                </Modal.Body>
-                <Modal.Footer>
-                    <Button
-                        variant="primary"
-                        onClick={handleImprimirJuntas}>
-                        Imprimir juntas
-                    </Button>
-                    <Button
-                        variant="primary"
-                        onClick={handleImprimirSeparadas}>
-                        Imprimir separadas
-                    </Button>
-                </Modal.Footer>
-            </Modal>
+                <Modal
+                    show={showModal}
+                    onHide={handleClose}>
+                    <Modal.Header closeButton>
+                        <Modal.Title>Imprimir recetas</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+                        ¿Quieres imprimir las recetas separadas o juntas?
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button
+                            variant="primary"
+                            onClick={handleImprimirJuntas}>
+                            Imprimir juntas
+                        </Button>
+                        <Button
+                            variant="primary"
+                            onClick={handleImprimirSeparadas}>
+                            Imprimir separadas
+                        </Button>
+                    </Modal.Footer>
+                </Modal>
 
-            <Container className="mb-3">
-                <Row>
-                    <Col xs={4}>
-                        <Form.Group>
-                            <Form.Label>Filtrar por salón</Form.Label>
-                            <Form.Select
-                                value={filtroSalon || ''}
-                                onChange={(e) =>
-                                    setFiltroSalon(e.target.value)
-                                }>
-                                <option value="A">Rut Haus - Origami</option>
-                                <option value="B">El Central - La Rural</option>
-                            </Form.Select>
-                        </Form.Group>
-                    </Col>
-                </Row>
+                <Container className="mb-3">
+                    <Row>
+                        <Col xs={4}>
+                            <Form.Group>
+                                <Form.Label>Filtrar por salón</Form.Label>
+                                <Form.Select
+                                    value={filtroSalon || ''}
+                                    onChange={(e) =>
+                                        setFiltroSalon(e.target.value)
+                                    }>
+                                    <option value="A">
+                                        Rut Haus - Origami
+                                    </option>
+                                    <option value="B">
+                                        El Central - La Rural
+                                    </option>
+                                </Form.Select>
+                            </Form.Group>
+                        </Col>
+                    </Row>
+                </Container>
+
+                <NavegacionSemanal
+                    semanaBase={semanaBase}
+                    setSemanaBase={setSemanaBase}
+                />
             </Container>
 
-            <NavegacionSemanal
-                semanaBase={semanaBase}
-                setSemanaBase={setSemanaBase}
-            />
-
-            <div style={{ overflowY: 'auto', height: 'calc(100vh - 300px)' }}>
+            <div
+                className="mt-3 mx-auto"
+                style={{
+                    overflowY: 'auto',
+                    height: '100vh',
+                    width: 'max-content',
+                }}>
                 <Table
                     bordered
                     striped
@@ -455,35 +512,35 @@ export default function ProduccionPage() {
                     <thead className="table-dark sticky-top">
                         <tr style={{ textAlign: 'center' }}>
                             <th></th>
-                            {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => {
-                                return (
-                                    <th key={i}>
-                                        <Button
-                                            className="btn-danger"
-                                            size="sm"
-                                            style={{
-                                                width: '2rem',
-                                                height: '2rem',
-                                                display: 'flex',
-                                                justifyContent: 'center',
-                                                alignItems: 'center',
-                                                margin: '0 auto',
-                                            }}
-                                            onClick={() => {
-                                                generarPDFFecha(i);
-                                            }}>
-                                            <FiletypePdf />
-                                        </Button>
-                                    </th>
-                                );
-                            })}
+                            {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(
+                                (i) => {
+                                    return (
+                                        <th key={i}>
+                                            <Button
+                                                className="btn-danger"
+                                                size="sm"
+                                                style={{
+                                                    width: '2rem',
+                                                    height: '2rem',
+                                                    display: 'flex',
+                                                    justifyContent: 'center',
+                                                    alignItems: 'center',
+                                                    margin: '0 auto',
+                                                }}
+                                                onClick={() => {
+                                                    generarPDFFecha(i);
+                                                }}>
+                                                <FiletypePdf />
+                                            </Button>
+                                        </th>
+                                    );
+                                }
+                            )}
                         </tr>
                         <tr style={{ textAlign: 'center' }}>
                             <th>Plato</th>
                             {diasSemana.filter(filterDias).map((dia, idx) => (
-                                <th key={idx}>
-                                    {format(dia, 'EEE d-M', { locale: es })}
-                                </th>
+                                <th key={idx}>{formatFecha(dia)}</th>
                             ))}
                         </tr>
                     </thead>
@@ -552,6 +609,6 @@ export default function ProduccionPage() {
                     </tbody>
                 </Table>
             </div>
-        </Container>
+        </>
     );
 }

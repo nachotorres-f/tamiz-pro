@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
         );
     }
 
-    const inicio = startOfWeek(new Date(fechaFinal), {
+    const inicio = startOfWeek(new Date(fechaInicio), {
         weekStartsOn: 1, // Lunes como inicio de semana
     });
 

@@ -27,8 +27,13 @@ export default function TablaEventosPlanificacion({
     >([]);
 
     useEffect(() => {
-        const fechaInicio = diasSemana[0] ?? null;
-        const fechaFinal = diasSemana[diasSemana.length - 1] ?? null;
+        const fechaInicio = diasSemana[5] ?? null;
+        const fechaFinal = diasSemana[diasSemana.length - 2] ?? null;
+
+        console.log('Fechas de eventos:', {
+            fechaInicio: fechaInicio?.toISOString(),
+            fechaFinal: fechaFinal?.toISOString(),
+        });
 
         if (!fechaInicio || !fechaFinal) {
             setEventos([]);
@@ -46,6 +51,7 @@ export default function TablaEventosPlanificacion({
     }, [diasSemana]);
 
     useEffect(() => {
+        console.log('Eventos:', eventos);
         if (filtroSalon) {
             const eventosFiltrados = eventos.filter((d) => {
                 if (filtroSalon === 'A') {
@@ -87,7 +93,7 @@ export default function TablaEventosPlanificacion({
                     <strong>
                         {diasSemana[4].toISOString().split('T')[0]} -{' '}
                         {
-                            diasSemana[diasSemana.length - 1]
+                            diasSemana[diasSemana.length - 3]
                                 .toISOString()
                                 .split('T')[0]
                         }

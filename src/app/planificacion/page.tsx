@@ -24,6 +24,8 @@ import { NavegacionSemanal } from '@/components/navegacionSemanal';
 import { TablaPlanificacion } from '@/components/tablaPlanificacion';
 import TablaEventosPlanificacion from '@/components/tablaEventosPlanificacion';
 import AgregarPlato from '@/components/agregarPlato';
+import { MoonLoader } from 'react-spinners';
+import { Slide, toast, ToastContainer } from 'react-toastify';
 
 export default function PlanificacionPage() {
     const [semanaBase, setSemanaBase] = useState(new Date());
@@ -37,6 +39,7 @@ export default function PlanificacionPage() {
     const [platoExpandido, setPlatoExpandido] = useState<string | null>(null);
     const [filtroSalon, setFiltroSalon] = useState<string | null>('A');
     const [produccionUpdate, setProduccionUpdate] = React.useState<any[]>([]);
+    const [loading, setLoading] = useState(false);
 
     // Referencias para medir el ancho de las celdas
     // const buttonRef = useRef<HTMLTableCellElement>(null);
@@ -59,20 +62,26 @@ export default function PlanificacionPage() {
     // }, [buttonRef, platoRef, totalRef]);
 
     useEffect(() => {
+        setLoading(true);
         fetch(
             '/api/planificacion?fechaInicio=' +
-                startOfWeek(semanaBase, { weekStartsOn: 4 }).toISOString()
+                startOfWeek(semanaBase, { weekStartsOn: 1 }).toISOString() +
+                '&salon=' +
+                (filtroSalon || 'A')
         ) // jueves
             .then((res) => res.json())
             .then((data) => {
                 setDatos(data.planifacion || []);
                 setProduccion(data.produccion || []);
+            })
+            .finally(() => {
+                setLoading(false);
             });
-    }, [semanaBase]);
+    }, [semanaBase, filtroSalon]);
 
     useEffect(() => {
         const inicioSemana = startOfWeek(semanaBase, { weekStartsOn: 4 }); // jueves
-        const dias = Array.from({ length: 11 }, (_, i) =>
+        const dias = Array.from({ length: 13 }, (_, i) =>
             addDays(inicioSemana, i)
         );
         setDiasSemana(dias);
@@ -81,26 +90,31 @@ export default function PlanificacionPage() {
 
     useEffect(() => {
         if (filtroSalon) {
-            const datosFiltrados = datos.filter((d) => {
-                if (filtroSalon === 'A') {
-                    return filtroSalon === 'A'
-                        ? d.lugar.toLowerCase().trim() !== 'el central'
-                        : d.lugar.toLowerCase().trim() !== 'la rural';
-                }
+            // const datosFiltrados = datos.filter((d) => {
+            //     if (filtroSalon === 'A') {
+            //         return filtroSalon === 'A'
+            //             ? d.lugar.toLowerCase().trim() !== 'el central'
+            //             : d.lugar.toLowerCase().trim() !== 'la rural';
+            //     }
 
-                if (filtroSalon === 'B') {
-                    return filtroSalon === 'B'
-                        ? d.lugar.toLowerCase().trim() === 'el central'
-                        : d.lugar.toLowerCase().trim() === 'la rural';
-                }
-            });
-            setDatosFiltrados(datosFiltrados);
+            //     if (filtroSalon === 'B') {
+            //         return filtroSalon === 'B'
+            //             ? d.lugar.toLowerCase().trim() === 'el central'
+            //             : d.lugar.toLowerCase().trim() === 'la rural';
+            //     }
+            // });
+            setDatosFiltrados(datos);
         } else {
             setDatosFiltrados(datos);
         }
     }, [filtroSalon, datos]);
 
     const handleGuardarProduccion = async () => {
+        toast.warn('Actualizando produccion', {
+            position: 'bottom-right',
+            theme: 'colored',
+            transition: Slide,
+        });
         await fetch('/api/planificacion', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -108,31 +122,72 @@ export default function PlanificacionPage() {
                 salon: filtroSalon,
                 produccion: produccionUpdate,
             }),
-        });
+        })
+            .then(() => {
+                toast.success('Produccion actualizada', {
+                    position: 'bottom-right',
+                    theme: 'colored',
+                    transition: Slide,
+                });
+            })
+            .catch(() => {
+                toast.error('Error al actualizar la producción', {
+                    position: 'bottom-right',
+                    theme: 'colored',
+                    transition: Slide,
+                });
+            });
+
         setProduccionUpdate([]);
 
-        alert('Producción actualizada correctamente');
-
-        fetch(
+        await fetch(
             '/api/planificacion?fechaInicio=' +
                 startOfWeek(semanaBase, {
-                    weekStartsOn: 4,
+                    weekStartsOn: 1,
                 }).toISOString()
         ) // jueves
             .then((res) => res.json())
             .then((data) => {
                 setDatos(data.planifacion || []);
                 setProduccion(data.produccion || []);
-            });
+            })
+            .finally(() => {});
     };
 
     const platosUnicos = [...new Set(datosFiltrados.map((d) => d.plato))];
 
-    return (
-        <Container className="mt-5">
-            <h2 className="text-center mb-4">Planificación</h2>
+    if (loading) {
+        return (
+            <>
+                <div
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        width: '100vw',
+                        height: '100vh',
+                        backgroundColor: 'rgba(0,0,0,0.5)',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        zIndex: 9999,
+                    }}>
+                    <MoonLoader
+                        color="#fff"
+                        speedMultiplier={0.5}
+                    />
+                </div>
+            </>
+        );
+    }
 
-            {/* <Form.Group>
+    return (
+        <div>
+            <ToastContainer />
+            <Container className="mt-5 flex-grow-1">
+                <h2 className="text-center mb-4">Planificación</h2>
+
+                {/* <Form.Group>
                 <Row>
                     <Col>
                         <FiltroPlatos
@@ -149,48 +204,53 @@ export default function PlanificacionPage() {
                 </Row>
             </Form.Group> */}
 
-            {/* EVENTOS */}
+                {/* EVENTOS */}
 
-            <Container className="mb-3">
-                <Row>
-                    <Col xs={4}>
-                        <Form.Group>
-                            <Form.Label>Filtrar por salón</Form.Label>
-                            <Form.Select
-                                value={filtroSalon || ''}
-                                onChange={(e) =>
-                                    setFiltroSalon(e.target.value)
-                                }>
-                                <option value="A">Rut Haus - Origami</option>
-                                <option value="B">El Central - La Rural</option>
-                            </Form.Select>
-                        </Form.Group>
-                    </Col>
-                </Row>
+                <Container className="mb-3">
+                    <Row>
+                        <Col xs={4}>
+                            <Form.Group>
+                                <Form.Label>Filtrar por salón</Form.Label>
+                                <Form.Select
+                                    value={filtroSalon || ''}
+                                    onChange={(e) =>
+                                        setFiltroSalon(e.target.value)
+                                    }>
+                                    <option value="A">
+                                        Rut Haus - Origami
+                                    </option>
+                                    <option value="B">
+                                        El Central - La Rural
+                                    </option>
+                                </Form.Select>
+                            </Form.Group>
+                        </Col>
+                    </Row>
+                </Container>
+
+                <TablaEventosPlanificacion
+                    diasSemana={diasSemana}
+                    diaActivo={diaActivo}
+                    filtroSalon={filtroSalon}
+                    // anchoColumna={anchoButton + anchoPlato + anchoTotal}
+                />
+
+                <NavegacionSemanal
+                    semanaBase={semanaBase}
+                    setSemanaBase={setSemanaBase}
+                />
+
+                <Button
+                    type="button"
+                    className="btn btn-success mb-3"
+                    onClick={handleGuardarProduccion}>
+                    Guardar Cambios
+                </Button>
             </Container>
-
-            <TablaEventosPlanificacion
-                diasSemana={diasSemana}
-                diaActivo={diaActivo}
-                filtroSalon={filtroSalon}
-                // anchoColumna={anchoButton + anchoPlato + anchoTotal}
-            />
-
-            <NavegacionSemanal
-                semanaBase={semanaBase}
-                setSemanaBase={setSemanaBase}
-            />
-
-            <Button
-                type="button"
-                className="btn btn-success mb-3"
-                onClick={handleGuardarProduccion}>
-                Guardar Cambios
-            </Button>
 
             <div
                 className="mb-3"
-                style={{ overflow: 'auto', height: 'calc(100vh)' }}>
+                style={{ overflow: 'auto', height: '80vh' }}>
                 <TablaPlanificacion
                     platosUnicos={platosUnicos}
                     diasSemana={diasSemana}
@@ -210,7 +270,9 @@ export default function PlanificacionPage() {
                 />
             </div>
 
-            <AgregarPlato />
-        </Container>
+            <Container>
+                <AgregarPlato setSemanaBase={setSemanaBase} />
+            </Container>
+        </div>
     );
 }

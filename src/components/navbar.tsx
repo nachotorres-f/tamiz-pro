@@ -37,7 +37,8 @@ export default function AppNavbar() {
         <Navbar
             bg="dark"
             variant="dark"
-            expand="lg">
+            expand="lg"
+            style={{ height: '10vh' }}>
             <Container>
                 <Navbar.Brand>
                     <Image

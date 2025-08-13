@@ -89,12 +89,21 @@ export function TablaPlanificacion({
         return true;
     };
 
+    const formatFecha = (dia: Date) => {
+        const nombreDia = format(dia, 'EEEE', { locale: es }); // "lunes"
+        const letraDia = nombreDia.charAt(0).toUpperCase(); // "L"
+        const diaNumero = format(dia, 'd'); // "5"
+        const mesNumero = format(dia, 'M'); // "8"
+        return `${letraDia} ${diaNumero}-${mesNumero}`;
+    };
+
     return (
         <>
             <Table
                 style={{
                     width: 'max-content',
                 }}
+                className="mx-auto"
                 size="sm"
                 bordered
                 striped>
@@ -137,9 +146,10 @@ export function TablaPlanificacion({
                                     // const mesNumero = format(dia, 'M');                    // "7"
                                     // const resultado = `${letraDia} ${diaNumero}-${mesNumero}`;
                                 }
-                                {format(dia, 'EEE d-M', {
+                                {formatFecha(dia)}
+                                {/* {format(dia, 'EEE d-M', {
                                     locale: es,
-                                })}{' '}
+                                })}{' '} */}
                                 {/* "Sáb 5-7" */}
                             </th>
                         ))}
@@ -283,20 +293,6 @@ export function TablaPlanificacion({
                                             fecha.setHours(0, 0, 0, 0);
                                             fecha.setDate(fecha.getDate() + 1); // Ajuste para comparar con el día limpio
 
-                                            if (
-                                                fecha.getTime() ===
-                                                    diaLimpio.getTime() &&
-                                                d.plato === plato
-                                            ) {
-                                                console.log(
-                                                    'Fecha coincide con dia',
-                                                    plato,
-                                                    d.plato,
-                                                    fecha,
-                                                    diaLimpio
-                                                );
-                                            }
-
                                             return (
                                                 d.plato === plato &&
                                                 fecha.getTime() ===
@@ -321,13 +317,6 @@ export function TablaPlanificacion({
                                         );
                                     }
 
-                                    if (
-                                        typeof cantidad === 'number' &&
-                                        cantidad === 0
-                                    ) {
-                                        cantidad = '';
-                                    }
-
                                     return (
                                         <td key={plato + i}>
                                             <Form.Control
@@ -338,14 +327,13 @@ export function TablaPlanificacion({
                                                 step={0.1}
                                                 min={0}
                                                 onChange={(e) => {
-                                                    e.preventDefault();
-
+                                                    console.log(e.target.value);
                                                     const cantidad = parseFloat(
                                                         e.target.value
                                                     );
-                                                    if (isNaN(cantidad)) {
-                                                        return;
-                                                    }
+                                                    // if (isNaN(cantidad)) {
+                                                    //     return;
+                                                    // }
                                                     const fecha = format(
                                                         diaLimpio,
                                                         'yyyy-MM-dd'
@@ -361,6 +349,11 @@ export function TablaPlanificacion({
                                                                 p.fecha ===
                                                                     fecha
                                                         );
+
+                                                    console.log(
+                                                        'CANTIDAD',
+                                                        cantidad
+                                                    );
                                                     if (index > -1) {
                                                         nuevaProduccion[
                                                             index

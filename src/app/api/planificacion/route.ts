@@ -28,7 +28,7 @@ interface PlatoEvento {
 const TIMEZONE = 'America/Argentina/Buenos_Aires';
 const DIAS_SEMANA = 7;
 const TIPO_RECETA_PT = 'PT';
-const DIAS_PRODUCCION_EXTRA = { anterior: 1, posterior: 9 };
+const DIAS_PRODUCCION_EXTRA = { anterior: 5, posterior: 9 };
 
 // Funciones auxiliares
 function validarFechaInicio(fechaInicio: string | null): Date {
@@ -40,6 +40,7 @@ function validarFechaInicio(fechaInicio: string | null): Date {
 
 function calcularRangoSemana(fechaInicio: string): Date {
     const fechaBase = validarFechaInicio(fechaInicio);
+    return startOfWeek(fechaBase, { weekStartsOn: 1 }); // Lunes como inicio de semana
     return startOfWeek(addDays(fechaBase, DIAS_SEMANA), { weekStartsOn: 1 }); // Lunes como inicio de semana
 }
 
@@ -52,7 +53,15 @@ async function obtenerNombresRecetasPT(): Promise<Set<string>> {
     return new Set(recetasPT.map((receta) => receta.nombreProducto));
 }
 
-async function obtenerEventosSemana(inicio: Date, nombresPT: Set<string>) {
+async function obtenerEventosSemana(
+    inicio: Date,
+    nombresPT: Set<string>,
+    salon: string
+) {
+    const lugares = ['El Central', 'La Rural'];
+    const usarNotIn = salon === 'B';
+    console.log('Obteniendo eventos para la semana:', { inicio, salon });
+
     return prisma.comanda.findMany({
         where: {
             OR: [
@@ -62,6 +71,7 @@ async function obtenerEventosSemana(inicio: Date, nombresPT: Set<string>) {
                         gte: inicio,
                         lte: addDays(inicio, DIAS_SEMANA),
                     },
+                    lugar: usarNotIn ? { notIn: lugares } : { in: lugares },
                     Plato: {
                         some: {
                             nombre: { in: Array.from(nombresPT) },
@@ -92,7 +102,7 @@ function procesarEventosAPlatos(
                 if (evento.id === 1) {
                     // Si el plato tiene una fecha específica, usarla
                     const fecha = format(new Date(plato.fecha), 'yyyy-MM-dd');
-                    console.log(fecha);
+
                     resultado.push({
                         plato: plato.nombre,
                         fecha: format(addDays(fecha, 1), 'yyyy-MM-dd'),
@@ -112,8 +122,6 @@ function procesarEventosAPlatos(
             }
         }
     }
-
-    console.log('Platos procesados:', resultado);
 
     return resultado.sort((a, b) => a.plato.localeCompare(b.plato));
 }
@@ -141,13 +149,14 @@ async function calcularIngredientesConFormato(
     }));
 }
 
-async function obtenerProduccion(inicio: Date) {
+async function obtenerProduccion(inicio: Date, salon: string) {
     return prisma.produccion.findMany({
         where: {
             fecha: {
                 gte: addDays(inicio, -DIAS_PRODUCCION_EXTRA.anterior),
                 lte: addDays(inicio, DIAS_PRODUCCION_EXTRA.posterior),
             },
+            salon: salon,
         },
     });
 }
@@ -161,10 +170,18 @@ export async function GET(req: NextRequest) {
         // Extraer y validar parámetros
         const { searchParams } = req.nextUrl;
         const fechaInicio = searchParams.get('fechaInicio');
+        const salon = searchParams.get('salon') || 'A';
 
         if (!fechaInicio) {
             return NextResponse.json(
                 { error: 'fechaInicio es requerido' },
+                { status: 400 }
+            );
+        }
+
+        if (!['A', 'B'].includes(salon)) {
+            return NextResponse.json(
+                { error: 'salon debe ser "A" o "B"' },
                 { status: 400 }
             );
         }
@@ -178,7 +195,7 @@ export async function GET(req: NextRequest) {
         ]);
 
         // Obtener eventos de la semana
-        const eventos = await obtenerEventosSemana(inicio, nombresPT);
+        const eventos = await obtenerEventosSemana(inicio, nombresPT, salon);
 
         // Procesar eventos a platos
         const platos = procesarEventosAPlatos(eventos, nombresPT);
@@ -186,7 +203,7 @@ export async function GET(req: NextRequest) {
         // Calcular ingredientes y obtener producción en paralelo
         const [ingredientes, produccion] = await Promise.all([
             calcularIngredientesConFormato(platos, recetas),
-            obtenerProduccion(inicio),
+            obtenerProduccion(inicio, salon),
         ]);
 
         return NextResponse.json({
@@ -310,8 +327,6 @@ export async function POST(req: NextRequest) {
         );
     }
 
-    console.log('Producción recibida:', produccion);
-
     for (const item of produccion) {
         if (!item.plato || !item.fecha || typeof item.cantidad !== 'number') {
             return NextResponse.json(
@@ -409,7 +424,6 @@ async function calcularIngredientesPT(
     }
 
     for (const item of platos) {
-        if (item.fecha === '2025-07-30') console.log(item);
         await recorrer(item.plato, item.fecha, item.cantidad, item.lugar);
     }
 
