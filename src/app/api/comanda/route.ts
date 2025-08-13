@@ -13,6 +13,8 @@ export async function POST(req: NextRequest) {
     }
     const body = await req.json();
 
+    console.log('BODY', body);
+
     body.Id = Number(body.Id);
 
     // Decodifica MomnetoId y MomnetoComidaId en un solo paso
