@@ -8,6 +8,7 @@ import { MoonLoader } from 'react-spinners';
 
 import 'react-datepicker/dist/react-datepicker.css';
 import { Slide, toast, ToastContainer } from 'react-toastify';
+import { es } from 'date-fns/locale';
 
 type Plato = { codigo: string | number; nombreProducto: string };
 
@@ -64,7 +65,7 @@ export default function AgregarPlato({
             },
             body: JSON.stringify({
                 plato: selectedPlato.split('-')[0],
-                cantidad: parseInt(cantidad, 10),
+                cantidad: parseFloat(cantidad).toFixed(2),
                 fecha: startDate.toISOString(),
             }),
         })
@@ -221,6 +222,7 @@ export default function AgregarPlato({
                             <DatePicker
                                 className="form-control"
                                 selected={startDate}
+                                locale={es}
                                 onChange={(date) => {
                                     if (date) setStartDate(date);
                                 }}

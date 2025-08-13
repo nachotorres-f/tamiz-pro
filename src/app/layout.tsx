@@ -25,8 +25,10 @@ export default function RootLayout({
     children: React.ReactNode;
 }>) {
     return (
-        <html lang="en">
-            <title>Tamiz</title>
+        <html lang="es">
+            <head>
+                <title>Tamiz Pro</title>
+            </head>
             <body
                 style={{
                     display: 'flex',

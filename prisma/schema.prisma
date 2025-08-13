@@ -52,7 +52,7 @@ model Comanda {
 model Plato {
   id        Int     @id @default(autoincrement())
   nombre    String
-  cantidad  Int
+  cantidad Float 
   comandaId Int
   comanda   Comanda @relation(fields: [comandaId], references: [id])
   fecha     DateTime? 

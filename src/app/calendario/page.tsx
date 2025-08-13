@@ -1,6 +1,6 @@
 'use client';
 
-import { Container } from 'react-bootstrap';
+import { Col, Container, Form, Row } from 'react-bootstrap';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import bootstrap5Plugin from '@fullcalendar/bootstrap5';
@@ -18,11 +18,12 @@ import { MoonLoader } from 'react-spinners';
 export default function CalendarioPage() {
     const [events, setEvents] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [filtroSalon, setFiltroSalon] = useState<string | null>('');
     const router = useRouter();
 
     useEffect(() => {
         setLoading(true);
-        fetch('/api/calendario')
+        fetch('/api/calendario?salon=' + filtroSalon)
             .then((response) => response.json())
             .then((data) => {
                 setEvents(data);
@@ -33,7 +34,7 @@ export default function CalendarioPage() {
             .finally(() => {
                 setLoading(false);
             });
-    }, []);
+    }, [filtroSalon]);
 
     const baseDate = startOfWeek(new Date(), { weekStartsOn: 1 });
     const weeks = [0, 1, 2, 3].map((offset) => addWeeks(baseDate, offset));
@@ -65,6 +66,25 @@ export default function CalendarioPage() {
     return (
         <Container className="py-4">
             <h3 className="mb-3">Calendario de eventos</h3>
+
+            <Container className="mb-3">
+                <Row>
+                    <Col xs={4}>
+                        <Form.Group>
+                            <Form.Label>Filtrar por salón</Form.Label>
+                            <Form.Select
+                                value={filtroSalon || ''}
+                                onChange={(e) =>
+                                    setFiltroSalon(e.target.value)
+                                }>
+                                <option value="">Todos</option>
+                                <option value="A">Rut Haus - Origami</option>
+                                <option value="B">El Central - La Rural</option>
+                            </Form.Select>
+                        </Form.Group>
+                    </Col>
+                </Row>
+            </Container>
 
             <div>
                 <div
