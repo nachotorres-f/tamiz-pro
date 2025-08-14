@@ -106,16 +106,14 @@ export default function TablaEventosPlanificacion({
 
                     return (
                         <li key={idx + diaIdx}>
-                            {format(
-                                new Date(evento.fecha.split('T')[0]),
-                                'dd-MM-yyyy'
-                            )}
+                            {format(new Date(evento.fecha), 'dd-MM-yyyy')}
                             {' - '}
                             <strong>{evento.nombre}</strong>
                             {' - '}
                             {evento.lugar}
                             {' - '}
                             {evento.salon}
+                            {'0'}
                         </li>
                     );
                 })
