@@ -154,7 +154,7 @@ export default function PlanificacionPage() {
 
         await fetch(
             '/api/planificacion?fechaInicio=' +
-                startOfWeek(semanaBase, {
+                startOfWeek(addDays(semanaBase, 4), {
                     weekStartsOn: 1,
                 }).toISOString()
         ) // jueves

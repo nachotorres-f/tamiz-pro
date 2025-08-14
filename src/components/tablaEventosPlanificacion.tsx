@@ -113,7 +113,6 @@ export default function TablaEventosPlanificacion({
                             {evento.lugar}
                             {' - '}
                             {evento.salon}
-                            {'0'}
                         </li>
                     );
                 })
