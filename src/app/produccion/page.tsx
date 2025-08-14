@@ -36,8 +36,6 @@ export default function ProduccionPage() {
     const [filtroSalon, setFiltroSalon] = useState<string>('A');
     const [loading, setLoading] = useState(false);
 
-    console.log('datos', datos);
-
     useEffect(() => {
         setLoading(true);
         fetch(
@@ -503,7 +501,7 @@ export default function ProduccionPage() {
                 style={{
                     overflowY: 'auto',
                     height: '100vh',
-                    width: 'max-content',
+                    width: '100%',
                 }}>
                 <Table
                     bordered

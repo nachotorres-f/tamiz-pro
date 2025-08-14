@@ -22,8 +22,9 @@ export default function AgregarPlato({
     const [cantidad, setCantidad] = useState<string>('');
     const [startDate, setStartDate] = useState(new Date());
     const [loading, setLoading] = useState(false);
+    const [mounted, setMounted] = useState(false);
 
-    const [, setIsClient] = useState(false);
+    const [client, setIsClient] = useState(false);
 
     useEffect(() => {
         setIsClient(true);
@@ -42,6 +43,7 @@ export default function AgregarPlato({
 
         if (!selectedPlato || !cantidad) {
             setLoading(false);
+            setMounted(true);
             toast.warn('Completa todos los campos', {
                 position: 'bottom-right',
                 autoClose: 5000,
@@ -53,6 +55,9 @@ export default function AgregarPlato({
                 theme: 'colored',
                 transition: Slide,
             });
+            setTimeout(() => {
+                setMounted(false);
+            }, 5000);
             return;
         }
 
@@ -102,20 +107,22 @@ export default function AgregarPlato({
     if (loading) {
         return (
             <>
-                <ToastContainer
-                    position="bottom-right"
-                    autoClose={5000}
-                    limit={5000}
-                    hideProgressBar={false}
-                    newestOnTop={false}
-                    closeOnClick
-                    rtl={false}
-                    pauseOnFocusLoss
-                    draggable
-                    pauseOnHover
-                    theme="colored"
-                    transition={Slide}
-                />
+                {/* {mounted && (
+                    <ToastContainer
+                        position="bottom-right"
+                        autoClose={5000}
+                        limit={5000}
+                        hideProgressBar={false}
+                        newestOnTop={false}
+                        closeOnClick
+                        rtl={false}
+                        pauseOnFocusLoss
+                        draggable
+                        pauseOnHover
+                        theme="colored"
+                        transition={Slide}
+                    />
+                )} */}
                 <div
                     style={{
                         position: 'fixed',
@@ -140,42 +147,46 @@ export default function AgregarPlato({
 
     return (
         <Container>
-            <ToastContainer
-                position="bottom-right"
-                autoClose={5000}
-                limit={5000}
-                hideProgressBar={false}
-                newestOnTop={false}
-                closeOnClick
-                rtl={false}
-                pauseOnFocusLoss
-                draggable
-                pauseOnHover
-                theme="colored"
-                transition={Slide}
-            />
+            {mounted && (
+                <ToastContainer
+                    position="bottom-right"
+                    autoClose={5000}
+                    limit={5000}
+                    hideProgressBar={false}
+                    newestOnTop={false}
+                    closeOnClick
+                    rtl={false}
+                    pauseOnFocusLoss
+                    draggable
+                    pauseOnHover
+                    theme="colored"
+                    transition={Slide}
+                />
+            )}
             <Form onSubmit={handleSubmit}>
                 <Row>
-                    <Col>
+                    <Col xs={3}>
                         <Form.Group controlId="plato">
                             <Form.Label>Plato</Form.Label>
-                            <Select
-                                options={opciones}
-                                value={opciones.find(
-                                    (o) => o.value === selectedPlato
-                                )}
-                                onChange={(opcion) =>
-                                    setSelectedPlato(opcion?.value || '')
-                                }
-                                placeholder="Selecciona o busca un plato..."
-                                isSearchable={true} // ya viene por defecto, pero lo aclaramos
-                                styles={{
-                                    menu: (provided) => ({
-                                        ...provided,
-                                        zIndex: 9999, // por si hay problemas de superposición
-                                    }),
-                                }}
-                            />
+                            {client && (
+                                <Select
+                                    options={opciones}
+                                    value={opciones.find(
+                                        (o) => o.value === selectedPlato
+                                    )}
+                                    onChange={(opcion) =>
+                                        setSelectedPlato(opcion?.value || '')
+                                    }
+                                    placeholder="Selecciona o busca un plato..."
+                                    isSearchable={true} // ya viene por defecto, pero lo aclaramos
+                                    styles={{
+                                        menu: (provided) => ({
+                                            ...provided,
+                                            zIndex: 9999, // por si hay problemas de superposición
+                                        }),
+                                    }}
+                                />
+                            )}
                             {/* <Form.Select
                                 value={selectedPlato}
                                 onChange={(e) =>
@@ -202,7 +213,7 @@ export default function AgregarPlato({
                             </Form.Select> */}
                         </Form.Group>
                     </Col>
-                    <Col>
+                    <Col xs={3}>
                         <Form.Group controlId="cantidad">
                             <Form.Label>Cantidad</Form.Label>
                             <Form.Control
@@ -214,22 +225,31 @@ export default function AgregarPlato({
                             />
                         </Form.Group>
                     </Col>
-                    <Col>
+                    <Col xs={3}>
                         <Form.Group controlId="fecha">
-                            <Form.Label style={{ display: 'block' }}>
-                                Fecha
-                            </Form.Label>
-                            <DatePicker
-                                className="form-control"
-                                selected={startDate}
-                                locale={es}
-                                onChange={(date) => {
-                                    if (date) setStartDate(date);
-                                }}
-                            />
+                            <Row>
+                                <Col>
+                                    <Form.Label style={{ display: 'block' }}>
+                                        Fecha
+                                    </Form.Label>
+                                </Col>
+                            </Row>
+                            <Row>
+                                <Col>
+                                    <DatePicker
+                                        className="form-control w-100"
+                                        selected={startDate}
+                                        locale={es}
+                                        dateFormat={'dd-MM-yyyy'}
+                                        onChange={(date) => {
+                                            if (date) setStartDate(date);
+                                        }}
+                                    />
+                                </Col>
+                            </Row>
                         </Form.Group>
                     </Col>
-                    <Col>
+                    <Col xs={3}>
                         <Button
                             variant="success"
                             style={{ margin: '2rem auto', display: 'block' }}

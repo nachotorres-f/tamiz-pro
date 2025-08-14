@@ -24,7 +24,6 @@ export async function POST(request: NextRequest) {
         fecha,
     }: { plato: string; cantidad: number; fecha: string } =
         await request.json();
-    console.log('Datos recibidos:', plato, cantidad, fecha);
 
     if (!plato || !cantidad) {
         return NextResponse.json({ error: 'Faltan datos' }, { status: 400 });

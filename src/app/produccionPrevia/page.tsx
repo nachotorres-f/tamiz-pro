@@ -496,7 +496,7 @@ export default function ProduccionPreviaPage() {
                 style={{
                     overflowY: 'auto',
                     height: '100vh',
-                    width: 'max-content',
+                    width: '100%',
                 }}>
                 <Table
                     bordered

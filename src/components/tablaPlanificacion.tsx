@@ -101,7 +101,7 @@ export function TablaPlanificacion({
         <>
             <Table
                 style={{
-                    width: 'max-content',
+                    width: '100%',
                 }}
                 className="mx-auto"
                 size="sm"
@@ -160,7 +160,6 @@ export function TablaPlanificacion({
                         <React.Fragment key={plato}>
                             <tr style={{ textAlign: 'center' }}>
                                 <td
-                                    rowSpan={2}
                                     className="align-items-center"
                                     style={{
                                         minWidth: '3rem',
@@ -197,7 +196,6 @@ export function TablaPlanificacion({
                                     </Button>
                                 </td>
                                 <td
-                                    rowSpan={2}
                                     style={{
                                         minWidth: '2rem',
                                         position: 'sticky',
@@ -207,25 +205,51 @@ export function TablaPlanificacion({
                                     }}>
                                     {plato}
                                 </td>
-                                <td
-                                    rowSpan={2}
-                                    style={{
-                                        minWidth: '2rem',
-                                        position: 'sticky',
-                                        left: '9.8rem',
-                                        zIndex: 4,
-                                    }}>
-                                    {parseFloat(
-                                        datos
-                                            .filter(
-                                                (dato) => dato.plato === plato
-                                            )
-                                            .reduce(
-                                                (sum, d) => sum + d.cantidad,
-                                                0
-                                            )
-                                    ).toFixed(2)}
-                                </td>
+                                {
+                                    <td
+                                        className={
+                                            datos
+                                                .filter(
+                                                    (dato) =>
+                                                        dato.plato === plato
+                                                )
+                                                .reduce(
+                                                    (sum, d) =>
+                                                        sum + d.cantidad,
+                                                    0
+                                                ) >
+                                            produccion
+                                                .filter(
+                                                    (d) => d.plato === plato
+                                                )
+                                                .reduce(
+                                                    (sum, d) =>
+                                                        sum + d.cantidad,
+                                                    0
+                                                )
+                                                ? 'text-danger'
+                                                : ''
+                                        }
+                                        style={{
+                                            minWidth: '2rem',
+                                            position: 'sticky',
+                                            left: '9.8rem',
+                                            zIndex: 4,
+                                        }}>
+                                        {parseFloat(
+                                            datos
+                                                .filter(
+                                                    (dato) =>
+                                                        dato.plato === plato
+                                                )
+                                                .reduce(
+                                                    (sum, d) =>
+                                                        sum + d.cantidad,
+                                                    0
+                                                )
+                                        ).toFixed(2)}
+                                    </td>
+                                }
                                 {/* <td rowSpan={2}>
                                     {(() => {
                                         const gestionados = datos
@@ -247,30 +271,6 @@ export function TablaPlanificacion({
                                         return 'Parcialmente gestionado';
                                     })()}
                                 </td> */}
-                                {diasSemana
-                                    .filter(filterDias)
-                                    .map((diaS, i) => {
-                                        const dia = new Date(diaS);
-                                        dia.setHours(0, 0, 0, 0);
-                                        const total = datos
-                                            .filter((d) => {
-                                                const fecha = new Date(d.fecha);
-                                                fecha.setHours(0, 0, 0, 0);
-
-                                                return (
-                                                    d.plato === plato &&
-                                                    fecha.getTime() ===
-                                                        dia.getTime()
-                                                );
-                                            })
-                                            .reduce(
-                                                (sum, d) => sum + d.cantidad,
-                                                0
-                                            );
-                                        return <td key={i}>{total || ''}</td>;
-                                    })}
-                            </tr>
-                            <tr>
                                 {diasSemana.filter(filterDias).map((dia, i) => {
                                     const diaLimpio = new Date(dia);
                                     diaLimpio.setHours(0, 0, 0, 0);
@@ -301,6 +301,22 @@ export function TablaPlanificacion({
                                         }
                                     );
 
+                                    const totalConsumo = datos
+                                        .filter((d) => {
+                                            const fecha = new Date(d.fecha);
+                                            fecha.setHours(0, 0, 0, 0);
+
+                                            return (
+                                                d.plato === plato &&
+                                                fecha.getTime() ===
+                                                    dia.getTime()
+                                            );
+                                        })
+                                        .reduce(
+                                            (sum, d) => sum + d.cantidad,
+                                            0
+                                        );
+
                                     let cantidad = '';
 
                                     if (total.length > 0) {
@@ -310,24 +326,37 @@ export function TablaPlanificacion({
                                         );
                                     }
 
+                                    let updateCant = false;
+
                                     if (update.length > 0) {
                                         cantidad = update.reduce(
                                             (sum, d) => sum + d.cantidad,
                                             0
                                         );
+
+                                        updateCant = true;
                                     }
 
                                     return (
                                         <td key={plato + i}>
                                             <Form.Control
                                                 type="number"
-                                                className="form-control form-control-sm"
-                                                style={{ width: '5.5rem' }}
+                                                style={{
+                                                    width: '5.5rem',
+                                                    color: updateCant
+                                                        ? '#ff0000'
+                                                        : '#000000',
+                                                }}
+                                                className="form-control form-control-sm input"
                                                 value={cantidad}
+                                                placeholder={
+                                                    totalConsumo
+                                                        ? totalConsumo.toString()
+                                                        : ''
+                                                }
                                                 step={0.1}
                                                 min={0}
                                                 onChange={(e) => {
-                                                    console.log(e.target.value);
                                                     const cantidad = parseFloat(
                                                         e.target.value
                                                     );
@@ -350,10 +379,6 @@ export function TablaPlanificacion({
                                                                     fecha
                                                         );
 
-                                                    console.log(
-                                                        'CANTIDAD',
-                                                        cantidad
-                                                    );
                                                     if (index > -1) {
                                                         nuevaProduccion[
                                                             index
@@ -367,6 +392,12 @@ export function TablaPlanificacion({
                                                     }
                                                     setProduccionUpdate(
                                                         nuevaProduccion
+                                                    );
+                                                    localStorage.setItem(
+                                                        'produccionUpdate',
+                                                        JSON.stringify(
+                                                            nuevaProduccion
+                                                        )
                                                     );
                                                 }}
                                             />

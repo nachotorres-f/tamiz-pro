@@ -7,6 +7,7 @@ import {
     useState,
 } from 'react';
 import {
+    Accordion,
     Button,
     Col,
     Container,
@@ -63,9 +64,12 @@ export default function PlanificacionPage() {
 
     useEffect(() => {
         setLoading(true);
+        console.log('Cargando planificacion para la semana:', semanaBase);
         fetch(
             '/api/planificacion?fechaInicio=' +
-                startOfWeek(semanaBase, { weekStartsOn: 1 }).toISOString() +
+                startOfWeek(addDays(semanaBase, 4), {
+                    weekStartsOn: 1,
+                }).toISOString() +
                 '&salon=' +
                 (filtroSalon || 'A')
         ) // jueves
@@ -77,6 +81,10 @@ export default function PlanificacionPage() {
             .finally(() => {
                 setLoading(false);
             });
+
+        setProduccionUpdate(
+            JSON.parse(localStorage.getItem('produccionUpdate') || '[]')
+        );
     }, [semanaBase, filtroSalon]);
 
     useEffect(() => {
@@ -115,6 +123,7 @@ export default function PlanificacionPage() {
             theme: 'colored',
             transition: Slide,
         });
+
         await fetch('/api/planificacion', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -129,6 +138,9 @@ export default function PlanificacionPage() {
                     theme: 'colored',
                     transition: Slide,
                 });
+
+                setProduccionUpdate([]);
+                localStorage.removeItem('produccionUpdate');
             })
             .catch(() => {
                 toast.error('Error al actualizar la producción', {
@@ -155,6 +167,16 @@ export default function PlanificacionPage() {
     };
 
     const platosUnicos = [...new Set(datosFiltrados.map((d) => d.plato))];
+
+    const handleLimpiarProduccion = () => {
+        setProduccionUpdate([]);
+        localStorage.removeItem('produccionUpdate');
+        toast.info('Producción limpiada', {
+            position: 'bottom-right',
+            theme: 'colored',
+            transition: Slide,
+        });
+    };
 
     if (loading) {
         return (
@@ -206,7 +228,24 @@ export default function PlanificacionPage() {
 
                 {/* EVENTOS */}
 
-                <Container className="mb-3">
+                <Container>
+                    <Row>
+                        <Col>
+                            <Accordion className="mb-5">
+                                <Accordion.Item eventKey="0">
+                                    <Accordion.Header>
+                                        Agregar plato
+                                    </Accordion.Header>
+                                    <Accordion.Body>
+                                        <AgregarPlato
+                                            setSemanaBase={setSemanaBase}
+                                        />
+                                    </Accordion.Body>
+                                </Accordion.Item>
+                            </Accordion>
+                        </Col>
+                    </Row>
+
                     <Row>
                         <Col xs={4}>
                             <Form.Group>
@@ -225,27 +264,43 @@ export default function PlanificacionPage() {
                                 </Form.Select>
                             </Form.Group>
                         </Col>
+
+                        <Col xs={4} />
+
+                        <Col>
+                            <TablaEventosPlanificacion
+                                diasSemana={diasSemana}
+                                diaActivo={diaActivo}
+                                filtroSalon={filtroSalon}
+                                // anchoColumna={anchoButton + anchoPlato + anchoTotal}
+                            />
+                        </Col>
+                    </Row>
+
+                    <Row>
+                        <Col xs={4}>
+                            <Button
+                                type="button"
+                                className="btn btn-success mb-3"
+                                onClick={handleGuardarProduccion}>
+                                Guardar Cambios
+                            </Button>
+                            <Button
+                                type="button"
+                                className="btn btn-primary mb-3 ms-2"
+                                onClick={handleLimpiarProduccion}>
+                                Limpiar cambios
+                            </Button>
+                        </Col>
+                        <Col xs={4}></Col>
+                        <Col xs={4}>
+                            <NavegacionSemanal
+                                semanaBase={semanaBase}
+                                setSemanaBase={setSemanaBase}
+                            />
+                        </Col>
                     </Row>
                 </Container>
-
-                <TablaEventosPlanificacion
-                    diasSemana={diasSemana}
-                    diaActivo={diaActivo}
-                    filtroSalon={filtroSalon}
-                    // anchoColumna={anchoButton + anchoPlato + anchoTotal}
-                />
-
-                <NavegacionSemanal
-                    semanaBase={semanaBase}
-                    setSemanaBase={setSemanaBase}
-                />
-
-                <Button
-                    type="button"
-                    className="btn btn-success mb-3"
-                    onClick={handleGuardarProduccion}>
-                    Guardar Cambios
-                </Button>
             </Container>
 
             <div
@@ -269,10 +324,6 @@ export default function PlanificacionPage() {
                     // anchoTotal={anchoTotal}
                 />
             </div>
-
-            <Container>
-                <AgregarPlato setSemanaBase={setSemanaBase} />
-            </Container>
         </div>
     );
 }

@@ -36,8 +36,6 @@ export async function GET(req: NextRequest) {
             },
         });
 
-        console.log(producciones);
-
         async function fetchIngredientesRecursivos(
             nombreProducto: string
         ): Promise<any[]> {

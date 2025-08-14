@@ -123,8 +123,6 @@ export async function GET(req: NextRequest) {
 
     // const tableDataFiltered = tableData.filter((item) => item.tipo === 'PT');
 
-    console.log(plato);
-
     return NextResponse.json({
         plato,
         // producciones,
@@ -157,28 +155,11 @@ const buscarPlato = async (nombrePlato: string, inicio: Date, fin: Date) => {
             continue;
         }
 
-        if (producto.nombre === 'Tapeo de Quesos Y Fiambres') {
-            console.log('Cantidad de tapeo: ', producto.cantidad);
-            console.log('Cantidad de la receta x 1', cantidad);
-            console.log('RSULTADO', producto.cantidad * cantidad);
-        }
         listProducto.push({
             ...producto,
             cantidad: producto.cantidad * cantidad,
         });
-
-        // console.log(
-        //     `ID: ${producto.id} - Cantidad: ${producto.cantidad} de ${
-        //         producto.nombre
-        //     } en ${
-        //         producto.comanda.nombre
-        //     } (${producto.comanda.fecha.toISOString()}): ${cantidad}`
-        // );
-        // console.log('##########################');
-        // console.log('');
     }
-
-    // console.log('FIN');
 
     return listProducto;
 };
@@ -208,13 +189,6 @@ const buscarIngredientes = async (
 
     const existe = ingredientes.some((ingrediente) => {
         if (ingrediente.descripcion === ingredienteBuscar) {
-            console.log('\n', ingredientes, '\n');
-
-            // console.log('');
-            // console.log(
-            //     `ID ${ingrediente.id} - Ingrediente encontrado: ${ingrediente.nombreProducto}, cantidad: ${ingrediente.porcionBruta})`
-            // );
-            // console.log('');
             return true; // Encontrado, salir del bucle
         }
         return false; // Continuar buscando

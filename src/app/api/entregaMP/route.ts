@@ -111,16 +111,6 @@ export async function GET() {
 
     const ingredientes = await calcularIngredientesPT(resultado, recetas);
 
-    // console.log(
-    //     'INGREDIENTES',
-    //     ingredientes.sort((a, b) => a.ingrediente.localeCompare(b.ingrediente))
-    // );
-
-    // console.log(resultado[0]);
-    // console.log(ingredientes[0]);
-
-    //console.log('RESULTADO', resultado); // todos los ingredientes PT sin repetir
-
     return NextResponse.json(ingredientes);
 }
 

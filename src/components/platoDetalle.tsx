@@ -44,7 +44,6 @@ export function PlatoDetalle({
         )
             .then((res) => res.json())
             .then((d) => {
-                console.log(d);
                 return d;
             })
             .then(setDatos);

@@ -26,7 +26,7 @@ interface PlatoEvento {
 
 // Constantes
 const TIMEZONE = 'America/Argentina/Buenos_Aires';
-const DIAS_SEMANA = 7;
+const DIAS_SEMANA = 9;
 const TIPO_RECETA_PT = 'PT';
 const DIAS_PRODUCCION_EXTRA = { anterior: 5, posterior: 9 };
 
@@ -60,7 +60,6 @@ async function obtenerEventosSemana(
 ) {
     const lugares = ['El Central', 'La Rural'];
     const usarNotIn = salon === 'A';
-    console.log('Obteniendo eventos para la semana:', { inicio, salon });
 
     return prisma.comanda.findMany({
         where: {

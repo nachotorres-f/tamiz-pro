@@ -10,14 +10,10 @@ async function main() {
             password: hashedPassword,
         },
     });
-
-    console.log('✅ Usuario insertado');
 }
 
 main()
-    .catch((e) => {
-        console.error('❌ Error al insertar usuario:', e);
-    })
+    .catch((e) => {})
     .finally(() => {
         prisma.$disconnect();
     });

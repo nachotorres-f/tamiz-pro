@@ -53,7 +53,6 @@ export default function PlanificacionPage() {
         fetch('/api/expedicion')
             .then((res) => res.json())
             .then((data) => {
-                console.log('Datos de planificación:', data);
                 return data;
             })
             .then(setDatos);

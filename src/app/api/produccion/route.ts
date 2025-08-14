@@ -101,7 +101,6 @@ export async function GET(req: NextRequest) {
             plato: 'asc',
         },
     });
-    console.log('Producciones obtenidas:', producciones);
 
     const groupedProducciones: any[] = [];
 

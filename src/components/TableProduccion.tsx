@@ -64,10 +64,6 @@ export const TableProduccion: React.FC<TableProduccionProps> = ({
                                             }
                                             onChange={(e) => {
                                                 e.preventDefault();
-                                                console.log(
-                                                    'Produccion Local',
-                                                    e.target.value
-                                                );
                                                 let val = parseFloat(
                                                     e.target.value
                                                 );

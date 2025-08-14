@@ -32,7 +32,6 @@ export default function EventoPage() {
             .then((data) => {
                 // Aquí puedes manejar los datos del evento, por ejemplo, guardarlos en el estado
                 setData(data);
-                console.log('Detalles del evento:', data);
             })
             .catch((error) => {
                 console.error('Error fetching event details:', error);
