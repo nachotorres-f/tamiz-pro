@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { startOfWeek, addDays } from 'date-fns';
@@ -39,33 +38,33 @@ export async function GET() {
 }
 
 // Búsqueda recursiva de ingredientes
-const buscarIngredientesRecursivo = async (
-    nombre: string,
-    cantidadPadre: number
-): Promise<any[]> => {
-    const ingredientes = await prisma.receta.findMany({
-        where: {
-            nombreProducto: nombre,
-        },
-    });
+// const buscarIngredientesRecursivo = async (
+//     nombre: string,
+//     cantidadPadre: number
+// ): Promise<any[]> => {
+//     const ingredientes = await prisma.receta.findMany({
+//         where: {
+//             nombreProducto: nombre,
+//         },
+//     });
 
-    const resultado: any[] = [];
+//     const resultado: any[] = [];
 
-    for (const ingrediente of ingredientes) {
-        // Multiplicamos la porción bruta por la cantidad del padre
-        const ingredienteMultiplicado = {
-            ...ingrediente,
-            porcionBruta: ingrediente.porcionBruta * cantidadPadre,
-        };
-        resultado.push(ingredienteMultiplicado);
+//     for (const ingrediente of ingredientes) {
+//         // Multiplicamos la porción bruta por la cantidad del padre
+//         const ingredienteMultiplicado = {
+//             ...ingrediente,
+//             porcionBruta: ingrediente.porcionBruta * cantidadPadre,
+//         };
+//         resultado.push(ingredienteMultiplicado);
 
-        // Buscamos ingredientes hijos recursivamente
-        const hijos = await buscarIngredientesRecursivo(
-            ingrediente.descripcion,
-            ingredienteMultiplicado.porcionBruta
-        );
-        resultado.push(...hijos);
-    }
+//         // Buscamos ingredientes hijos recursivamente
+//         const hijos = await buscarIngredientesRecursivo(
+//             ingrediente.descripcion,
+//             ingredienteMultiplicado.porcionBruta
+//         );
+//         resultado.push(...hijos);
+//     }
 
-    return resultado;
-};
+//     return resultado;
+// };

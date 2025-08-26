@@ -4,7 +4,7 @@
 import React, { useEffect } from 'react';
 
 export const ChecklistEvento = ({ idEvent }: { idEvent: number }) => {
-    const [data, setData] = React.useState<any>(null);
+    const [, setData] = React.useState<any>(null);
 
     useEffect(() => {
         fetch('/api/expedicion/evento?id=' + idEvent)
