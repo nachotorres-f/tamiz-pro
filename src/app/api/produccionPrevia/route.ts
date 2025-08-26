@@ -123,7 +123,7 @@ export async function GET(req: NextRequest) {
                 principal: isPrincipal,
                 produccion: [
                     {
-                        fecha: produccion.fecha,
+                        fecha: addDays(produccion.fecha, -1),
                         cantidad: produccion.cantidad,
                     },
                 ],

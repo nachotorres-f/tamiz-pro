@@ -22,22 +22,24 @@ export async function POST(request: NextRequest) {
         plato,
         cantidad,
         fecha,
-    }: { plato: string; cantidad: number; fecha: string } =
+    }: { plato: string; cantidad: string; fecha: string } =
         await request.json();
 
     if (!plato || !cantidad) {
         return NextResponse.json({ error: 'Faltan datos' }, { status: 400 });
     }
 
+    console.log('LLEGO POST', { plato, cantidad, fecha });
+
     try {
         const nuevoPlato = await prisma.plato.create({
             data: {
                 nombre: plato,
-                cantidad: cantidad,
+                cantidad: parseFloat(cantidad),
                 comanda: {
                     connect: { id: 1 },
                 },
-                fecha: new Date(fecha),
+                fecha: new Date(fecha.split('T')[0]),
             },
         });
 

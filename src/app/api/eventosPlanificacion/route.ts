@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
         where: {
             fecha: {
                 gte: inicio,
-                lte: addDays(final, 1),
+                lte: addDays(final, 2),
             },
         },
         orderBy: {

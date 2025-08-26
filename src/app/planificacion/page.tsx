@@ -41,6 +41,7 @@ export default function PlanificacionPage() {
     const [filtroSalon, setFiltroSalon] = useState<string | null>('A');
     const [produccionUpdate, setProduccionUpdate] = React.useState<any[]>([]);
     const [loading, setLoading] = useState(false);
+    const [ciclo, setCiclo] = useState(false);
 
     // Referencias para medir el ancho de las celdas
     // const buttonRef = useRef<HTMLTableCellElement>(null);
@@ -64,14 +65,15 @@ export default function PlanificacionPage() {
 
     useEffect(() => {
         setLoading(true);
-        console.log('Cargando planificacion para la semana:', semanaBase);
         fetch(
             '/api/planificacion?fechaInicio=' +
                 startOfWeek(addDays(semanaBase, 4), {
                     weekStartsOn: 1,
                 }).toISOString() +
                 '&salon=' +
-                (filtroSalon || 'A')
+                (filtroSalon || 'A') +
+                '&ciclo13=' +
+                ciclo.toString()
         ) // jueves
             .then((res) => res.json())
             .then((data) => {
@@ -85,16 +87,16 @@ export default function PlanificacionPage() {
         setProduccionUpdate(
             JSON.parse(localStorage.getItem('produccionUpdate') || '[]')
         );
-    }, [semanaBase, filtroSalon]);
+    }, [semanaBase, filtroSalon, ciclo]);
 
     useEffect(() => {
         const inicioSemana = startOfWeek(semanaBase, { weekStartsOn: 4 }); // jueves
-        const dias = Array.from({ length: 13 }, (_, i) =>
+        const dias = Array.from({ length: ciclo ? 13 : 11 }, (_, i) =>
             addDays(inicioSemana, i)
         );
         setDiasSemana(dias);
         setDiaActivo('');
-    }, [semanaBase]);
+    }, [semanaBase, ciclo]);
 
     useEffect(() => {
         if (filtroSalon) {
@@ -156,7 +158,11 @@ export default function PlanificacionPage() {
             '/api/planificacion?fechaInicio=' +
                 startOfWeek(addDays(semanaBase, 4), {
                     weekStartsOn: 1,
-                }).toISOString()
+                }).toISOString() +
+                '&salon=' +
+                (filtroSalon || 'A') +
+                '&ciclo13=' +
+                ciclo.toString()
         ) // jueves
             .then((res) => res.json())
             .then((data) => {
@@ -238,6 +244,8 @@ export default function PlanificacionPage() {
                                     </Accordion.Header>
                                     <Accordion.Body>
                                         <AgregarPlato
+                                            salon={filtroSalon || 'A'}
+                                            produccion={false}
                                             setSemanaBase={setSemanaBase}
                                         />
                                     </Accordion.Body>
@@ -248,21 +256,40 @@ export default function PlanificacionPage() {
 
                     <Row>
                         <Col xs={4}>
-                            <Form.Group>
-                                <Form.Label>Filtrar por salón</Form.Label>
-                                <Form.Select
-                                    value={filtroSalon || ''}
-                                    onChange={(e) =>
-                                        setFiltroSalon(e.target.value)
-                                    }>
-                                    <option value="A">
-                                        Rut Haus - Origami
-                                    </option>
-                                    <option value="B">
-                                        El Central - La Rural
-                                    </option>
-                                </Form.Select>
-                            </Form.Group>
+                            <Row>
+                                <Col>
+                                    <Form.Group>
+                                        <Form.Label>
+                                            Filtrar por salón
+                                        </Form.Label>
+                                        <Form.Select
+                                            value={filtroSalon || ''}
+                                            onChange={(e) =>
+                                                setFiltroSalon(e.target.value)
+                                            }>
+                                            <option value="A">
+                                                Rut Haus - Origami
+                                            </option>
+                                            <option value="B">
+                                                El Central - La Rural
+                                            </option>
+                                        </Form.Select>
+                                    </Form.Group>
+                                </Col>
+                            </Row>
+                            <Row>
+                                <Col>
+                                    <Form.Check
+                                        className="mt-3"
+                                        type="checkbox"
+                                        label="Ciclo 13 dias"
+                                        checked={ciclo}
+                                        onChange={() => {
+                                            setCiclo(!ciclo);
+                                        }}
+                                    />
+                                </Col>
+                            </Row>
                         </Col>
 
                         <Col xs={4} />
@@ -272,6 +299,7 @@ export default function PlanificacionPage() {
                                 diasSemana={diasSemana}
                                 diaActivo={diaActivo}
                                 filtroSalon={filtroSalon}
+                                ciclo13={ciclo}
                                 // anchoColumna={anchoButton + anchoPlato + anchoTotal}
                             />
                         </Col>

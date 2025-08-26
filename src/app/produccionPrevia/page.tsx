@@ -388,7 +388,9 @@ export default function ProduccionPreviaPage() {
 
     const formatFecha = (dia: Date) => {
         const nombreDia = format(dia, 'EEEE', { locale: es }); // "lunes"
-        const letraDia = nombreDia.charAt(0).toUpperCase(); // "L"
+        const letraDia = nombreDia.startsWith('mi')
+            ? 'X'
+            : nombreDia.charAt(0).toUpperCase(); // "L"
         const diaNumero = format(dia, 'd'); // "5"
         const mesNumero = format(dia, 'M'); // "8"
         return `${letraDia} ${diaNumero}-${mesNumero}`;
@@ -421,7 +423,7 @@ export default function ProduccionPreviaPage() {
     return (
         <>
             <Container className="mt-5">
-                <h2 className="text-center mb-4">Produccion Previa</h2>
+                <h2 className="text-center mb-4">Entrega de MP</h2>
 
                 {/* <Form.Group>
                 <Row>

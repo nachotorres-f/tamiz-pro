@@ -1,4 +1,4 @@
-import { format } from 'date-fns';
+import { addDays, format } from 'date-fns';
 import React, { useEffect } from 'react';
 // import { ListGroup } from 'react-bootstrap';
 
@@ -11,11 +11,13 @@ interface EventoPlanificacion {
 }
 
 export default function TablaEventosPlanificacion({
+    ciclo13,
     diasSemana,
     diaActivo,
     filtroSalon,
 }: // anchoColumna,
 {
+    ciclo13: boolean;
     diasSemana: Date[];
     diaActivo: string;
     filtroSalon: string | null;
@@ -39,11 +41,14 @@ export default function TablaEventosPlanificacion({
             '/api/eventosPlanificacion?fechaInicio=' +
                 format(fechaInicio, 'yyyy-MM-dd') +
                 '&fechaFinal=' +
-                format(fechaFinal, 'yyyy-MM-dd')
+                format(
+                    ciclo13 ? addDays(fechaFinal, 2) : fechaFinal,
+                    'yyyy-MM-dd'
+                )
         )
             .then((res) => res.json())
             .then((data) => setEventos(data));
-    }, [diasSemana]);
+    }, [diasSemana, ciclo13]);
 
     useEffect(() => {
         if (filtroSalon) {
@@ -87,7 +92,7 @@ export default function TablaEventosPlanificacion({
                     <strong>
                         {diasSemana[4].toISOString().split('T')[0]} -{' '}
                         {
-                            diasSemana[diasSemana.length - 3]
+                            diasSemana[diasSemana.length - 1]
                                 .toISOString()
                                 .split('T')[0]
                         }

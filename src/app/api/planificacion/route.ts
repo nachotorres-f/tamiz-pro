@@ -56,7 +56,8 @@ async function obtenerNombresRecetasPT(): Promise<Set<string>> {
 async function obtenerEventosSemana(
     inicio: Date,
     nombresPT: Set<string>,
-    salon: string
+    salon: string,
+    ciclo13: boolean
 ) {
     const lugares = ['El Central', 'La Rural'];
     const usarNotIn = salon === 'A';
@@ -68,7 +69,10 @@ async function obtenerEventosSemana(
                     // condición 1: fecha + plato
                     fecha: {
                         gte: inicio,
-                        lte: addDays(inicio, DIAS_SEMANA),
+                        lte: addDays(
+                            inicio,
+                            ciclo13 ? DIAS_SEMANA : DIAS_SEMANA - 2
+                        ),
                     },
                     lugar: usarNotIn ? { notIn: lugares } : { in: lugares },
                     Plato: {
@@ -104,7 +108,7 @@ function procesarEventosAPlatos(
 
                     resultado.push({
                         plato: plato.nombre,
-                        fecha: format(addDays(fecha, 1), 'yyyy-MM-dd'),
+                        fecha: format(addDays(fecha, 3), 'yyyy-MM-dd'),
                         cantidad: plato.cantidad,
                         gestionado: false,
                         lugar: '',
@@ -170,6 +174,7 @@ export async function GET(req: NextRequest) {
         const { searchParams } = req.nextUrl;
         const fechaInicio = searchParams.get('fechaInicio');
         const salon = searchParams.get('salon') || 'A';
+        const ciclo13 = searchParams.get('ciclo13') === 'true';
 
         if (!fechaInicio) {
             return NextResponse.json(
@@ -194,7 +199,12 @@ export async function GET(req: NextRequest) {
         ]);
 
         // Obtener eventos de la semana
-        const eventos = await obtenerEventosSemana(inicio, nombresPT, salon);
+        const eventos = await obtenerEventosSemana(
+            inicio,
+            nombresPT,
+            salon,
+            ciclo13
+        );
 
         // Procesar eventos a platos
         const platos = procesarEventosAPlatos(eventos, nombresPT);

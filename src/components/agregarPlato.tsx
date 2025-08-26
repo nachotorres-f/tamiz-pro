@@ -13,8 +13,12 @@ import { es } from 'date-fns/locale';
 type Plato = { codigo: string | number; nombreProducto: string };
 
 export default function AgregarPlato({
+    salon,
+    produccion,
     setSemanaBase,
 }: {
+    salon: string;
+    produccion: boolean;
     setSemanaBase: (date: Date) => void;
 }) {
     const [platos, setPlatos] = useState<Plato[]>([]);
@@ -63,40 +67,78 @@ export default function AgregarPlato({
 
         setLoading(true);
 
-        fetch('/api/platos', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                plato: selectedPlato.split('-')[0],
-                cantidad: parseFloat(cantidad).toFixed(2),
-                fecha: startDate.toISOString(),
-            }),
-        })
-            .then((res) => res.json())
-            .then(() => {
-                setSemanaBase(new Date());
+        if (produccion) {
+            fetch('api/produccion/plato', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    plato: selectedPlato.split('-')[0],
+                    cantidad: parseFloat(cantidad).toFixed(2),
+                    fecha: startDate.toISOString(),
+                    salon,
+                }),
             })
-            .catch(() => {
-                toast.error('Completa todos los campos', {
-                    position: 'bottom-right',
-                    autoClose: 5000,
-                    hideProgressBar: false,
-                    closeOnClick: true,
-                    pauseOnHover: true,
-                    draggable: true,
-                    progress: undefined,
-                    theme: 'colored',
-                    transition: Slide,
+                .then((res) => res.json())
+                .then(() => {
+                    setSemanaBase(new Date());
+                })
+                .catch(() => {
+                    toast.error('Completa todos los campos', {
+                        position: 'bottom-right',
+                        autoClose: 5000,
+                        hideProgressBar: false,
+                        closeOnClick: true,
+                        pauseOnHover: true,
+                        draggable: true,
+                        progress: undefined,
+                        theme: 'colored',
+                        transition: Slide,
+                    });
+                })
+                .finally(() => {
+                    setLoading(false);
+                    setSelectedPlato('');
+                    setCantidad('');
+                    setStartDate(new Date());
                 });
+        } else {
+            fetch('/api/platos', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    plato: selectedPlato.split('-')[0],
+                    cantidad: parseFloat(cantidad).toFixed(2),
+                    fecha: startDate.toISOString(),
+                }),
             })
-            .finally(() => {
-                setLoading(false);
-                setSelectedPlato('');
-                setCantidad('');
-                setStartDate(new Date());
-            });
+                .then((res) => res.json())
+                .then(() => {
+                    setSemanaBase(new Date());
+                })
+                .catch(() => {
+                    toast.error('Completa todos los campos', {
+                        position: 'bottom-right',
+                        autoClose: 5000,
+                        hideProgressBar: false,
+                        closeOnClick: true,
+                        pauseOnHover: true,
+                        draggable: true,
+                        progress: undefined,
+                        theme: 'colored',
+                        transition: Slide,
+                    });
+                })
+                .finally(() => {
+                    setLoading(false);
+                    setSelectedPlato('');
+                    setCantidad('');
+                    setStartDate(new Date());
+                });
+        }
     };
 
     const opciones = platos.map((plato) => ({

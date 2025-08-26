@@ -8,6 +8,7 @@ import { addDays, format, startOfWeek } from 'date-fns';
 import { es } from 'date-fns/locale';
 import React, { useEffect, useState } from 'react';
 import {
+    Accordion,
     Button,
     Col,
     // Col,
@@ -19,10 +20,12 @@ import {
     // Row,
     Table,
 } from 'react-bootstrap';
-import { FiletypePdf } from 'react-bootstrap-icons';
+import { FiletypePdf, ArrowRight } from 'react-bootstrap-icons';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { MoonLoader } from 'react-spinners';
+import { Slide, toast } from 'react-toastify';
+import AgregarPlato from '@/components/agregarPlato';
 
 export default function ProduccionPage() {
     //const [filtro, setFiltro] = useState('');
@@ -114,7 +117,7 @@ export default function ProduccionPage() {
                 doc.addPage();
             }
 
-            const plato = platos[index];
+            const plato = platosList[index];
 
             await fetch(
                 'api/generarPDF?plato=' +
@@ -393,10 +396,62 @@ export default function ProduccionPage() {
 
     const formatFecha = (dia: Date) => {
         const nombreDia = format(dia, 'EEEE', { locale: es }); // "lunes"
-        const letraDia = nombreDia.charAt(0).toUpperCase(); // "L"
+        const letraDia = nombreDia.startsWith('mi')
+            ? 'X'
+            : nombreDia.charAt(0).toUpperCase(); // "L"
         const diaNumero = format(dia, 'd'); // "5"
         const mesNumero = format(dia, 'M'); // "8"
         return `${letraDia} ${diaNumero}-${mesNumero}`;
+    };
+
+    const pasarProduccion = async (
+        nombre: string,
+        cantidad: number,
+        fecha: Date
+    ) => {
+        toast.warn('Pasando produccion', {
+            position: 'bottom-right',
+            theme: 'colored',
+            transition: Slide,
+        });
+
+        fetch('api/produccion/pasar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                plato: nombre,
+                cantidad: cantidad,
+                fecha: fecha,
+            }),
+        })
+            .then(() => {
+                toast.success('Producción pasada al día siguiente', {
+                    position: 'bottom-right',
+                    theme: 'colored',
+                    transition: Slide,
+                });
+                setLoading(true);
+                fetch(
+                    '/api/produccion?fechaInicio=' +
+                        startOfWeek(semanaBase, {
+                            weekStartsOn: 1,
+                        }).toISOString()
+                )
+                    .then((res) => res.json())
+                    .then((res) => res.data)
+                    .then(setDatos)
+                    .finally(() => {
+                        setLoading(false);
+                    });
+            })
+            .catch(() => {
+                toast.error('Error al pasar la producción', {
+                    position: 'bottom-right',
+                    theme: 'colored',
+                    transition: Slide,
+                });
+                setLoading(false);
+            });
     };
 
     if (loading) {
@@ -470,6 +525,24 @@ export default function ProduccionPage() {
 
                 <Container className="mb-3">
                     <Row>
+                        <Col>
+                            <Accordion className="mb-5">
+                                <Accordion.Item eventKey="0">
+                                    <Accordion.Header>
+                                        Agregar plato
+                                    </Accordion.Header>
+                                    <Accordion.Body>
+                                        <AgregarPlato
+                                            salon={filtroSalon || 'A'}
+                                            produccion={true}
+                                            setSemanaBase={setSemanaBase}
+                                        />
+                                    </Accordion.Body>
+                                </Accordion.Item>
+                            </Accordion>
+                        </Col>
+                    </Row>
+                    <Row>
                         <Col xs={4}>
                             <Form.Group>
                                 <Form.Label>Filtrar por salón</Form.Label>
@@ -487,6 +560,30 @@ export default function ProduccionPage() {
                                 </Form.Select>
                             </Form.Group>
                         </Col>
+                        <Col xs={4}></Col>
+                        <Col xs={4}>
+                            <Form.Group>
+                                <Form.Label>Filtrar por dia</Form.Label>
+                                <Form.Select
+                                    value={diaActivo}
+                                    onChange={(e) =>
+                                        setDiaActivo(e.target.value)
+                                    }>
+                                    <option value="">Todos los dias</option>
+                                    {diasSemana.map((dia, i) => {
+                                        const fecha = format(dia, 'yyyy-MM-dd');
+                                        return (
+                                            <option
+                                                key={i}
+                                                value={fecha}>
+                                                {' '}
+                                                {formatFecha(dia)}
+                                            </option>
+                                        );
+                                    })}
+                                </Form.Select>
+                            </Form.Group>
+                        </Col>
                     </Row>
                 </Container>
 
@@ -496,7 +593,7 @@ export default function ProduccionPage() {
                 />
             </Container>
 
-            <div
+            {/* <div
                 className="mt-3 mx-auto"
                 style={{
                     overflowY: 'auto',
@@ -548,8 +645,8 @@ export default function ProduccionPage() {
                                 .filter(filterPlatos)
                                 .filter(filterSalon)
                                 .map((dato) => (
-                                    <tr key={dato.plato}>
-                                        {/* <td>
+                                    <tr key={dato.plato}> */}
+            {/* <td>
                                         <Button
                                             className="btn-danger"
                                             size="sm"
@@ -566,7 +663,7 @@ export default function ProduccionPage() {
                                             <FiletypePdf />
                                         </Button>
                                     </td> */}
-                                        <td>{dato.plato}</td>
+            {/* <td>{dato.plato}</td>
 
                                         {diasSemana
                                             .filter(filterDias)
@@ -606,6 +703,158 @@ export default function ProduccionPage() {
                                 ))}
                     </tbody>
                 </Table>
+            </div> */}
+
+            <div
+                className="d-flex flex-row justify-content-evenly mt-3 mx-auto flex-wrap"
+                style={{ width: '100%' }}>
+                {diasSemana.filter(filterDias).map((dia, i) => {
+                    // Primero filtramos y procesamos los datos para este día
+                    const datosDelDia = datos
+                        .filter(filterPlatos)
+                        .filter(filterSalon)
+                        .map((dato) => {
+                            dia.setHours(0, 0, 0, 0);
+                            const produccion = dato.produccion.find(
+                                (prod: any) => {
+                                    const fecha = new Date(prod.fecha);
+                                    fecha.setHours(0, 0, 0, 0);
+                                    return fecha.getTime() === dia.getTime();
+                                }
+                            );
+                            const cantidad = produccion
+                                ? produccion.cantidad
+                                : 0;
+
+                            // Solo incluimos los datos que tienen cantidad
+                            if (cantidad > 0) {
+                                return {
+                                    plato: dato.plato,
+                                    cantidad: cantidad,
+                                };
+                            }
+                            return null;
+                        })
+                        .filter(Boolean); // Eliminamos los elementos null
+
+                    return (
+                        <Table
+                            key={i}
+                            className="table-striped "
+                            style={{
+                                width: '300px',
+                                margin: '',
+                                height: 'max-content',
+                            }}
+                            bordered>
+                            <thead className="table-dark">
+                                <tr>
+                                    <th colSpan={4}>
+                                        {formatFecha(dia)}{' '}
+                                        {datosDelDia.length > 0 && (
+                                            <Button
+                                                className="btn-danger d-inline-block ms-3"
+                                                size="sm"
+                                                style={{
+                                                    width: '2rem',
+                                                    height: '2rem',
+                                                    display: 'flex',
+                                                    justifyContent: 'center',
+                                                    alignItems: 'center',
+                                                    margin: '0 auto',
+                                                }}
+                                                onClick={() => {
+                                                    generarPDFFecha(i);
+                                                }}>
+                                                <FiletypePdf />
+                                            </Button>
+                                        )}
+                                    </th>
+                                </tr>
+                                <tr>
+                                    <th></th>
+                                    <th>Plato</th>
+                                    <th>Cantidad</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {datosDelDia.length > 0 ? (
+                                    datosDelDia.map((dato, i) => (
+                                        <tr
+                                            key={dato && dato.plato}
+                                            style={{
+                                                textAlign: 'center',
+                                                height:
+                                                    datosDelDia.length - 1 !== i
+                                                        ? 'max-content'
+                                                        : '',
+                                            }}>
+                                            <td>
+                                                <Button
+                                                    className="btn-danger"
+                                                    size="sm"
+                                                    style={{
+                                                        width: '2rem',
+                                                        height: '2rem',
+                                                        display: 'flex',
+                                                        justifyContent:
+                                                            'center',
+                                                        alignItems: 'center',
+                                                    }}
+                                                    onClick={() => {
+                                                        if (dato)
+                                                            generarPDF([
+                                                                dato.plato,
+                                                            ]);
+                                                    }}>
+                                                    <FiletypePdf />
+                                                </Button>
+                                            </td>
+                                            <td>{dato && dato.plato}</td>
+                                            <td>{dato && dato.cantidad}</td>
+                                            <td>
+                                                <Button
+                                                    className="btn-primary"
+                                                    size="sm"
+                                                    style={{
+                                                        width: '2rem',
+                                                        height: '2rem',
+                                                        display: 'flex',
+                                                        justifyContent:
+                                                            'center',
+                                                        alignItems: 'center',
+                                                    }}
+                                                    onClick={() => {
+                                                        if (dato)
+                                                            pasarProduccion(
+                                                                dato.plato,
+                                                                dato.cantidad,
+                                                                dia
+                                                            );
+                                                    }}>
+                                                    <ArrowRight />
+                                                </Button>
+                                            </td>
+                                        </tr>
+                                    ))
+                                ) : (
+                                    <tr>
+                                        <td
+                                            colSpan={4}
+                                            style={{
+                                                textAlign: 'center',
+                                                fontStyle: 'italic',
+                                                color: '#666',
+                                            }}>
+                                            No hay nada para producir
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </Table>
+                    );
+                })}
             </div>
         </>
     );

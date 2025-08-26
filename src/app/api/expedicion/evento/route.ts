@@ -1,39 +1,38 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { prisma } from '@/lib/prisma';
-import { NextResponse } from 'next/server';
-import { startOfWeek, addDays } from 'date-fns';
+import { NextRequest, NextResponse } from 'next/server';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
     process.env.TZ = 'America/Argentina/Buenos_Aires';
+
+    const { searchParams } = req.nextUrl;
+    const id = searchParams.get('id');
 
     const eventos = await prisma.comanda.findMany({
         where: {
-            fecha: {
-                gte: startOfWeek(new Date(), { weekStartsOn: 1 }),
-                lt: addDays(startOfWeek(new Date(), { weekStartsOn: 1 }), 7),
-            },
+            id: id ? Number(id) : undefined,
         },
         include: {
             Plato: true,
         },
     });
 
-    // Para cada evento, obtenemos los ingredientes recursivamente
-    // const eventosConIngredientes = [];
-    // for (const evento of eventos) {
-    //     const ingredientes: any[] = [];
-    //     for (const plato of evento.Plato) {
-    //         const ingredientesPlato = await buscarIngredientesRecursivo(
-    //             plato.nombre,
-    //             plato.cantidad
-    //         );
-    //         ingredientes.push(...ingredientesPlato);
-    //     }
-    //     eventosConIngredientes.push({
-    //         ...evento,
-    //         ingredientes,
-    //     });
-    // }
+    //Para cada evento, obtenemos los ingredientes recursivamente
+    const eventosConIngredientes = [];
+    for (const evento of eventos) {
+        const ingredientes: any[] = [];
+        for (const plato of evento.Plato) {
+            const ingredientesPlato = await buscarIngredientesRecursivo(
+                plato.nombre,
+                plato.cantidad
+            );
+            ingredientes.push(...ingredientesPlato);
+        }
+        eventosConIngredientes.push({
+            ...evento,
+            ingredientes,
+        });
+    }
 
     return NextResponse.json(eventos);
 }

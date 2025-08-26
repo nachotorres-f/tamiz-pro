@@ -91,7 +91,9 @@ export function TablaPlanificacion({
 
     const formatFecha = (dia: Date) => {
         const nombreDia = format(dia, 'EEEE', { locale: es }); // "lunes"
-        const letraDia = nombreDia.charAt(0).toUpperCase(); // "L"
+        const letraDia = nombreDia.startsWith('mi')
+            ? 'X'
+            : nombreDia.charAt(0).toUpperCase(); // "L"
         const diaNumero = format(dia, 'd'); // "5"
         const mesNumero = format(dia, 'M'); // "8"
         return `${letraDia} ${diaNumero}-${mesNumero}`;

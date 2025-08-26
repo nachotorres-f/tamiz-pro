@@ -87,11 +87,6 @@ export default function AppNavbar() {
                                     onClick={() =>
                                         router.push('/produccionPrevia')
                                     }>
-                                    Produccion Previa
-                                </Nav.Link>
-
-                                <Nav.Link
-                                    onClick={() => router.push('/entregaMP')}>
                                     Entrega de MP
                                 </Nav.Link>
 
@@ -99,6 +94,16 @@ export default function AppNavbar() {
                                     onClick={() => router.push('/expedicion')}>
                                     Expedicion
                                 </Nav.Link>
+
+                                {/* <Nav.Link
+                                    onClick={() => router.push('/entregaMP')}>
+                                    Entrega de MP
+                                </Nav.Link>
+
+                                <Nav.Link
+                                    onClick={() => router.push('/expedicion')}>
+                                    Expedicion
+                                </Nav.Link> */}
                             </>
                         )}
                     </Nav>
