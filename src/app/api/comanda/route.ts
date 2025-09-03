@@ -68,8 +68,8 @@ export async function POST(req: NextRequest) {
     });
 
     if (comandaExiste) {
-        await prisma.comanda.delete({ where: { id: body.Id } });
         await prisma.plato.deleteMany({ where: { comandaId: body.Id } });
+        await prisma.comanda.delete({ where: { id: body.Id } });
     }
 
     await prisma.comanda.create({
