@@ -63,11 +63,17 @@ export async function POST(req: NextRequest) {
         )
     );
 
-    // Upsert comanda
-    await prisma.comanda.upsert({
+    const comandaExiste = await prisma.comanda.findFirst({
         where: { id: body.Id },
-        update: {},
-        create: {
+    });
+
+    if (comandaExiste) {
+        await prisma.comanda.delete({ where: { id: body.Id } });
+        await prisma.plato.deleteMany({ where: { comandaId: body.Id } });
+    }
+
+    await prisma.comanda.create({
+        data: {
             id: body.Id,
             lugar: body.Lugar,
             salon: body.Espacio,
@@ -126,28 +132,10 @@ export async function POST(req: NextRequest) {
     });
 
     // Busca platos existentes en una sola consulta
-    const nombres = platos.map((p) => p.nombre);
-    const existentes = await prisma.plato.findMany({
-        where: {
-            nombre: { in: nombres },
-            comandaId: body.Id,
-        },
-        select: { id: true, nombre: true },
-    });
-    const existentesMap = new Map(existentes.map((e) => [e.nombre, e.id]));
-
     // Actualiza o crea platos en paralelo
     await Promise.all(
         platos.map(async (plato) => {
-            const existenteId = existentesMap.get(plato.nombre);
-            if (existenteId) {
-                await prisma.plato.update({
-                    where: { id: existenteId },
-                    data: { cantidad: plato.cantidad },
-                });
-            } else {
-                await prisma.plato.create({ data: plato });
-            }
+            await prisma.plato.create({ data: plato });
         })
     );
 

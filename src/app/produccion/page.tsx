@@ -36,8 +36,15 @@ export default function ProduccionPage() {
     const [datos, setDatos] = useState<any[]>([]);
     const [showModal, setShowModal] = useState(false);
     const [platos, setPlatos] = useState<string[]>([]);
-    const [filtroSalon, setFiltroSalon] = useState<string>('A');
+    const [filtroSalon, setFiltroSalon] = useState<string | null>('A');
     const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        const savedFiltro = sessionStorage.getItem('filtroSalon');
+        if (savedFiltro) {
+            setFiltroSalon(savedFiltro);
+        }
+    }, []);
 
     useEffect(() => {
         setLoading(true);
@@ -54,11 +61,8 @@ export default function ProduccionPage() {
     }, [semanaBase]);
 
     useEffect(() => {
-        const inicioSemana = addDays(
-            startOfWeek(semanaBase, { weekStartsOn: 1 }),
-            -4
-        ); // jueves
-        const dias = Array.from({ length: 13 }, (_, i) =>
+        const inicioSemana = startOfWeek(semanaBase, { weekStartsOn: 1 });
+        const dias = Array.from({ length: 7 }, (_, i) =>
             addDays(inicioSemana, i)
         );
         setDiasSemana(dias);
@@ -260,7 +264,18 @@ export default function ProduccionPage() {
                                             );
                                         } else {
                                             doc.text(
-                                                'Cantidad: ' + cantidad,
+                                                'Cantidad a producir: ' +
+                                                    cantidad,
+                                                14,
+                                                yPosition
+                                            );
+                                        }
+
+                                        if (platoGrupo.observacion) {
+                                            yPosition += 5;
+                                            doc.text(
+                                                'Observacion: ' +
+                                                    platoGrupo.observacion,
                                                 14,
                                                 yPosition
                                             );
@@ -548,9 +563,13 @@ export default function ProduccionPage() {
                                 <Form.Label>Filtrar por salón</Form.Label>
                                 <Form.Select
                                     value={filtroSalon || ''}
-                                    onChange={(e) =>
-                                        setFiltroSalon(e.target.value)
-                                    }>
+                                    onChange={(e) => {
+                                        setFiltroSalon(e.target.value);
+                                        sessionStorage.setItem(
+                                            'filtroSalon',
+                                            e.target.value
+                                        );
+                                    }}>
                                     <option value="A">
                                         Rut Haus - Origami
                                     </option>
@@ -742,7 +761,7 @@ export default function ProduccionPage() {
                             key={i}
                             className="table-striped "
                             style={{
-                                width: '300px',
+                                width: diaActivo ? '600px' : '300px',
                                 margin: '',
                                 height: 'max-content',
                             }}
@@ -758,7 +777,7 @@ export default function ProduccionPage() {
                                                 style={{
                                                     width: '2rem',
                                                     height: '2rem',
-                                                    display: 'flex',
+                                                    display: 'block',
                                                     justifyContent: 'center',
                                                     alignItems: 'center',
                                                     margin: '0 auto',
@@ -797,10 +816,11 @@ export default function ProduccionPage() {
                                                     style={{
                                                         width: '2rem',
                                                         height: '2rem',
-                                                        display: 'flex',
+                                                        display: 'block',
                                                         justifyContent:
                                                             'center',
                                                         alignItems: 'center',
+                                                        margin: 'auto',
                                                     }}
                                                     onClick={() => {
                                                         if (dato)
@@ -820,10 +840,11 @@ export default function ProduccionPage() {
                                                     style={{
                                                         width: '2rem',
                                                         height: '2rem',
-                                                        display: 'flex',
+                                                        display: 'block',
                                                         justifyContent:
                                                             'center',
                                                         alignItems: 'center',
+                                                        margin: 'auto',
                                                     }}
                                                     onClick={() => {
                                                         if (dato)

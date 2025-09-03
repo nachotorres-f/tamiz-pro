@@ -22,6 +22,13 @@ export default function CalendarioPage() {
     const router = useRouter();
 
     useEffect(() => {
+        const savedFiltro = sessionStorage.getItem('filtroSalon');
+        if (savedFiltro) {
+            setFiltroSalon(savedFiltro);
+        }
+    }, []);
+
+    useEffect(() => {
         setLoading(true);
         fetch('/api/calendario?salon=' + filtroSalon)
             .then((response) => response.json())
@@ -74,9 +81,14 @@ export default function CalendarioPage() {
                             <Form.Label>Filtrar por salón</Form.Label>
                             <Form.Select
                                 value={filtroSalon || ''}
-                                onChange={(e) =>
-                                    setFiltroSalon(e.target.value)
-                                }>
+                                onChange={(e) => {
+                                    setFiltroSalon(e.target.value);
+                                    if (!e.target.value) {
+                                        sessionStorage.removeItem(
+                                            'filtroSalon'
+                                        );
+                                    }
+                                }}>
                                 <option value="">Todos</option>
                                 <option value="A">Rut Haus - Origami</option>
                                 <option value="B">El Central - La Rural</option>

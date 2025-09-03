@@ -42,6 +42,16 @@ export default function PlanificacionPage() {
     const [produccionUpdate, setProduccionUpdate] = React.useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [ciclo, setCiclo] = useState(false);
+    const [observaciones, setObservaciones] = useState<
+        { plato: string; observacion: string }[]
+    >([]);
+
+    useEffect(() => {
+        const savedFiltro = sessionStorage.getItem('filtroSalon');
+        if (savedFiltro) {
+            setFiltroSalon(savedFiltro);
+        }
+    }, []);
 
     // Referencias para medir el ancho de las celdas
     // const buttonRef = useRef<HTMLTableCellElement>(null);
@@ -132,6 +142,7 @@ export default function PlanificacionPage() {
             body: JSON.stringify({
                 salon: filtroSalon,
                 produccion: produccionUpdate,
+                observaciones,
             }),
         })
             .then(() => {
@@ -264,9 +275,13 @@ export default function PlanificacionPage() {
                                         </Form.Label>
                                         <Form.Select
                                             value={filtroSalon || ''}
-                                            onChange={(e) =>
-                                                setFiltroSalon(e.target.value)
-                                            }>
+                                            onChange={(e) => {
+                                                setFiltroSalon(e.target.value);
+                                                sessionStorage.setItem(
+                                                    'filtroSalon',
+                                                    e.target.value
+                                                );
+                                            }}>
                                             <option value="A">
                                                 Rut Haus - Origami
                                             </option>
@@ -347,6 +362,8 @@ export default function PlanificacionPage() {
                     setProduccion={setProduccion}
                     produccionUpdate={produccionUpdate}
                     setProduccionUpdate={setProduccionUpdate}
+                    observaciones={observaciones}
+                    setObservaciones={setObservaciones}
                     // anchoButton={anchoButton}
                     // anchoPlato={anchoPlato}
                     // anchoTotal={anchoTotal}

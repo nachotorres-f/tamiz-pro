@@ -320,11 +320,18 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     process.env.TZ = 'America/Argentina/Buenos_Aires';
 
-    const { salon, produccion } = await req.json();
+    const { salon, produccion, observaciones } = await req.json();
 
     if (!Array.isArray(produccion)) {
         return NextResponse.json(
             { error: 'El cuerpo debe ser un array de producciones' },
+            { status: 400 }
+        );
+    }
+
+    if (!Array.isArray(observaciones)) {
+        return NextResponse.json(
+            { error: 'El cuerpo debe ser un array de observaciones' },
             { status: 400 }
         );
     }
@@ -358,7 +365,13 @@ export async function POST(req: NextRequest) {
             // Si hay cambios, actualizamos la cantidad
             await prisma.produccion.update({
                 where: { id: existe.id },
-                data: { cantidad: item.cantidad, salon: salon },
+                data: {
+                    cantidad: item.cantidad,
+                    salon: salon,
+                    observacion:
+                        observaciones.find((o) => o.plato === existe.plato)
+                            ?.observacion || '',
+                },
             });
             continue;
         } else {
@@ -369,6 +382,9 @@ export async function POST(req: NextRequest) {
                     fecha: new Date(item.fecha),
                     cantidad: item.cantidad,
                     salon,
+                    observacion:
+                        observaciones.find((o) => o.plato === item.plato)
+                            ?.observacion || '',
                 },
             });
         }

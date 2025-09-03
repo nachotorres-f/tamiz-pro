@@ -33,8 +33,15 @@ export default function ProduccionPreviaPage() {
     const [datos, setDatos] = useState<any[]>([]);
     const [showModal, setShowModal] = useState(false);
     const [platos, setPlatos] = useState<string[]>([]);
-    const [filtroSalon, setFiltroSalon] = useState('A');
+    const [filtroSalon, setFiltroSalon] = useState<string | null>('A');
     const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        const savedFiltro = sessionStorage.getItem('filtroSalon');
+        if (savedFiltro) {
+            setFiltroSalon(savedFiltro);
+        }
+    }, []);
 
     useEffect(() => {
         setLoading(true);
@@ -259,7 +266,18 @@ export default function ProduccionPreviaPage() {
                                             );
                                         } else {
                                             doc.text(
-                                                'Cantidad: ' + cantidad,
+                                                'Cantidad a producir: ' +
+                                                    cantidad,
+                                                14,
+                                                yPosition
+                                            );
+                                        }
+
+                                        if (platoGrupo.observacion) {
+                                            yPosition += 5;
+                                            doc.text(
+                                                'Observacion: ' +
+                                                    platoGrupo.observacion,
                                                 14,
                                                 yPosition
                                             );
@@ -472,9 +490,13 @@ export default function ProduccionPreviaPage() {
                                 <Form.Label>Filtrar por salón</Form.Label>
                                 <Form.Select
                                     value={filtroSalon || ''}
-                                    onChange={(e) =>
-                                        setFiltroSalon(e.target.value)
-                                    }>
+                                    onChange={(e) => {
+                                        setFiltroSalon(e.target.value);
+                                        sessionStorage.setItem(
+                                            'filtroSalon',
+                                            e.target.value
+                                        );
+                                    }}>
                                     <option value="A">
                                         Rut Haus - Origami
                                     </option>

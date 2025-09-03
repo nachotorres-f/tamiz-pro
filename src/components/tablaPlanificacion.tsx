@@ -1,12 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import React, { useEffect } from 'react';
-import { Button, Form, Table } from 'react-bootstrap';
+import React, { useEffect, useState } from 'react';
+import { Button, FloatingLabel, Form, Modal, Table } from 'react-bootstrap';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { PlatoDetalle } from './platoDetalle';
-import { /* EyeFill, EyeSlashFill, */ Plus, Dash } from 'react-bootstrap-icons';
+import { /* EyeFill, EyeSlashFill, */ Plus } from 'react-bootstrap-icons';
 
 export function TablaPlanificacion({
     pageOcultos,
@@ -18,8 +18,9 @@ export function TablaPlanificacion({
     platoExpandido,
     produccion,
     produccionUpdate,
+    observaciones,
+    setObservaciones,
     setProduccionUpdate,
-    setPlatoExpandido,
 }: // anchoButton,
 // anchoPlato,
 // anchoTotal,
@@ -33,6 +34,8 @@ export function TablaPlanificacion({
     platoExpandido: string | null;
     produccion: any[];
     produccionUpdate: any[];
+    observaciones: { plato: string; observacion: string }[];
+    setObservaciones: (value: { plato: string; observacion: string }[]) => void;
     setProduccion: (value: any[]) => void;
     setProduccionUpdate: (value: any[]) => void;
     // anchoButton: any;
@@ -41,6 +44,10 @@ export function TablaPlanificacion({
     setPlatoExpandido: (value: string | null) => void;
 }) {
     const [ocultos, setOcultos] = React.useState<Set<string>>(new Set());
+    const [show, setShow] = useState(false);
+    const [platoModal, setPlatoModal] = useState('');
+    const [observacionModal, setObservacionModal] = useState('');
+    //const [primeraCargaModal, setPrimeraCargaModal] = useState(true);
 
     useEffect(() => {
         fetch('/api/ocultos')
@@ -98,9 +105,75 @@ export function TablaPlanificacion({
         const mesNumero = format(dia, 'M'); // "8"
         return `${letraDia} ${diaNumero}-${mesNumero}`;
     };
+    const handleClose = () => setShow(false);
 
     return (
         <>
+            <Modal
+                show={show}
+                onHide={handleClose}>
+                <Modal.Header closeButton>
+                    <Modal.Title>Observacion - {platoModal}</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <FloatingLabel
+                        controlId="floatingTextarea"
+                        label="Observación"
+                        className="mb-3">
+                        <Form.Control
+                            as="textarea"
+                            value={observacionModal}
+                            onChange={(
+                                e: React.ChangeEvent<
+                                    HTMLInputElement | HTMLTextAreaElement
+                                >
+                            ) => {
+                                setObservacionModal(e.target.value);
+                            }}
+                            style={{ height: '200px' }}
+                        />
+                    </FloatingLabel>
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button
+                        variant="secondary"
+                        onClick={() => {
+                            setObservacionModal('');
+                            handleClose();
+                        }}>
+                        Cerrar
+                    </Button>
+                    <Button
+                        variant="primary"
+                        onClick={() => {
+                            const obsExistente = observaciones.find(
+                                (o) => o.plato === platoModal
+                            );
+                            if (obsExistente) {
+                                obsExistente.observacion = observacionModal;
+                                setObservaciones([
+                                    ...observaciones.filter(
+                                        (o) => o.plato !== platoModal
+                                    ),
+                                    obsExistente,
+                                ]);
+                            } else {
+                                setObservaciones([
+                                    ...observaciones,
+                                    {
+                                        plato: platoModal,
+                                        observacion: observacionModal,
+                                    },
+                                ]);
+                            }
+                            setObservacionModal('');
+                            handleClose();
+                        }}>
+                        Guardar Cambios
+                    </Button>
+                </Modal.Footer>
+            </Modal>
+
             <Table
                 style={{
                     width: '100%',
@@ -161,7 +234,7 @@ export function TablaPlanificacion({
                     {platosUnicos.filter(filterPlatos).map((plato) => (
                         <React.Fragment key={plato}>
                             <tr style={{ textAlign: 'center' }}>
-                                <td
+                                {/* <td
                                     className="align-items-center"
                                     style={{
                                         minWidth: '3rem',
@@ -195,6 +268,32 @@ export function TablaPlanificacion({
                                         ) : (
                                             <Plus />
                                         )}
+                                    </Button>
+                                </td> */}
+                                <td>
+                                    <Button
+                                        size="sm"
+                                        variant="primary"
+                                        style={{
+                                            width: '2rem',
+                                            height: '2rem',
+                                            display: 'flex',
+                                            justifyContent: 'center',
+                                            alignItems: 'center',
+                                        }}
+                                        onClick={() => {
+                                            setPlatoModal(plato);
+                                            setShow(true);
+
+                                            const observacion =
+                                                observaciones.find(
+                                                    (o) => o.plato === plato
+                                                )?.observacion ||
+                                                observacionModal;
+
+                                            setObservacionModal(observacion);
+                                        }}>
+                                        <Plus />
                                     </Button>
                                 </td>
                                 <td
