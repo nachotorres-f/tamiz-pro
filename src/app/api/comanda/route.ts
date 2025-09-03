@@ -96,6 +96,7 @@ export async function POST(req: NextRequest) {
         'Champagne',
         'Vino',
         'Cafe',
+        'Maridaje',
     ];
 
     // Prepara los platos a upsert en batch
@@ -133,11 +134,15 @@ export async function POST(req: NextRequest) {
 
     // Busca platos existentes en una sola consulta
     // Actualiza o crea platos en paralelo
-    await Promise.all(
-        platos.map(async (plato) => {
-            await prisma.plato.create({ data: plato });
-        })
-    );
+    // await Promise.all(
+    //     platos.map(async (plato) => {
+    //         await prisma.plato.create({ data: plato });
+    //     })
+    // );
+
+    await prisma.plato.createMany({
+        data: platos,
+    });
 
     return NextResponse.json({ success: true }, { status: 201 });
 }
