@@ -17,6 +17,7 @@ interface Receta {
 }
 
 interface PlatoEvento {
+    comandaId: number;
     plato: string;
     fecha: string;
     cantidad: number;
@@ -107,6 +108,7 @@ function procesarEventosAPlatos(
                     const fecha = format(new Date(plato.fecha), 'yyyy-MM-dd');
 
                     resultado.push({
+                        comandaId: evento.id,
                         plato: plato.nombre,
                         fecha: format(addDays(fecha, 3), 'yyyy-MM-dd'),
                         cantidad: plato.cantidad,
@@ -115,6 +117,7 @@ function procesarEventosAPlatos(
                     });
                 } else {
                     resultado.push({
+                        comandaId: evento.id,
                         plato: plato.nombre,
                         fecha: format(addDays(evento.fecha, 1), 'yyyy-MM-dd'),
                         cantidad: plato.cantidad,
@@ -393,12 +396,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: 'Producción actualizada' });
 }
 
-type Plato = {
-    plato: string;
-    fecha: string;
-    cantidad: number;
-    lugar: string;
-};
+// type Plato = {
+//     comandaId: number;
+//     plato: string;
+//     fecha: string;
+//     cantidad: number;
+//     lugar: string;
+// };
 
 type Resultado = {
     plato: string;
@@ -408,7 +412,7 @@ type Resultado = {
 };
 
 async function calcularIngredientesPT(
-    platos: Plato[],
+    platos: PlatoEvento[],
     recetas: Receta[]
 ): Promise<Resultado[]> {
     const resultado: Resultado[] = [];
@@ -418,7 +422,8 @@ async function calcularIngredientesPT(
         nombre: string,
         fecha: string,
         cantidad: number,
-        lugar: string
+        lugar: string,
+        comandaId: number
     ) {
         const subRecetas = recetas.filter(
             (r) => r.nombreProducto === nombre && r.tipo === 'PT'
@@ -437,19 +442,26 @@ async function calcularIngredientesPT(
             });
 
             if (!visitados.has(ingrediente)) {
-                visitados.add(ingrediente);
+                visitados.add(ingrediente + comandaId);
                 await recorrer(
                     ingrediente,
                     fecha,
                     parseFloat(cantidadTotal.toFixed(2)),
-                    lugar
+                    lugar,
+                    comandaId
                 );
             }
         }
     }
 
     for (const item of platos) {
-        await recorrer(item.plato, item.fecha, item.cantidad, item.lugar);
+        await recorrer(
+            item.plato,
+            item.fecha,
+            item.cantidad,
+            item.lugar,
+            item.comandaId
+        );
     }
 
     // Agrupar por ingrediente + fecha y sumar
