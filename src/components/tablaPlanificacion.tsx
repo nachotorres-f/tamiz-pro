@@ -6,7 +6,7 @@ import { Button, FloatingLabel, Form, Modal, Table } from 'react-bootstrap';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { PlatoDetalle } from './platoDetalle';
-import { /* EyeFill, EyeSlashFill, */ Plus } from 'react-bootstrap-icons';
+import { ChatRightText } from 'react-bootstrap-icons';
 
 export function TablaPlanificacion({
     pageOcultos,
@@ -282,18 +282,36 @@ export function TablaPlanificacion({
                                             alignItems: 'center',
                                         }}
                                         onClick={() => {
-                                            setPlatoModal(plato);
-                                            setShow(true);
-
                                             const observacion =
                                                 observaciones.find(
                                                     (o) => o.plato === plato
                                                 )?.observacion ||
                                                 observacionModal;
 
-                                            setObservacionModal(observacion);
+                                            if (observacion) {
+                                                setObservacionModal(
+                                                    observacion
+                                                );
+                                            } else {
+                                                const prod = produccion.filter(
+                                                    (p) =>
+                                                        p.plato === plato &&
+                                                        p.observacion
+                                                );
+
+                                                if (prod.length > 0) {
+                                                    setObservacionModal(
+                                                        prod[0].observacion
+                                                    );
+                                                } else {
+                                                    setObservacionModal('');
+                                                }
+                                            }
+
+                                            setPlatoModal(plato);
+                                            setShow(true);
                                         }}>
-                                        <Plus />
+                                        <ChatRightText />
                                     </Button>
                                 </td>
                                 <td

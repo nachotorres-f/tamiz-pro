@@ -6,13 +6,14 @@ import { NavegacionSemanal } from '@/components/navegacionSemanal';
 // import { SelectorDias } from '@/components/selectorDias';
 import { addDays, format, startOfWeek } from 'date-fns';
 import { es } from 'date-fns/locale';
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
 import {
     Accordion,
     Button,
     Col,
     // Col,
     Container,
+    FloatingLabel,
     Form,
     Modal,
     Row,
@@ -20,14 +21,22 @@ import {
     // Row,
     Table,
 } from 'react-bootstrap';
-import { FiletypePdf, ArrowRight } from 'react-bootstrap-icons';
+import {
+    FiletypePdf,
+    ArrowRight,
+    ArrowsFullscreen,
+    ChatLeftText,
+} from 'react-bootstrap-icons';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { MoonLoader } from 'react-spinners';
 import { Slide, toast } from 'react-toastify';
 import AgregarPlato from '@/components/agregarPlato';
+import { SalonContext } from '../layout';
 
 export default function ProduccionPage() {
+    const salon = useContext(SalonContext);
+
     //const [filtro, setFiltro] = useState('');
     const [filtro] = useState('');
     const [diasSemana, setDiasSemana] = useState<Date[]>([]);
@@ -36,15 +45,35 @@ export default function ProduccionPage() {
     const [datos, setDatos] = useState<any[]>([]);
     const [showModal, setShowModal] = useState(false);
     const [platos, setPlatos] = useState<string[]>([]);
-    const [filtroSalon, setFiltroSalon] = useState<string | null>('A');
+    const [filtroSalon, setFiltroSalon] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const [fechaImprimir, setFechaImprimir] = useState<Date | null>(null);
+    const [show, setShow] = useState(false);
+    const [observacionModal, setObservacionModal] = useState('');
+    const [platoModal, setPlatoModal] = useState<{
+        plato: string;
+        cantidad: number;
+        dia: Date;
+        comentario: string;
+    }>({ plato: '', cantidad: 0, dia: new Date(), comentario: '' });
+
+    const ref = useRef<HTMLTableElement>(null);
+
+    const handleFullscreen = () => {
+        if (ref.current && !isFullscreen) goFullscreen(ref.current);
+
+        if (isFullscreen) {
+            exitFullscreen();
+            setIsFullscreen(false);
+        }
+    };
 
     useEffect(() => {
-        const savedFiltro = sessionStorage.getItem('filtroSalon');
-        if (savedFiltro) {
-            setFiltroSalon(savedFiltro);
+        if (salon) {
+            setFiltroSalon(salon); // sincroniza el estado con el context
         }
-    }, []);
+    }, [salon]);
 
     useEffect(() => {
         setLoading(true);
@@ -86,6 +115,7 @@ export default function ProduccionPage() {
     const generarPDFFecha = async (i: number) => {
         const dia = diasSemana[i];
         const fecha = format(dia, 'yyyy-MM-dd');
+        setFechaImprimir(dia);
 
         const platosEnFecha = datos
             .map((item) => {
@@ -113,7 +143,7 @@ export default function ProduccionPage() {
         setShowModal(true);
     };
 
-    const generarPDF = async (platosList: string[]) => {
+    const generarPDF = async (platosList: string[], fecha: Date) => {
         const doc = new jsPDF();
 
         for (let index = 0; index < platosList.length; index++) {
@@ -127,7 +157,9 @@ export default function ProduccionPage() {
                 'api/generarPDF?plato=' +
                     plato +
                     '&fechaInicio=' +
-                    startOfWeek(semanaBase, { weekStartsOn: 4 }).toISOString()
+                    fecha.toISOString() +
+                    '&salon=' +
+                    filtroSalon
             )
                 .then((res) => res.json())
                 .then((res) => {
@@ -273,12 +305,19 @@ export default function ProduccionPage() {
 
                                         if (platoGrupo.observacion) {
                                             yPosition += 5;
-                                            doc.text(
+                                            const text =
                                                 'Observacion: ' +
-                                                    platoGrupo.observacion,
-                                                14,
-                                                yPosition
-                                            );
+                                                platoGrupo.observacion;
+                                            doc.setFillColor(255, 255, 0); // RGB → amarillo
+                                            doc.rect(
+                                                13,
+                                                yPosition - 4,
+                                                doc.getTextWidth(text) + 2,
+                                                5,
+                                                'F'
+                                            ); // Dibuja rectángulo relleno
+
+                                            doc.text(text, 14, yPosition);
                                         }
 
                                         yPosition += 5;
@@ -384,11 +423,12 @@ export default function ProduccionPage() {
     };
 
     const handleClose = () => setShowModal(false);
+    const handleCloseModal = () => setShow(false);
 
     const handleImprimirJuntas = async () => {
         setShowModal(false);
         setLoading(true);
-        await generarPDF(platos);
+        if (fechaImprimir) await generarPDF(platos, fechaImprimir);
         setLoading(false);
     };
 
@@ -398,7 +438,7 @@ export default function ProduccionPage() {
         for (let index = 0; index < platos.length; index++) {
             const list = [];
             list.push(platos[index]);
-            await generarPDF(list);
+            if (fechaImprimir) await generarPDF(list, fechaImprimir);
         }
         setLoading(false);
     };
@@ -418,6 +458,53 @@ export default function ProduccionPage() {
         const mesNumero = format(dia, 'M'); // "8"
         return `${letraDia} ${diaNumero}-${mesNumero}`;
     };
+
+    function guardarComentario(plato: string, cantidad: number, dia: Date) {
+        toast.warn('Agregando Comentario', {
+            position: 'bottom-right',
+            theme: 'colored',
+            transition: Slide,
+        });
+
+        fetch('api/produccion/comentario', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                plato: plato,
+                cantidad: cantidad,
+                fecha: dia,
+                comentario: observacionModal,
+            }),
+        })
+            .then(() => {
+                toast.success('Comentario guardado', {
+                    position: 'bottom-right',
+                    theme: 'colored',
+                    transition: Slide,
+                });
+                setLoading(true);
+                fetch(
+                    '/api/produccion?fechaInicio=' +
+                        startOfWeek(semanaBase, {
+                            weekStartsOn: 1,
+                        }).toISOString()
+                )
+                    .then((res) => res.json())
+                    .then((res) => res.data)
+                    .then(setDatos)
+                    .finally(() => {
+                        setLoading(false);
+                    });
+            })
+            .catch(() => {
+                toast.error('Error al guardar el comentario', {
+                    position: 'bottom-right',
+                    theme: 'colored',
+                    transition: Slide,
+                });
+                setLoading(false);
+            });
+    }
 
     const pasarProduccion = async (
         nombre: string,
@@ -468,6 +555,33 @@ export default function ProduccionPage() {
                 setLoading(false);
             });
     };
+
+    function goFullscreen(element: HTMLElement) {
+        if (element.requestFullscreen) {
+            element.requestFullscreen();
+            setIsFullscreen(true);
+        } else if ((element as any).webkitRequestFullscreen) {
+            /* Safari */
+            (element as any).webkitRequestFullscreen();
+            setIsFullscreen(true);
+        } else if ((element as any).msRequestFullscreen) {
+            /* IE11 */
+            (element as any).msRequestFullscreen();
+            setIsFullscreen(true);
+        }
+    }
+
+    function exitFullscreen() {
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        } else if ((document as any).webkitExitFullscreen) {
+            /* Safari */
+            (document as any).webkitExitFullscreen();
+        } else if ((document as any).msExitFullscreen) {
+            /* IE11 */
+            (document as any).msExitFullscreen();
+        }
+    }
 
     if (loading) {
         return (
@@ -558,7 +672,7 @@ export default function ProduccionPage() {
                         </Col>
                     </Row>
                     <Row>
-                        <Col xs={4}>
+                        {/* <Col xs={4}>
                             <Form.Group>
                                 <Form.Label>Filtrar por salón</Form.Label>
                                 <Form.Select
@@ -578,8 +692,8 @@ export default function ProduccionPage() {
                                     </option>
                                 </Form.Select>
                             </Form.Group>
-                        </Col>
-                        <Col xs={4}></Col>
+                        </Col> */}
+                        {/* <Col xs={4}></Col> */}
                         <Col xs={4}>
                             <Form.Group>
                                 <Form.Label>Filtrar por dia</Form.Label>
@@ -723,6 +837,55 @@ export default function ProduccionPage() {
                     </tbody>
                 </Table>
             </div> */}
+            <Modal
+                show={show}
+                onHide={handleCloseModal}>
+                <Modal.Header closeButton>
+                    <Modal.Title>Observacion - {platoModal.plato}</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <FloatingLabel
+                        controlId="floatingTextarea"
+                        label="Observación"
+                        className="mb-3">
+                        <Form.Control
+                            as="textarea"
+                            value={observacionModal}
+                            onChange={(
+                                e: React.ChangeEvent<
+                                    HTMLInputElement | HTMLTextAreaElement
+                                >
+                            ) => {
+                                setObservacionModal(e.target.value);
+                            }}
+                            style={{ height: '200px' }}
+                        />
+                    </FloatingLabel>
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button
+                        variant="secondary"
+                        onClick={() => {
+                            setObservacionModal('');
+                            handleCloseModal();
+                        }}>
+                        Cerrar
+                    </Button>
+                    <Button
+                        variant="primary"
+                        onClick={() => {
+                            guardarComentario(
+                                platoModal.plato,
+                                platoModal.cantidad,
+                                platoModal.dia
+                            );
+                            setObservacionModal('');
+                            handleCloseModal();
+                        }}>
+                        Guardar Cambios
+                    </Button>
+                </Modal.Footer>
+            </Modal>
 
             <div
                 className="d-flex flex-row justify-content-evenly mt-3 mx-auto flex-wrap"
@@ -750,6 +913,7 @@ export default function ProduccionPage() {
                                 return {
                                     plato: dato.plato,
                                     cantidad: cantidad,
+                                    comentario: produccion.comentario,
                                 };
                             }
                             return null;
@@ -757,123 +921,235 @@ export default function ProduccionPage() {
                         .filter(Boolean); // Eliminamos los elementos null
 
                     return (
-                        <Table
+                        <div
                             key={i}
-                            className="table-striped "
                             style={{
-                                width: diaActivo ? '600px' : '300px',
-                                margin: '',
-                                height: 'max-content',
+                                height: diaActivo ? 'max-content' : '50vh',
+                                overflow: 'auto',
+                                width: diaActivo ? '100%' : 'max-content',
                             }}
-                            bordered>
-                            <thead className="table-dark">
-                                <tr>
-                                    <th colSpan={4}>
-                                        {formatFecha(dia)}{' '}
-                                        {datosDelDia.length > 0 && (
-                                            <Button
-                                                className="btn-danger d-inline-block ms-3"
-                                                size="sm"
+                            ref={diaActivo ? ref : null}>
+                            <Table
+                                className="table-striped "
+                                style={{
+                                    width: diaActivo ? '100%' : '300px',
+                                    margin: '',
+                                    maxHeight: diaActivo ? '80vh' : '',
+                                }}
+                                bordered>
+                                <thead className="table-dark sticky-top">
+                                    <tr>
+                                        <th colSpan={4}>
+                                            {format(dia, "EEEE, dd 'de' MMMM", {
+                                                locale: es,
+                                            })
+                                                .split(' ')
+                                                .map((word) => {
+                                                    if (word === 'de') {
+                                                        return 'de';
+                                                    }
+                                                    return (
+                                                        word
+                                                            .charAt(0)
+                                                            .toUpperCase() +
+                                                        word.slice(1)
+                                                    );
+                                                })
+                                                .join(' ')}{' '}
+                                            {datosDelDia.length > 0 && (
+                                                <>
+                                                    <Button
+                                                        className="btn-danger d-inline-block ms-3"
+                                                        size="sm"
+                                                        style={{
+                                                            width: '2rem',
+                                                            height: '2rem',
+                                                            display: 'block',
+                                                            justifyContent:
+                                                                'center',
+                                                            alignItems:
+                                                                'center',
+                                                            margin: '0 auto',
+                                                        }}
+                                                        onClick={() => {
+                                                            generarPDFFecha(i);
+                                                        }}>
+                                                        <FiletypePdf />
+                                                    </Button>
+                                                    {diaActivo && (
+                                                        <Button
+                                                            className="btn-primary d-inline-block ms-3"
+                                                            size="sm"
+                                                            style={{
+                                                                width: '2rem',
+                                                                height: '2rem',
+                                                                display:
+                                                                    'block',
+                                                                justifyContent:
+                                                                    'center',
+                                                                alignItems:
+                                                                    'center',
+                                                                margin: '0 auto',
+                                                            }}
+                                                            onClick={
+                                                                handleFullscreen
+                                                            }>
+                                                            <ArrowsFullscreen />
+                                                        </Button>
+                                                    )}
+                                                </>
+                                            )}
+                                        </th>
+                                    </tr>
+                                    <tr>
+                                        <th></th>
+                                        <th>Plato</th>
+                                        <th>
+                                            Cantidad{' '}
+                                            {datosDelDia.length > 0
+                                                ? `(${datosDelDia.length})`
+                                                : ''}
+                                        </th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {datosDelDia.length > 0 ? (
+                                        datosDelDia.map((dato, i) => (
+                                            <React.Fragment
+                                                key={dato && dato.plato}>
+                                                <tr
+                                                    style={{
+                                                        textAlign: 'center',
+                                                        height:
+                                                            datosDelDia.length -
+                                                                1 !==
+                                                            i
+                                                                ? 'max-content'
+                                                                : '',
+                                                    }}>
+                                                    <td>
+                                                        <Button
+                                                            className="btn-danger"
+                                                            size="sm"
+                                                            style={{
+                                                                width: '2rem',
+                                                                height: '2rem',
+                                                                display:
+                                                                    'block',
+                                                                justifyContent:
+                                                                    'center',
+                                                                alignItems:
+                                                                    'center',
+                                                                margin: 'auto',
+                                                            }}
+                                                            onClick={() => {
+                                                                if (dato) {
+                                                                    setFechaImprimir(
+                                                                        dia
+                                                                    );
+                                                                    generarPDF(
+                                                                        [
+                                                                            dato.plato,
+                                                                        ],
+                                                                        dia
+                                                                    );
+                                                                }
+                                                            }}>
+                                                            <FiletypePdf />
+                                                        </Button>
+                                                    </td>
+                                                    <td>
+                                                        {dato && dato.plato}
+                                                    </td>
+                                                    <td>
+                                                        {dato && dato.cantidad}
+                                                    </td>
+                                                    <td>
+                                                        <Button
+                                                            className="btn-primary"
+                                                            size="sm"
+                                                            style={{
+                                                                width: '2rem',
+                                                                height: '2rem',
+                                                                justifyContent:
+                                                                    'center',
+                                                                alignItems:
+                                                                    'center',
+                                                                margin: 'auto',
+                                                            }}
+                                                            onClick={() => {
+                                                                if (dato)
+                                                                    pasarProduccion(
+                                                                        dato.plato,
+                                                                        dato.cantidad,
+                                                                        dia
+                                                                    );
+                                                            }}>
+                                                            <ArrowRight />
+                                                        </Button>
+                                                        <Button
+                                                            className="btn-primary"
+                                                            size="sm"
+                                                            style={{
+                                                                width: '2rem',
+                                                                height: '2rem',
+                                                                justifyContent:
+                                                                    'center',
+                                                                alignItems:
+                                                                    'center',
+                                                                margin: !diaActivo
+                                                                    ? '.2rem auto 0'
+                                                                    : '0rem 0 0rem .2rem',
+                                                            }}
+                                                            onClick={() => {
+                                                                if (dato) {
+                                                                    setPlatoModal(
+                                                                        {
+                                                                            plato: dato.plato,
+                                                                            cantidad:
+                                                                                dato.cantidad,
+                                                                            dia,
+                                                                            comentario:
+                                                                                dato.comentario,
+                                                                        }
+                                                                    );
+                                                                    setObservacionModal(
+                                                                        dato.comentario
+                                                                    );
+                                                                }
+                                                                setShow(true);
+                                                            }}>
+                                                            <ChatLeftText />
+                                                        </Button>
+                                                    </td>
+                                                </tr>
+
+                                                {dato?.comentario && (
+                                                    <tr className="text-center text-wrap fst-italic fs-6 text-secondary">
+                                                        <td colSpan={4}>
+                                                            {dato.comentario}
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </React.Fragment>
+                                        ))
+                                    ) : (
+                                        <tr>
+                                            <td
+                                                colSpan={4}
                                                 style={{
-                                                    width: '2rem',
-                                                    height: '2rem',
-                                                    display: 'block',
-                                                    justifyContent: 'center',
-                                                    alignItems: 'center',
-                                                    margin: '0 auto',
-                                                }}
-                                                onClick={() => {
-                                                    generarPDFFecha(i);
+                                                    textAlign: 'center',
+                                                    fontStyle: 'italic',
+                                                    color: '#666',
                                                 }}>
-                                                <FiletypePdf />
-                                            </Button>
-                                        )}
-                                    </th>
-                                </tr>
-                                <tr>
-                                    <th></th>
-                                    <th>Plato</th>
-                                    <th>Cantidad</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {datosDelDia.length > 0 ? (
-                                    datosDelDia.map((dato, i) => (
-                                        <tr
-                                            key={dato && dato.plato}
-                                            style={{
-                                                textAlign: 'center',
-                                                height:
-                                                    datosDelDia.length - 1 !== i
-                                                        ? 'max-content'
-                                                        : '',
-                                            }}>
-                                            <td>
-                                                <Button
-                                                    className="btn-danger"
-                                                    size="sm"
-                                                    style={{
-                                                        width: '2rem',
-                                                        height: '2rem',
-                                                        display: 'block',
-                                                        justifyContent:
-                                                            'center',
-                                                        alignItems: 'center',
-                                                        margin: 'auto',
-                                                    }}
-                                                    onClick={() => {
-                                                        if (dato)
-                                                            generarPDF([
-                                                                dato.plato,
-                                                            ]);
-                                                    }}>
-                                                    <FiletypePdf />
-                                                </Button>
-                                            </td>
-                                            <td>{dato && dato.plato}</td>
-                                            <td>{dato && dato.cantidad}</td>
-                                            <td>
-                                                <Button
-                                                    className="btn-primary"
-                                                    size="sm"
-                                                    style={{
-                                                        width: '2rem',
-                                                        height: '2rem',
-                                                        display: 'block',
-                                                        justifyContent:
-                                                            'center',
-                                                        alignItems: 'center',
-                                                        margin: 'auto',
-                                                    }}
-                                                    onClick={() => {
-                                                        if (dato)
-                                                            pasarProduccion(
-                                                                dato.plato,
-                                                                dato.cantidad,
-                                                                dia
-                                                            );
-                                                    }}>
-                                                    <ArrowRight />
-                                                </Button>
+                                                No hay nada para producir
                                             </td>
                                         </tr>
-                                    ))
-                                ) : (
-                                    <tr>
-                                        <td
-                                            colSpan={4}
-                                            style={{
-                                                textAlign: 'center',
-                                                fontStyle: 'italic',
-                                                color: '#666',
-                                            }}>
-                                            No hay nada para producir
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </Table>
+                                    )}
+                                </tbody>
+                            </Table>
+                        </div>
                     );
                 })}
             </div>

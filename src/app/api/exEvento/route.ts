@@ -86,5 +86,20 @@ export async function GET(req: NextRequest) {
     //     });
     // }
 
-    return NextResponse.json(resultados);
+    const ingredientesAgrupados = [];
+    const visitados: string[] = [];
+
+    for (const ingrediente of resultados) {
+        if (visitados.includes(ingrediente.codigo)) continue;
+
+        const similares = resultados.filter(
+            (item) => item.codigo === ingrediente.codigo
+        );
+
+        ingredientesAgrupados.push(similares);
+
+        visitados.push(ingrediente.codigo);
+    }
+
+    return NextResponse.json(ingredientesAgrupados);
 }

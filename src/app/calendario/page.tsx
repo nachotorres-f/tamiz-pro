@@ -1,32 +1,35 @@
 'use client';
 
-import { Col, Container, Form, Row } from 'react-bootstrap';
+import { Container } from 'react-bootstrap';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import bootstrap5Plugin from '@fullcalendar/bootstrap5';
 import esLocale from '@fullcalendar/core/locales/es';
 import '@fullcalendar/bootstrap5';
-import { useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { startOfWeek, addWeeks } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { MoonLoader } from 'react-spinners';
+import { SalonContext } from '../layout';
 // import timeGridPlugin from '@fullcalendar/timegrid';
 // import interactionPlugin from '@fullcalendar/interaction';
 // import '@fullcalendar/core/index.css';
 // import '@fullcalendar/daygrid/index.css';
 
 export default function CalendarioPage() {
+    const salon = useContext(SalonContext);
+
     const [events, setEvents] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [filtroSalon, setFiltroSalon] = useState<string | null>('');
+    const [filtroSalon, setFiltroSalon] = useState<string | null>(null);
+
     const router = useRouter();
 
     useEffect(() => {
-        const savedFiltro = sessionStorage.getItem('filtroSalon');
-        if (savedFiltro) {
-            setFiltroSalon(savedFiltro);
+        if (salon) {
+            setFiltroSalon(salon); // sincroniza el estado con el context
         }
-    }, []);
+    }, [salon]);
 
     useEffect(() => {
         setLoading(true);
@@ -72,9 +75,9 @@ export default function CalendarioPage() {
 
     return (
         <Container className="py-4">
-            <h3 className="mb-3">Calendario de eventos</h3>
+            <h3 className="mb-3 text-center">Calendario de eventos</h3>
 
-            <Container className="mb-3">
+            {/* <Container className="mb-3">
                 <Row>
                     <Col xs={4}>
                         <Form.Group>
@@ -96,7 +99,7 @@ export default function CalendarioPage() {
                         </Form.Group>
                     </Col>
                 </Row>
-            </Container>
+            </Container> */}
 
             <div>
                 <div

@@ -2,6 +2,7 @@
 'use client';
 
 import {
+    useContext,
     useEffect,
     //  useRef,
     useState,
@@ -27,8 +28,11 @@ import TablaEventosPlanificacion from '@/components/tablaEventosPlanificacion';
 import AgregarPlato from '@/components/agregarPlato';
 import { MoonLoader } from 'react-spinners';
 import { Slide, toast, ToastContainer } from 'react-toastify';
+import { SalonContext } from '../layout';
 
 export default function PlanificacionPage() {
+    const salon = useContext(SalonContext);
+
     const [semanaBase, setSemanaBase] = useState(new Date());
     const [diasSemana, setDiasSemana] = useState<Date[]>([]);
     const [datos, setDatos] = useState<any[]>([]);
@@ -38,7 +42,7 @@ export default function PlanificacionPage() {
     const [filtro] = useState('');
     const [diaActivo, setDiaActivo] = useState('');
     const [platoExpandido, setPlatoExpandido] = useState<string | null>(null);
-    const [filtroSalon, setFiltroSalon] = useState<string | null>('A');
+    const [filtroSalon, setFiltroSalon] = useState<string | null>(null);
     const [produccionUpdate, setProduccionUpdate] = React.useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [ciclo, setCiclo] = useState(false);
@@ -47,11 +51,10 @@ export default function PlanificacionPage() {
     >([]);
 
     useEffect(() => {
-        const savedFiltro = sessionStorage.getItem('filtroSalon');
-        if (savedFiltro) {
-            setFiltroSalon(savedFiltro);
+        if (salon) {
+            setFiltroSalon(salon); // sincroniza el estado con el context
         }
-    }, []);
+    }, [salon]);
 
     // Referencias para medir el ancho de las celdas
     // const buttonRef = useRef<HTMLTableCellElement>(null);
@@ -143,6 +146,11 @@ export default function PlanificacionPage() {
                 salon: filtroSalon,
                 produccion: produccionUpdate,
                 observaciones,
+                fechaInicio: startOfWeek(addDays(semanaBase, 4), {
+                    weekStartsOn: 1,
+                })
+                    .toISOString()
+                    .split('T')[0],
             }),
         })
             .then(() => {
@@ -267,7 +275,7 @@ export default function PlanificacionPage() {
 
                     <Row>
                         <Col xs={4}>
-                            <Row>
+                            {/* <Row>
                                 <Col>
                                     <Form.Group>
                                         <Form.Label>
@@ -291,7 +299,7 @@ export default function PlanificacionPage() {
                                         </Form.Select>
                                     </Form.Group>
                                 </Col>
-                            </Row>
+                            </Row> */}
                             <Row>
                                 <Col>
                                     <Form.Check
@@ -306,9 +314,6 @@ export default function PlanificacionPage() {
                                 </Col>
                             </Row>
                         </Col>
-
-                        <Col xs={4} />
-
                         <Col>
                             <TablaEventosPlanificacion
                                 diasSemana={diasSemana}

@@ -323,7 +323,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     process.env.TZ = 'America/Argentina/Buenos_Aires';
 
-    const { salon, produccion, observaciones } = await req.json();
+    const { salon, produccion, observaciones, fechaInicio } = await req.json();
 
     if (!Array.isArray(produccion)) {
         return NextResponse.json(
@@ -344,6 +344,29 @@ export async function POST(req: NextRequest) {
             { error: 'El salón es requerido' },
             { status: 400 }
         );
+    }
+
+    if (!fechaInicio) {
+        return NextResponse.json(
+            { error: 'La fecha es requerido' },
+            { status: 400 }
+        );
+    }
+
+    if ((produccion.length === 0, observaciones.length > 0)) {
+        for (const observacionProduccion of observaciones) {
+            await prisma.produccion.updateMany({
+                where: {
+                    plato: observacionProduccion.plato,
+                    salon: salon,
+                    fecha: {
+                        gte: new Date(fechaInicio),
+                        lte: addDays(new Date(fechaInicio), 11),
+                    },
+                },
+                data: { observacion: observacionProduccion.observacion },
+            });
+        }
     }
 
     for (const item of produccion) {

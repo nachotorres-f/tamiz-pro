@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { prisma } from '@/lib/prisma';
-import { addDays, startOfWeek } from 'date-fns';
+//import { addDays, startOfWeek } from 'date-fns';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(req: NextRequest) {
@@ -10,6 +10,7 @@ export async function GET(req: NextRequest) {
         const { searchParams } = req.nextUrl;
         const plato = searchParams.get('plato');
         const fechaInicio = searchParams.get('fechaInicio');
+        const salon = searchParams.get('salon');
 
         if (plato === '' || plato === null) {
             return NextResponse.json({
@@ -25,16 +26,24 @@ export async function GET(req: NextRequest) {
             );
         }
 
-        const inicio = startOfWeek(new Date(fechaInicio), { weekStartsOn: 4 });
+        if (!salon) {
+            return NextResponse.json(
+                { error: 'salon es requerido' },
+                { status: 400 }
+            );
+        }
+
+        const fecha = new Date(fechaInicio.split('T')[0]);
 
         const producciones = await prisma.produccion.findMany({
             where: {
-                plato,
-                fecha: {
-                    gte: addDays(inicio, -1),
-                },
+                plato: plato,
+                fecha: fecha,
+                salon: salon,
             },
         });
+
+        console.log('PRODUCCIONES', producciones);
 
         async function fetchIngredientesRecursivos(
             nombreProducto: string
@@ -65,6 +74,8 @@ export async function GET(req: NextRequest) {
         }
 
         const ingredientes = await fetchIngredientesRecursivos(plato || '');
+
+        console.log('INGREDIENTES', ingredientes);
 
         function buildTableData(
             ingredientes: any[],
@@ -106,12 +117,20 @@ export async function GET(req: NextRequest) {
 
         const tableData = buildTableData(ingredientes);
 
+        console.log('TABLE DTA', tableData);
+
         const data = producciones.map((produccion) => {
+            console.log('PRE DATA', produccion);
             return {
                 ...produccion,
-                ingredientes: tableData,
+                ingredientes: tableData, // Si cada producción tiene ingredientes distintos, deberías obtenerlos aquí
             };
         });
+        producciones.forEach((produccion) => {
+            console.log('POST DATA', produccion);
+        });
+
+        console.log('DATA', data);
 
         return NextResponse.json({ data }, { status: 200 });
     } catch {

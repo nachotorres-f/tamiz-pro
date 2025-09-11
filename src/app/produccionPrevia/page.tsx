@@ -6,15 +6,12 @@ import { NavegacionSemanal } from '@/components/navegacionSemanal';
 // import { SelectorDias } from '@/components/selectorDias';
 import { addDays, format, startOfWeek } from 'date-fns';
 import { es } from 'date-fns/locale';
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import {
     Button,
-    Col,
     // Col,
     Container,
-    Form,
     Modal,
-    Row,
     // Form,
     // Row,
     Table,
@@ -23,8 +20,11 @@ import { FiletypePdf } from 'react-bootstrap-icons';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { MoonLoader } from 'react-spinners';
+import { SalonContext } from '../layout';
 
 export default function ProduccionPreviaPage() {
+    const salon = useContext(SalonContext);
+
     //const [filtro, setFiltro] = useState('');
     const [filtro] = useState('');
     const [diasSemana, setDiasSemana] = useState<Date[]>([]);
@@ -37,11 +37,10 @@ export default function ProduccionPreviaPage() {
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        const savedFiltro = sessionStorage.getItem('filtroSalon');
-        if (savedFiltro) {
-            setFiltroSalon(savedFiltro);
+        if (salon) {
+            setFiltroSalon(salon); // sincroniza el estado con el context
         }
-    }, []);
+    }, [salon]);
 
     useEffect(() => {
         setLoading(true);
@@ -275,12 +274,19 @@ export default function ProduccionPreviaPage() {
 
                                         if (platoGrupo.observacion) {
                                             yPosition += 5;
-                                            doc.text(
+                                            const text =
                                                 'Observacion: ' +
-                                                    platoGrupo.observacion,
-                                                14,
-                                                yPosition
-                                            );
+                                                platoGrupo.observacion;
+                                            doc.setFillColor(255, 255, 0); // RGB → amarillo
+                                            doc.rect(
+                                                13,
+                                                yPosition - 4,
+                                                doc.getTextWidth(text) + 2,
+                                                5,
+                                                'F'
+                                            ); // Dibuja rectángulo relleno
+
+                                            doc.text(text, 14, yPosition);
                                         }
 
                                         yPosition += 5;
@@ -483,7 +489,7 @@ export default function ProduccionPreviaPage() {
                     </Modal.Footer>
                 </Modal>
 
-                <Container className="mb-3">
+                {/* <Container className="mb-3">
                     <Row>
                         <Col xs={4}>
                             <Form.Group>
@@ -507,7 +513,7 @@ export default function ProduccionPreviaPage() {
                             </Form.Group>
                         </Col>
                     </Row>
-                </Container>
+                </Container> */}
 
                 <NavegacionSemanal
                     semanaBase={semanaBase}

@@ -1,10 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import React, { useState } from 'react';
+import React, { useContext, useState } from 'react';
 import { useEffect } from 'react';
 
-import { Container, InputGroup, Table } from 'react-bootstrap';
+import { Accordion, Container, InputGroup, Table } from 'react-bootstrap';
 
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -13,13 +13,21 @@ import esLocale from '@fullcalendar/core/locales/es';
 import { addDays, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { MoonLoader } from 'react-spinners';
+import { SalonContext } from '../layout';
 
 export default function PlanificacionPage() {
+    const salon = useContext(SalonContext);
+
     const [events, setEvents] = React.useState<any[]>([]);
     const [, setData] = React.useState<any[]>([]);
     const [title, setTitle] = React.useState('');
     const [id, setId] = React.useState(0);
     const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (salon) {
+        }
+    }, [salon]);
 
     type InfoItem = {
         id: number;
@@ -32,7 +40,9 @@ export default function PlanificacionPage() {
         porcionBruta: number;
     };
 
-    const [info, setInfo] = React.useState<InfoItem[]>([]);
+    type InfoArray = InfoItem[];
+
+    const [info, setInfo] = React.useState<InfoArray[]>([]);
 
     useEffect(() => {
         setLoading(true);
@@ -69,6 +79,7 @@ export default function PlanificacionPage() {
         fetch('/api/exEvento?id=' + id)
             .then((res) => res.json())
             .then((data) => {
+                console.log(data);
                 setInfo(data);
             })
             .finally(() => {
@@ -140,38 +151,78 @@ export default function PlanificacionPage() {
 
             <h2 className="text-center mt-5">{title}</h2>
 
-            <Table>
-                <thead>
-                    <tr>
-                        <th>Codigo</th>
-                        <th>Nombre</th>
-                        <th>Codigo</th>
-                        <th>Ingrediente</th>
-                        <th>Tipo</th>
-                        <th>Unidad de Medida</th>
-                        <th>Cantidad</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {info.map((data, i) => {
-                        return (
-                            <tr key={i}>
-                                <td>{data.codigo}</td>
-                                <td>{data.nombreProducto}</td>
-                                <td>{data.subCodigo}</td>
-                                <td>{data.descripcion}</td>
-                                <td>{data.tipo}</td>
-                                <td>{data.unidadMedida}</td>
-                                <td>{data.porcionBruta.toFixed(2)}</td>
-                                <td>
-                                    <InputGroup.Checkbox aria-label="Checkbox for following text input" />
-                                </td>
-                            </tr>
-                        );
-                    })}
-                </tbody>
-            </Table>
+            {info.map((data, i) => {
+                return (
+                    <Accordion
+                        defaultActiveKey="0"
+                        className="mb-3"
+                        key={i}>
+                        <Accordion.Item eventKey={i.toString()}>
+                            <Accordion.Header>
+                                {data[0].nombreProducto}
+                            </Accordion.Header>
+                            <Accordion.Body>
+                                <Table>
+                                    <thead>
+                                        <tr>
+                                            <th>Codigo</th>
+                                            <th>Producto</th>
+                                            <th>Sub Codigo</th>
+                                            <th>Sub Producto</th>
+                                            <th>Tipo</th>
+                                            <th>Unidad Medida</th>
+                                            <th>Porcion Bruta</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {data.map((item, j) => {
+                                            return (
+                                                <tr key={i + ' ' + j}>
+                                                    <td>{item.codigo}</td>
+                                                    <td>
+                                                        {item.nombreProducto}
+                                                    </td>
+                                                    <td>{item.subCodigo}</td>
+                                                    <td>{item.descripcion}</td>
+                                                    <td>{item.tipo}</td>
+                                                    <td>{item.unidadMedida}</td>
+                                                    <td>
+                                                        {item.porcionBruta.toFixed(
+                                                            2
+                                                        )}
+                                                    </td>
+                                                    <td>
+                                                        <InputGroup.Checkbox
+                                                            aria-label={
+                                                                item.codigo +
+                                                                ' - ' +
+                                                                item.subCodigo
+                                                            }
+                                                        />
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </Table>
+                            </Accordion.Body>
+                        </Accordion.Item>
+                    </Accordion>
+                );
+                // <tr key={i}>
+                //     <td>{data.codigo}</td>
+                //     <td>{data.nombreProducto}</td>
+                //     <td>{data.subCodigo}</td>
+                //     <td>{data.descripcion}</td>
+                //     <td>{data.tipo}</td>
+                //     <td>{data.unidadMedida}</td>
+                //     <td>{data.porcionBruta.toFixed(2)}</td>
+                //     <td>
+                //         <InputGroup.Checkbox aria-label="Checkbox for following text input" />
+                //     </td>
+                // </tr>
+            })}
         </Container>
     );
 }

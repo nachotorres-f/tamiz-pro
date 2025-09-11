@@ -6,11 +6,25 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import logo from '../../public/logo_white.png'; // Adjust the path as necessary
 
-export default function AppNavbar() {
+export default function AppNavbar({
+    salon,
+    setSalon,
+}: {
+    salon: string;
+    setSalon: (salon: string) => void;
+}) {
     const [loggedIn, setLoggedIn] = useState(false);
     const router = useRouter();
 
     useEffect(() => {
+        const salon = localStorage.getItem('filtroSalon');
+        if (!salon) {
+            localStorage.setItem('filtroSalon', 'A');
+            setSalon('A');
+        } else {
+            setSalon(salon);
+        }
+
         fetch('/api/session')
             .then((res) => res.json())
             .then((data) => {
@@ -32,6 +46,23 @@ export default function AppNavbar() {
         setLoggedIn(false);
         router.push('/acceso');
     };
+
+    function handleSalonChange(): void {
+        const savedFiltro = localStorage.getItem('filtroSalon');
+
+        if (!savedFiltro) {
+            localStorage.setItem('filtroSalon', 'A');
+            setSalon('A');
+        }
+
+        if (savedFiltro === 'A') {
+            localStorage.setItem('filtroSalon', 'B');
+            setSalon('B');
+        } else {
+            localStorage.setItem('filtroSalon', 'A');
+            setSalon('A');
+        }
+    }
 
     return (
         <Navbar
@@ -108,11 +139,25 @@ export default function AppNavbar() {
                         )}
                     </Nav>
                     {loggedIn ? (
-                        <Button
-                            variant="outline-light"
-                            onClick={handleLogout}>
-                            Cerrar sesión
-                        </Button>
+                        <>
+                            <Button
+                                variant="outline-light"
+                                className="me-2 d-block"
+                                onClick={handleLogout}>
+                                Cerrar sesión
+                            </Button>
+                            <Button
+                                variant="outline-light"
+                                className="d-block"
+                                onClick={handleSalonChange}>
+                                Cambiar salon
+                            </Button>
+                            <p className="text-white align-self-center ms-3 mb-0 text-bold">
+                                {salon === 'A'
+                                    ? 'Rut Haus / Origami'
+                                    : 'El Central / La Rural'}
+                            </p>
+                        </>
                     ) : (
                         <></>
                     )}

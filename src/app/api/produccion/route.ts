@@ -113,6 +113,7 @@ export async function GET(req: NextRequest) {
             existingPlato.produccion.push({
                 fecha: addDays(produccion.fecha, 1),
                 cantidad: produccion.cantidad,
+                comentario: produccion.observacionProduccion || '',
             });
         } else {
             groupedProducciones.push({
@@ -121,6 +122,7 @@ export async function GET(req: NextRequest) {
                     {
                         fecha: addDays(produccion.fecha, 1),
                         cantidad: produccion.cantidad,
+                        comentario: produccion.observacionProduccion || '',
                     },
                 ],
                 salon: produccion.salon,
