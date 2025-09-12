@@ -1,4 +1,5 @@
 'use client';
+import React from 'react';
 import { Form } from 'react-bootstrap';
 
 export function FiltroPlatos({
@@ -16,5 +17,19 @@ export function FiltroPlatos({
             onChange={(e) => setFiltro(e.target.value)}
             className="col-md-4 mb-3"
         />
+    );
+}
+
+const SalonContext = React.createContext<string>('SALON');
+
+export function SalonProvider({
+    salon,
+    children,
+}: {
+    salon: string;
+    children: React.ReactNode;
+}) {
+    return (
+        <SalonContext.Provider value={salon}>{children}</SalonContext.Provider>
     );
 }

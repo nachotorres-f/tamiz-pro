@@ -6,6 +6,7 @@ import './globals.css';
 import AppNavbar from '../components/navbar';
 import { usePathname } from 'next/navigation';
 import React from 'react';
+import { SalonContext } from '@/components/salonContext';
 
 const geistSans = Geist({
     variable: '--font-geist-sans',
@@ -16,8 +17,6 @@ const geistMono = Geist_Mono({
     variable: '--font-geist-mono',
     subsets: ['latin'],
 });
-
-export const SalonContext = React.createContext<string>('');
 
 export default function RootLayout({
     children,
