@@ -6,7 +6,7 @@ import './globals.css';
 import AppNavbar from '../components/navbar';
 import { usePathname } from 'next/navigation';
 import React from 'react';
-import { SalonContext } from '@/components/salonContext';
+import { SalonContext } from '@/components/filtroPlatos';
 
 const geistSans = Geist({
     variable: '--font-geist-sans',

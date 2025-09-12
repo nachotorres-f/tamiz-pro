@@ -20,7 +20,7 @@ export function FiltroPlatos({
     );
 }
 
-const SalonContext = React.createContext<string>('SALON');
+export const SalonContext = React.createContext<string>('SALON');
 
 export function SalonProvider({
     salon,
