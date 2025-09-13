@@ -13,7 +13,7 @@ import esLocale from '@fullcalendar/core/locales/es';
 import { addDays, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { MoonLoader } from 'react-spinners';
-import { SalonContext } from '../layout';
+import { SalonContext } from '@/components/filtroPlatos';
 
 export default function PlanificacionPage() {
     const salon = useContext(SalonContext);

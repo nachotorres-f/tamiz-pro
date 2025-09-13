@@ -32,7 +32,7 @@ import autoTable from 'jspdf-autotable';
 import { MoonLoader } from 'react-spinners';
 import { Slide, toast } from 'react-toastify';
 import AgregarPlato from '@/components/agregarPlato';
-import { SalonContext } from '../layout';
+import { SalonContext } from '@/components/filtroPlatos';
 
 export default function ProduccionPage() {
     const salon = useContext(SalonContext);

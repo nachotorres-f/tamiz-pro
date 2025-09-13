@@ -28,7 +28,7 @@ import TablaEventosPlanificacion from '@/components/tablaEventosPlanificacion';
 import AgregarPlato from '@/components/agregarPlato';
 import { MoonLoader } from 'react-spinners';
 import { Slide, toast, ToastContainer } from 'react-toastify';
-import { SalonContext } from '../layout';
+import { SalonContext } from '@/components/filtroPlatos';
 
 export default function PlanificacionPage() {
     const salon = useContext(SalonContext);

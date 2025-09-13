@@ -20,7 +20,7 @@ import { FiletypePdf } from 'react-bootstrap-icons';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { MoonLoader } from 'react-spinners';
-import { SalonContext } from '../layout';
+import { SalonContext } from '@/components/filtroPlatos';
 
 export default function ProduccionPreviaPage() {
     const salon = useContext(SalonContext);

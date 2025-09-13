@@ -10,7 +10,7 @@ import { useContext, useEffect, useState } from 'react';
 import { startOfWeek, addWeeks } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { MoonLoader } from 'react-spinners';
-import { SalonContext } from '../layout';
+import { SalonContext } from '@/components/filtroPlatos';
 // import timeGridPlugin from '@fullcalendar/timegrid';
 // import interactionPlugin from '@fullcalendar/interaction';
 // import '@fullcalendar/core/index.css';
