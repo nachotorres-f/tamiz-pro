@@ -1,26 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-// import { FiltroPlatos } from '@/components/filtroPlatos';
 import { NavegacionSemanal } from '@/components/navegacionSemanal';
-// import { SelectorDias } from '@/components/selectorDias';
 import { addDays, format, startOfWeek } from 'date-fns';
 import { es } from 'date-fns/locale';
 import React, { useContext, useEffect, useState } from 'react';
-import {
-    Button,
-    // Col,
-    Container,
-    Modal,
-    // Form,
-    // Row,
-    Table,
-} from 'react-bootstrap';
+import { Button, Container, Modal, Table } from 'react-bootstrap';
 import { FiletypePdf } from 'react-bootstrap-icons';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { MoonLoader } from 'react-spinners';
 import { SalonContext } from '@/components/filtroPlatos';
+import { Slide, toast, ToastContainer } from 'react-toastify';
+import { generarPDFReceta } from '@/lib/generarPDF';
 
 export default function ProduccionPreviaPage() {
     const salon = useContext(SalonContext);
@@ -32,9 +22,9 @@ export default function ProduccionPreviaPage() {
     const [semanaBase, setSemanaBase] = useState(new Date());
     const [datos, setDatos] = useState<any[]>([]);
     const [showModal, setShowModal] = useState(false);
-    const [platos, setPlatos] = useState<string[]>([]);
     const [filtroSalon, setFiltroSalon] = useState<string | null>('A');
     const [loading, setLoading] = useState(false);
+    const [fechaImprimir, setFechaImprimir] = useState<Date | null>(null);
 
     useEffect(() => {
         if (salon) {
@@ -82,327 +72,25 @@ export default function ProduccionPreviaPage() {
         return dato.plato.toLowerCase().includes(filtro.toLowerCase());
     };
 
-    const generarPDFFecha = async (i: number) => {
-        const dia = diasSemana[i];
-        const fecha = format(dia, 'yyyy-MM-dd');
-
-        const platosEnFecha = datos
-            .map((item) => {
-                return {
-                    ...item,
-                    produccion: item.produccion.map((p: { fecha: string }) => ({
-                        ...p,
-                        fecha: format(new Date(p.fecha), 'yyyy-MM-dd'),
-                    })),
-                };
-            })
-            .filter((item) =>
-                item.produccion.some((p: { fecha: string }) =>
-                    p.fecha.startsWith(fecha)
-                )
-            )
-            .map((item) => item.plato);
-
-        // for (let index = 0; index < platosEnFecha.length; index++) {
-        //     // Generar PDF para cada plato en la fecha seleccionada
-        //     // Aquí puedes llamar a la función generarPDF con el plato correspondiente
-        //     const element = platosEnFecha[index];
-        //     generarPDF(element);
-        // }
-
-        setPlatos(platosEnFecha);
-        setShowModal(true);
-    };
-
-    const generarPDF = async (platosList: string[]) => {
-        const doc = new jsPDF();
-
-        for (let index = 0; index < platosList.length; index++) {
-            if (index > 0) {
-                doc.addPage();
-            }
-
-            const plato = platos[index];
-
-            await fetch(
-                'api/generarPDF?plato=' +
-                    plato +
-                    '&fechaInicio=' +
-                    startOfWeek(semanaBase, { weekStartsOn: 4 }).toISOString()
-            )
-                .then((res) => res.json())
-                .then((res) => {
-                    const data = res.data;
-                    data.forEach((platoGrupo: any) => {
-                        const ingredientesAgrupados = agruparIngredientes(
-                            platoGrupo.ingredientes
-                        );
-
-                        const produccion: any = datos.find(
-                            (dato) => dato.plato === plato
-                        )?.produccion;
-
-                        produccion.forEach(
-                            (
-                                {
-                                    fecha,
-                                    cantidad,
-                                }: { fecha: Date; cantidad: number },
-                                indexProd: number
-                            ) => {
-                                if (indexProd > 0) {
-                                    doc.addPage();
-                                }
-
-                                ingredientesAgrupados.forEach(
-                                    (ingredientes: any, index: number) => {
-                                        if (index !== 0) {
-                                            doc.addPage();
-                                        }
-                                        const pageWidth =
-                                            doc.internal.pageSize.getWidth();
-                                        const pageHeight =
-                                            doc.internal.pageSize.getHeight();
-                                        let yPosition = 40;
-
-                                        doc.setFontSize(20);
-                                        doc.setTextColor(0, 0, 0);
-
-                                        const title = 'Produccion';
-                                        const titleWidth =
-                                            doc.getTextWidth(title);
-
-                                        const titleX =
-                                            (pageWidth - titleWidth) / 2;
-                                        const titleY = yPosition;
-                                        doc.text(title, titleX, titleY);
-
-                                        // Agregar una imagen en la esquina superior izquierda
-                                        const imgWidth = 40; // Ancho de la imagen
-                                        const imgHeight = 40; // Alto de la imagen
-
-                                        const imgUrl = '/logo_black.png'; // Ruta de la imagen
-                                        const img = new Image();
-                                        img.src = imgUrl;
-
-                                        doc.addImage(
-                                            img,
-                                            'PNG',
-                                            10,
-                                            10,
-                                            imgWidth,
-                                            imgHeight
-                                        );
-
-                                        // Fecha de generación
-                                        const dateCreate = `Generado el: ${format(
-                                            new Date(),
-                                            'dd/MM/yyyy HH:mm'
-                                        )}`;
-                                        const dateCreateWidth =
-                                            doc.getTextWidth(dateCreate);
-                                        const dateCreateX =
-                                            pageWidth - dateCreateWidth + 35;
-                                        const dateCreateY = pageHeight - 10;
-
-                                        doc.setFontSize(10);
-                                        doc.text(
-                                            dateCreate,
-                                            dateCreateX,
-                                            dateCreateY
-                                        );
-
-                                        yPosition += 10;
-
-                                        doc.setLineWidth(0.2); // grosor fino
-
-                                        // linea horizontal
-                                        doc.line(
-                                            10,
-                                            yPosition,
-                                            doc.internal.pageSize.getWidth() -
-                                                10,
-                                            yPosition
-                                        );
-
-                                        yPosition += 10;
-
-                                        // Título de la receta
-                                        doc.setFontSize(16);
-                                        doc.text(
-                                            index > 0
-                                                ? ingredientes[0].nombre.toString() +
-                                                      ' - ' +
-                                                      ingredientes[0].codigo
-                                                : plato.toString(),
-                                            14,
-                                            yPosition
-                                        );
-
-                                        yPosition += 5;
-                                        doc.setFontSize(10);
-
-                                        if (index > 0) {
-                                            const cantidad =
-                                                ingredientesAgrupados.find(
-                                                    (ingAgr: any) => {
-                                                        if (
-                                                            ingAgr[0].nombre ===
-                                                            ingredientes[0]
-                                                                .nombre
-                                                        ) {
-                                                            return true;
-                                                        }
-                                                    }
-                                                )[0].porcionBruta;
-
-                                            doc.text(
-                                                'Cantidad a producir: ' +
-                                                    cantidad +
-                                                    ' porciones',
-                                                14,
-                                                yPosition
-                                            );
-                                        } else {
-                                            doc.text(
-                                                'Cantidad a producir: ' +
-                                                    cantidad,
-                                                14,
-                                                yPosition
-                                            );
-                                        }
-
-                                        if (platoGrupo.observacion) {
-                                            yPosition += 5;
-                                            const text =
-                                                'Observacion: ' +
-                                                platoGrupo.observacion;
-                                            doc.setFillColor(255, 255, 0); // RGB → amarillo
-                                            doc.rect(
-                                                13,
-                                                yPosition - 4,
-                                                doc.getTextWidth(text) + 2,
-                                                5,
-                                                'F'
-                                            ); // Dibuja rectángulo relleno
-
-                                            doc.text(text, 14, yPosition);
-                                        }
-
-                                        yPosition += 5;
-                                        doc.text(
-                                            'Fecha Produccion: ' +
-                                                format(
-                                                    new Date(fecha),
-                                                    'dd/MM/yyyy'
-                                                ),
-                                            14,
-                                            yPosition
-                                        );
-
-                                        const headers = [
-                                            [
-                                                'Código',
-                                                'Descripción',
-                                                'Unidad',
-                                                'Porción Bruta',
-                                            ],
-                                        ];
-
-                                        const data = ingredientes
-                                            .filter(
-                                                (
-                                                    _ingrediente: any,
-                                                    i: number
-                                                ) =>
-                                                    (index > 0 && i !== 0) ||
-                                                    index === 0
-                                            )
-                                            .map((ingrediente: any) => [
-                                                ingrediente.codigo,
-                                                ingrediente.nombre,
-                                                ingrediente.unidadMedida,
-                                                (
-                                                    ingrediente.porcionBruta *
-                                                    cantidad
-                                                ).toFixed(2),
-                                            ]);
-
-                                        const tableData = {
-                                            head: headers,
-                                            body: data,
-                                        };
-                                        autoTable(doc, {
-                                            ...tableData,
-                                            startY: yPosition + 10,
-                                            margin: { left: 10 },
-                                            theme: 'plain',
-                                        });
-                                    }
-                                );
-                            }
-                        );
-                    });
-
-                    if (platosList.length === 1) {
-                        const fechaHoy = format(new Date(), 'yyyy-MM-dd');
-                        doc.save(fechaHoy + ' ' + plato + '.pdf');
-                    }
-                });
-        }
-
-        if (platosList.length > 1) {
-            doc.save(format(new Date(), 'yyyy-MM-dd') + ' Produccion.pdf');
-        }
-    };
-
-    const agruparIngredientes = (ingredientes: any) => {
-        if (!ingredientes) return [];
-
-        const ingredientesAgrupados: any = [];
-
-        ingredientesAgrupados.push(
-            ingredientes.filter((ingrediente: any) => ingrediente.depth === 0)
-        );
-
-        const gruposPT = ingredientes.filter(
-            (ingrediente: any) => ingrediente.tipo === 'PT'
-        );
-
-        gruposPT.forEach((grupoPT: any) => {
-            const subIngredientes = ingredientes.filter(
-                (ingrediente: any) =>
-                    (ingrediente.parentPT === grupoPT.nombre &&
-                        ingrediente.depth > 0) ||
-                    (ingrediente.tipo === 'PT' &&
-                        ingrediente.nombre === grupoPT.nombre)
-            );
-
-            ingredientesAgrupados.push(subIngredientes);
+    const generarPDF = (modo: 'unico' | 'separado') => {
+        toast.info('Imprimiendo recetas', {
+            position: 'bottom-right',
+            theme: 'colored',
+            transition: Slide,
         });
 
-        return ingredientesAgrupados;
+        generarPDFReceta(
+            [],
+            fechaImprimir || new Date(),
+            filtroSalon || 'A',
+            modo,
+            true
+        );
+
+        handleClose();
     };
 
     const handleClose = () => setShowModal(false);
-
-    const handleImprimirJuntas = () => {
-        setShowModal(false);
-        setLoading(true);
-        generarPDF(platos);
-        setLoading(false);
-    };
-
-    const handleImprimirSeparadas = async () => {
-        setShowModal(false);
-        setLoading(true);
-        for (let index = 0; index < platos.length; index++) {
-            const list = [];
-            list.push(platos[index]);
-            await generarPDF(list);
-        }
-        setLoading(false);
-    };
 
     const filterSalon = (dato: any) => {
         if (!filtroSalon) return true;
@@ -449,23 +137,7 @@ export default function ProduccionPreviaPage() {
             <Container className="mt-5">
                 <h2 className="text-center mb-4">Entrega de MP</h2>
 
-                {/* <Form.Group>
-                <Row>
-                    <Col>
-                        <FiltroPlatos
-                            filtro={filtro}
-                            setFiltro={setFiltro}
-                        />
-                    </Col>
-                    <Col>
-                        <SelectorDias
-                            diasSemana={diasSemana}
-                            setDiaActivo={setDiaActivo}
-                        />
-                    </Col>
-                </Row>
-            </Form.Group> */}
-
+                <ToastContainer />
                 <Modal
                     show={showModal}
                     onHide={handleClose}>
@@ -478,42 +150,20 @@ export default function ProduccionPreviaPage() {
                     <Modal.Footer>
                         <Button
                             variant="primary"
-                            onClick={handleImprimirJuntas}>
+                            onClick={() => {
+                                generarPDF('unico');
+                            }}>
                             Imprimir juntas
                         </Button>
                         <Button
                             variant="primary"
-                            onClick={handleImprimirSeparadas}>
+                            onClick={() => {
+                                generarPDF('separado');
+                            }}>
                             Imprimir separadas
                         </Button>
                     </Modal.Footer>
                 </Modal>
-
-                {/* <Container className="mb-3">
-                    <Row>
-                        <Col xs={4}>
-                            <Form.Group>
-                                <Form.Label>Filtrar por salón</Form.Label>
-                                <Form.Select
-                                    value={filtroSalon || ''}
-                                    onChange={(e) => {
-                                        setFiltroSalon(e.target.value);
-                                        sessionStorage.setItem(
-                                            'filtroSalon',
-                                            e.target.value
-                                        );
-                                    }}>
-                                    <option value="A">
-                                        Rut Haus - Origami
-                                    </option>
-                                    <option value="B">
-                                        El Central - La Rural
-                                    </option>
-                                </Form.Select>
-                            </Form.Group>
-                        </Col>
-                    </Row>
-                </Container> */}
 
                 <NavegacionSemanal
                     semanaBase={semanaBase}
@@ -551,7 +201,13 @@ export default function ProduccionPreviaPage() {
                                                     margin: '0 auto',
                                                 }}
                                                 onClick={() => {
-                                                    generarPDFFecha(i);
+                                                    setFechaImprimir(
+                                                        addDays(
+                                                            diasSemana[i],
+                                                            2
+                                                        )
+                                                    );
+                                                    setShowModal(true);
                                                 }}>
                                                 <FiletypePdf />
                                             </Button>
@@ -574,23 +230,6 @@ export default function ProduccionPreviaPage() {
                                 .filter(filterSalon)
                                 .map((dato) => (
                                     <tr key={dato.plato}>
-                                        {/* <td>
-                                        <Button
-                                            className="btn-danger"
-                                            size="sm"
-                                            style={{
-                                                width: '2rem',
-                                                height: '2rem',
-                                                display: 'flex',
-                                                justifyContent: 'center',
-                                                alignItems: 'center',
-                                            }}
-                                            onClick={() => {
-                                                generarPDF(dato.plato);
-                                            }}>
-                                            <FiletypePdf />
-                                        </Button>
-                                    </td> */}
                                         <td>{dato.plato}</td>
 
                                         {diasSemana

@@ -51,6 +51,15 @@ export async function POST(req: NextRequest) {
         })
     );
 
+    await prisma.$executeRawUnsafe(`
+        DELETE p1
+        FROM producciones p1
+        JOIN producciones p2
+        ON p1.fecha = p2.fecha
+        AND p1.plato = p2.plato
+        AND p1.createdAt < p2.createdAt;
+    `);
+
     const startOfWeek = new Date();
     startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay()); // Ajusta al inicio de la semana (domingo)
     startOfWeek.setHours(0, 0, 0, 0); // Establece la hora al inicio del día
