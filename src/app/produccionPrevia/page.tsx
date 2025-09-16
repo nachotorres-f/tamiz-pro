@@ -261,7 +261,30 @@ export default function ProduccionPreviaPage() {
                                                     ? produccion.cantidad
                                                     : 0;
                                                 return (
-                                                    <td key={i}>
+                                                    <td
+                                                        key={i}
+                                                        className="link-pdf"
+                                                        onClick={() => {
+                                                            toast.info(
+                                                                'Imprimiendo receta',
+                                                                {
+                                                                    position:
+                                                                        'bottom-right',
+                                                                    theme: 'colored',
+                                                                    transition:
+                                                                        Slide,
+                                                                }
+                                                            );
+
+                                                            generarPDFReceta(
+                                                                [dato.plato],
+                                                                addDays(dia, 2),
+                                                                filtroSalon ||
+                                                                    'A',
+                                                                'separado',
+                                                                true
+                                                            );
+                                                        }}>
                                                         {cantidad || ''}
                                                     </td>
                                                 );

@@ -42,6 +42,8 @@ model Comanda {
   nombre              String
   horarioInicio       DateTime
   horarioFin          DateTime
+  cantidadMayores     Int @default(0)
+  cantidadMenores     Int @default(0)
   observaciones       String? @db.Text
 
   Plato Plato[]
@@ -76,4 +78,11 @@ model PlatoOculto {
   id       Int      @id @default(autoincrement())
   plato    String
   creadoEn DateTime @default(now())
+}
+
+model Expedicion {
+  id Int @id @default(autoincrement())
+  codigo String
+  subCodigo String
+  comandaId Int
 }

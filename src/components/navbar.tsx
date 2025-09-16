@@ -126,6 +126,11 @@ export default function AppNavbar({
                                     Expedicion
                                 </Nav.Link>
 
+                                <Nav.Link
+                                    onClick={() => router.push('/picking')}>
+                                    Picking
+                                </Nav.Link>
+
                                 {/* <Nav.Link
                                     onClick={() => router.push('/entregaMP')}>
                                     Entrega de MP

@@ -12,9 +12,6 @@ export async function GET() {
                 lt: addDays(startOfWeek(new Date(), { weekStartsOn: 1 }), 7),
             },
         },
-        include: {
-            Plato: true,
-        },
     });
 
     // Para cada evento, obtenemos los ingredientes recursivamente

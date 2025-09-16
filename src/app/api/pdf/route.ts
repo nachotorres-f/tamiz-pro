@@ -84,9 +84,17 @@ const buscarProduccionPorPlato = async (
     salon: string,
     plato: string[]
 ) => {
+    const gte = addDays(set(fecha, { hours: 0, minutes: 0, seconds: 0 }), -1);
+    const lte = addDays(
+        set(fecha, { hours: 23, minutes: 59, seconds: 59 }),
+        -1
+    );
     const produccionList = await prisma.produccion.findMany({
         where: {
-            fecha,
+            fecha: {
+                gte,
+                lte,
+            },
             salon,
             plato: { in: plato },
         },

@@ -83,6 +83,8 @@ export async function POST(req: NextRequest) {
             horarioInicio,
             horarioFin,
             observaciones: body.Observaciones || '',
+            cantidadMayores: Number(body.CantMayores) || 0,
+            cantidadMenores: Number(body.CantMenores) || 0,
         },
     });
 

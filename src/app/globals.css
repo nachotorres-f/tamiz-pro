@@ -95,3 +95,12 @@ input::-webkit-inner-spin-button {
 input[type='number'] {
     -moz-appearance: textfield !important;
 }
+
+.link-pdf {
+    cursor: pointer;
+}
+
+.link-pdf:hover {
+    color: darkblue;
+    text-decoration: underline;
+}

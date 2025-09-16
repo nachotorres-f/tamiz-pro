@@ -1,13 +1,11 @@
 'use client';
 
-import { Container } from 'react-bootstrap';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import bootstrap5Plugin from '@fullcalendar/bootstrap5';
 import esLocale from '@fullcalendar/core/locales/es';
 import '@fullcalendar/bootstrap5';
 import { useContext, useEffect, useState } from 'react';
-import { startOfWeek, addWeeks } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { MoonLoader } from 'react-spinners';
 import { SalonContext } from '@/components/filtroPlatos';
@@ -20,6 +18,9 @@ export default function CalendarioPage() {
     const salon = useContext(SalonContext);
 
     const [events, setEvents] = useState([]);
+    const [weeks, setWeeks] = useState<
+        { semana: Date; totalInvitados: number }[]
+    >([]);
     const [loading, setLoading] = useState(false);
     const [filtroSalon, setFiltroSalon] = useState<string | null>(null);
 
@@ -36,7 +37,8 @@ export default function CalendarioPage() {
         fetch('/api/calendario?salon=' + filtroSalon)
             .then((response) => response.json())
             .then((data) => {
-                setEvents(data);
+                setEvents(data.eventos);
+                setWeeks(data.weeks);
             })
             .catch((error) => {
                 console.error('Error fetching events:', error);
@@ -45,9 +47,6 @@ export default function CalendarioPage() {
                 setLoading(false);
             });
     }, [filtroSalon]);
-
-    const baseDate = startOfWeek(new Date(), { weekStartsOn: 1 });
-    const weeks = [0, 1, 2, 3].map((offset) => addWeeks(baseDate, offset));
 
     if (loading) {
         return (
@@ -74,8 +73,8 @@ export default function CalendarioPage() {
     }
 
     return (
-        <Container className="py-4">
-            <h3 className="mb-3 text-center">Calendario de eventos</h3>
+        <>
+            <h3 className="my-5 text-center">Calendario de eventos</h3>
 
             {/* <Container className="mb-3">
                 <Row>
@@ -101,37 +100,25 @@ export default function CalendarioPage() {
                 </Row>
             </Container> */}
 
-            <div>
+            <p className="text-center">
+                <span className="fw-bold">Pax Mensual:</span>{' '}
+                {weeks.reduce(
+                    (acc, { totalInvitados }) => acc + totalInvitados,
+                    0
+                )}
+            </p>
+            {weeks.map(({ semana, totalInvitados }, i) => (
                 <div
-                    style={{
-                        display: 'flex',
-                        textAlign: 'center',
-                        fontWeight: 'bold',
-                    }}>
-                    {[
-                        'Lunes',
-                        'Martes',
-                        'Miércoles',
-                        'Jueves',
-                        'Viernes',
-                        'Sábado',
-                        'Domingo',
-                    ].map((dia, i) => (
-                        <div
-                            key={i}
-                            style={{ flex: 1 }}>
-                            {dia}
-                        </div>
-                    ))}
-                </div>
-
-                {weeks.map((weekStart, i) => (
-                    <div key={i}>
+                    key={i}
+                    className="d-flex flex-row justify-content-center">
+                    <div
+                        className="ms-5"
+                        style={{ minWidth: '80%' }}>
                         <FullCalendar
                             plugins={[dayGridPlugin, bootstrap5Plugin]}
                             themeSystem="bootstrap5"
                             initialView="dayGridWeek"
-                            initialDate={weekStart}
+                            initialDate={semana}
                             headerToolbar={false}
                             events={events}
                             eventClick={(info) => {
@@ -141,14 +128,32 @@ export default function CalendarioPage() {
                             locale="es"
                             height="10rem"
                             dayHeaderFormat={{
-                                // weekday: 'long',
+                                weekday: 'long',
                                 day: '2-digit',
                                 month: 'long',
                             }}
+                            eventContent={(arg) => {
+                                const title = arg.event.title;
+                                const cantidad =
+                                    arg.event.extendedProps.cantidad;
+
+                                return {
+                                    html: `
+                                        <p style="margin: 0; padding: 0">${title}</p>
+                                        <p style="margin: 0; padding: 0">Pax: ${cantidad}</p>
+                                    `,
+                                };
+                            }}
                         />
                     </div>
-                ))}
-            </div>
+                    <p
+                        className="ms-3 mt-3"
+                        style={{ minWidth: '10%' }}>
+                        <span className="fw-bold">Pax semanal: </span>
+                        {totalInvitados}
+                    </p>
+                </div>
+            ))}
 
             {/* <FullCalendar
                 plugins={[dayGridPlugin, bootstrap5Plugin]}
@@ -168,6 +173,6 @@ export default function CalendarioPage() {
                     weekday: 'long',
                 }}
             /> */}
-        </Container>
+        </>
     );
 }

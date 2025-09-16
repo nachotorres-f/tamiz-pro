@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { addWeeks, endOfWeek, isWithinInterval, startOfWeek } from 'date-fns';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(req: NextRequest) {
@@ -22,7 +23,35 @@ export async function GET(req: NextRequest) {
         title: comanda.lugar + ' - ' + comanda.salon,
         date: comanda.fecha.toISOString().split('T')[0], // Convert to YYYY-MM-DD format
         id: comanda.id,
+        extendedProps: {
+            cantidad: comanda.cantidadMayores + comanda.cantidadMenores,
+        },
     }));
 
-    return NextResponse.json(eventos);
+    const baseDate = startOfWeek(new Date(), { weekStartsOn: 1 });
+    const weeks = [0, 1, 2, 3].map((offset) => addWeeks(baseDate, offset));
+
+    const resultado = weeks.map((weekStart) => {
+        const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
+
+        const totalInvitados = comandas.reduce((acc, comanda) => {
+            const fechaComanda = comanda.fecha;
+            if (
+                isWithinInterval(fechaComanda, {
+                    start: weekStart,
+                    end: weekEnd,
+                })
+            ) {
+                return acc + comanda.cantidadMayores + comanda.cantidadMenores;
+            }
+            return acc;
+        }, 0);
+
+        return {
+            semana: weekStart,
+            totalInvitados,
+        };
+    });
+
+    return NextResponse.json({ eventos, weeks: resultado });
 }

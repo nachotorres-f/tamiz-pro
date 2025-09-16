@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { prisma } from '@/lib/prisma';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -21,7 +20,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = req.nextUrl;
     const id = searchParams.get('id');
 
-    const eventos = await prisma.comanda.findMany({
+    const evento = await prisma.comanda.findFirst({
         where: {
             id: id ? Number(id) : undefined,
         },
@@ -30,76 +29,101 @@ export async function GET(req: NextRequest) {
         },
     });
 
-    const resultados: any[] = [];
+    const platos = await Promise.all(
+        evento?.Plato.map(async ({ nombre, cantidad }) => {
+            const recetas = await prisma.receta.findMany({
+                where: {
+                    nombreProducto: nombre,
+                },
+            });
 
-    async function recorrerPropio(plato: string, cantidad: number) {
-        const recetasFind = await prisma.receta.findMany({
-            where: {
-                nombreProducto: plato,
-            },
+            return await Promise.all(
+                recetas.map(
+                    async ({ codigo, subCodigo, porcionBruta, ...receta }) => {
+                        const checkExpedicion =
+                            await prisma.expedicion.findFirst({
+                                select: { id: true },
+                                where: {
+                                    comandaId: Number(id),
+                                    codigo,
+                                    subCodigo,
+                                },
+                            });
+
+                        return {
+                            codigo,
+                            subCodigo,
+                            ...receta,
+                            porcionBruta: (porcionBruta * cantidad).toFixed(2),
+                            check: !!checkExpedicion,
+                        };
+                    }
+                )
+            );
+        }) ?? []
+    );
+
+    return NextResponse.json(platos);
+}
+
+interface Body {
+    comandaId: number;
+    codigo: string;
+    subCodigo: string;
+}
+
+export async function POST(req: NextRequest) {
+    process.env.TZ = 'America/Argentina/Buenos_Aires';
+    const { comandaId, codigo, subCodigo }: Body = await req.json();
+
+    if (!comandaId || !codigo || !subCodigo) {
+        return NextResponse.json({
+            json: 400,
+            message: 'Faltan datos para marcar la expedicion',
         });
+    }
 
-        const recetasCantidad = recetasFind.map((receta) => {
-            return {
-                ...receta,
-                porcionBruta: receta.porcionBruta * cantidad,
-            };
+    const exist = await prisma.expedicion.findFirst({
+        where: {
+            comandaId,
+            codigo,
+            subCodigo,
+        },
+    });
+
+    if (exist) {
+        return NextResponse.json({ success: true }, { status: 201 });
+    }
+
+    await prisma.expedicion.create({
+        data: {
+            comandaId,
+            codigo,
+            subCodigo,
+        },
+    });
+
+    return NextResponse.json({ success: true }, { status: 201 });
+}
+
+export async function DELETE(req: NextRequest) {
+    process.env.TZ = 'America/Argentina/Buenos_Aires';
+    const { comandaId, codigo, subCodigo }: Body = await req.json();
+
+    if (!comandaId || !codigo || !subCodigo) {
+        return NextResponse.json({
+            json: 400,
+            message: 'Faltan datos para borrar la expedicion',
         });
-
-        resultados.push(...recetasCantidad);
-
-        const filtroPT = recetasCantidad.filter(
-            (receta) => receta.tipo === 'PT'
-        );
-
-        if (filtroPT.length === 0) return;
-
-        for (const platoPT of filtroPT) {
-            await recorrerPropio(platoPT.descripcion, platoPT.porcionBruta);
-        }
-
-        // for (const platoPT of filtroPT) {
-        //     await recorrerPropio(platoPT.descripcion);
-        // }
     }
 
-    for (const evento of eventos) {
-        for (const plato of evento.Plato) {
-            await recorrerPropio(plato.nombre, plato.cantidad);
-        }
-    }
+    await prisma.expedicion.deleteMany({
+        where: {
+            comandaId,
+            codigo,
+            subCodigo,
+        },
+    });
 
-    // //Para cada evento, obtenemos los ingredientes recursivamente
-    // const eventosConIngredientes = [];
-    // for (const evento of eventos) {
-    //     const ingredientes: any[] = [];
-    //     for (const plato of evento.Plato) {
-    //         const ingredientesPlato = await buscarIngredientesRecursivo(
-    //             plato.nombre,
-    //             plato.cantidad
-    //         );
-    //         ingredientes.push(...ingredientesPlato);
-    //     }
-    //     eventosConIngredientes.push({
-    //         ...evento,
-    //         ingredientes,
-    //     });
-    // }
-
-    const ingredientesAgrupados = [];
-    const visitados: string[] = [];
-
-    for (const ingrediente of resultados) {
-        if (visitados.includes(ingrediente.codigo)) continue;
-
-        const similares = resultados.filter(
-            (item) => item.codigo === ingrediente.codigo
-        );
-
-        ingredientesAgrupados.push(similares);
-
-        visitados.push(ingrediente.codigo);
-    }
-
-    return NextResponse.json(ingredientesAgrupados);
+    return NextResponse.json({ success: true }, { status: 201 });
 }

@@ -4,7 +4,7 @@
 import React, { useContext, useState } from 'react';
 import { useEffect } from 'react';
 
-import { Accordion, Container, InputGroup, Table } from 'react-bootstrap';
+import { Accordion, Container, Form, Table } from 'react-bootstrap';
 
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -15,7 +15,7 @@ import { es } from 'date-fns/locale';
 import { MoonLoader } from 'react-spinners';
 import { SalonContext } from '@/components/filtroPlatos';
 
-export default function PlanificacionPage() {
+export default function ExpedicionPage() {
     const salon = useContext(SalonContext);
 
     const [events, setEvents] = React.useState<any[]>([]);
@@ -38,6 +38,7 @@ export default function PlanificacionPage() {
         tipo: string;
         unidadMedida: string;
         porcionBruta: number;
+        check: boolean;
     };
 
     type InfoArray = InfoItem[];
@@ -63,7 +64,7 @@ export default function PlanificacionPage() {
                         ' - ' +
                         data[0].salon +
                         ' - ' +
-                        format(addDays(data[0].fecha, 1), 'EEEE dd/MM/yyyy', {
+                        format(data[0].fecha, 'EEEE dd/MM/yyyy', {
                             locale: es,
                         })
                 );
@@ -79,13 +80,59 @@ export default function PlanificacionPage() {
         fetch('/api/exEvento?id=' + id)
             .then((res) => res.json())
             .then((data) => {
-                console.log(data);
                 setInfo(data);
             })
             .finally(() => {
                 setLoading(false);
             });
     }, [id]);
+
+    const checkExpedicion = async (
+        checked: boolean,
+        codigo: string,
+        subCodigo: string
+    ) => {
+        fetch('/api/exEvento', {
+            method: checked ? 'POST' : 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                codigo,
+                subCodigo,
+                comandaId: id,
+            }),
+        });
+    };
+
+    const updateCheck = (i: number, j: number, checked: boolean) => {
+        const nuevoInfo = [...info];
+        nuevoInfo[i] = info[i].map((ingrediente, k) =>
+            k === j ? { ...ingrediente, check: checked } : ingrediente
+        );
+
+        setInfo(nuevoInfo);
+    };
+
+    const checkAllExpedicion = async (checked: boolean, i: number) => {
+        // actualizar en backend todas las filas
+        await Promise.all(
+            info[i].map((ingrediente) =>
+                checkExpedicion(
+                    checked,
+                    ingrediente.codigo,
+                    ingrediente.subCodigo
+                )
+            )
+        );
+
+        // crear nueva copia del estado
+        const nuevoInfo = [...info];
+        nuevoInfo[i] = info[i].map((ingrediente) => ({
+            ...ingrediente,
+            check: checked,
+        }));
+
+        setInfo(nuevoInfo);
+    };
 
     const weekStart = new Date();
 
@@ -152,6 +199,7 @@ export default function PlanificacionPage() {
             <h2 className="text-center mt-5">{title}</h2>
 
             {info.map((data, i) => {
+                if (data.length === 0) return;
                 return (
                     <Accordion
                         defaultActiveKey="0"
@@ -162,9 +210,22 @@ export default function PlanificacionPage() {
                                 {data[0].nombreProducto}
                             </Accordion.Header>
                             <Accordion.Body>
+                                <Form.Check
+                                    className="ms-2 fw-bold"
+                                    type="checkbox"
+                                    id={`${i}`}
+                                    label={`Marcar todas`}
+                                    checked={data.every(
+                                        (ingrediente) => ingrediente.check
+                                    )}
+                                    onChange={(e) => {
+                                        checkAllExpedicion(e.target.checked, i);
+                                    }}
+                                />
                                 <Table>
                                     <thead>
                                         <tr>
+                                            <th></th>
                                             <th>Codigo</th>
                                             <th>Producto</th>
                                             <th>Sub Codigo</th>
@@ -172,13 +233,34 @@ export default function PlanificacionPage() {
                                             <th>Tipo</th>
                                             <th>Unidad Medida</th>
                                             <th>Porcion Bruta</th>
-                                            <th></th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {data.map((item, j) => {
                                             return (
                                                 <tr key={i + ' ' + j}>
+                                                    <td>
+                                                        <Form.Check
+                                                            type="checkbox"
+                                                            id={`${item.codigo}${item.subCodigo}`}
+                                                            label={``}
+                                                            checked={item.check}
+                                                            onChange={(e) => {
+                                                                checkExpedicion(
+                                                                    e.target
+                                                                        .checked,
+                                                                    item.codigo,
+                                                                    item.subCodigo
+                                                                );
+                                                                updateCheck(
+                                                                    i,
+                                                                    j,
+                                                                    e.target
+                                                                        .checked
+                                                                );
+                                                            }}
+                                                        />
+                                                    </td>
                                                     <td>{item.codigo}</td>
                                                     <td>
                                                         {item.nombreProducto}
@@ -187,20 +269,7 @@ export default function PlanificacionPage() {
                                                     <td>{item.descripcion}</td>
                                                     <td>{item.tipo}</td>
                                                     <td>{item.unidadMedida}</td>
-                                                    <td>
-                                                        {item.porcionBruta.toFixed(
-                                                            2
-                                                        )}
-                                                    </td>
-                                                    <td>
-                                                        <InputGroup.Checkbox
-                                                            aria-label={
-                                                                item.codigo +
-                                                                ' - ' +
-                                                                item.subCodigo
-                                                            }
-                                                        />
-                                                    </td>
+                                                    <td>{item.porcionBruta}</td>
                                                 </tr>
                                             );
                                         })}
