@@ -22,19 +22,12 @@ export default function CalendarioPage() {
         { semana: Date; totalInvitados: number }[]
     >([]);
     const [loading, setLoading] = useState(false);
-    const [filtroSalon, setFiltroSalon] = useState<string | null>(null);
 
     const router = useRouter();
 
     useEffect(() => {
-        if (salon) {
-            setFiltroSalon(salon); // sincroniza el estado con el context
-        }
-    }, [salon]);
-
-    useEffect(() => {
         setLoading(true);
-        fetch('/api/calendario?salon=' + filtroSalon)
+        fetch('/api/calendario?salon=' + salon)
             .then((response) => response.json())
             .then((data) => {
                 setEvents(data.eventos);
@@ -46,7 +39,7 @@ export default function CalendarioPage() {
             .finally(() => {
                 setLoading(false);
             });
-    }, [filtroSalon]);
+    }, [salon]);
 
     if (loading) {
         return (
