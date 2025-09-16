@@ -100,7 +100,9 @@ export default function CalendarioPage() {
                 </Row>
             </Container> */}
 
-            <p className="text-center">
+            <p
+                className="mx-auto p-3 text-center bg-warning-subtle"
+                style={{ width: 'max-content' }}>
                 <span className="fw-bold">Pax Mensual:</span>{' '}
                 {weeks.reduce(
                     (acc, { totalInvitados }) => acc + totalInvitados,
@@ -147,8 +149,8 @@ export default function CalendarioPage() {
                         />
                     </div>
                     <p
-                        className="ms-3 mt-3"
-                        style={{ minWidth: '10%' }}>
+                        className="ms-5 bg-warning-subtle p-3 text-center align-items-start"
+                        style={{ minWidth: '10%', maxHeight: 'min-content' }}>
                         <span className="fw-bold">Pax semanal: </span>
                         {totalInvitados}
                     </p>
