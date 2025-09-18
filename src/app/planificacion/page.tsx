@@ -31,7 +31,7 @@ import { SalonContext } from '@/components/filtroPlatos';
 import { Loading } from '@/components/loading';
 
 export default function PlanificacionPage() {
-    const salon = useContext(SalonContext);
+    const filtroSalon = useContext(SalonContext);
 
     const [semanaBase, setSemanaBase] = useState(new Date());
     const [diasSemana, setDiasSemana] = useState<Date[]>([]);
@@ -42,19 +42,12 @@ export default function PlanificacionPage() {
     const [filtro] = useState('');
     const [diaActivo, setDiaActivo] = useState('');
     const [platoExpandido, setPlatoExpandido] = useState<string | null>(null);
-    const [filtroSalon, setFiltroSalon] = useState<string | null>(null);
     const [produccionUpdate, setProduccionUpdate] = React.useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [ciclo, setCiclo] = useState(false);
     const [observaciones, setObservaciones] = useState<
         { plato: string; observacion: string }[]
     >([]);
-
-    useEffect(() => {
-        if (salon) {
-            setFiltroSalon(salon); // sincroniza el estado con el context
-        }
-    }, [salon]);
 
     // Referencias para medir el ancho de las celdas
     // const buttonRef = useRef<HTMLTableCellElement>(null);
