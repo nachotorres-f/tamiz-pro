@@ -313,49 +313,6 @@ export default function ProduccionPage() {
                             </Accordion>
                         </Col>
                     </Row>
-                    <Row>
-                        <Col xs={4}>
-                            <Form.Group>
-                                <Form.Label>Filtrar por dia</Form.Label>
-                                <Form.Select
-                                    value={diaActivo}
-                                    onChange={(e) =>
-                                        setDiaActivo(e.target.value)
-                                    }>
-                                    <option value="">Todos los dias</option>
-                                    {diasSemana.map((dia, i) => {
-                                        const fecha = format(dia, 'yyyy-MM-dd');
-                                        return (
-                                            <option
-                                                key={i}
-                                                value={fecha}>
-                                                {format(
-                                                    dia,
-                                                    "EEEE, dd 'de' MMMM",
-                                                    {
-                                                        locale: es,
-                                                    }
-                                                )
-                                                    .split(' ')
-                                                    .map((word) => {
-                                                        if (word === 'de') {
-                                                            return 'de';
-                                                        }
-                                                        return (
-                                                            word
-                                                                .charAt(0)
-                                                                .toUpperCase() +
-                                                            word.slice(1)
-                                                        );
-                                                    })
-                                                    .join(' ')}
-                                            </option>
-                                        );
-                                    })}
-                                </Form.Select>
-                            </Form.Group>
-                        </Col>
-                    </Row>
                 </Container>
 
                 <NavegacionSemanal
