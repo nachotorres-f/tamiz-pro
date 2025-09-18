@@ -39,13 +39,13 @@ export default function RootLayout({
                     backgroundColor: pathname === '/acceso' ? '#1C1C1C' : '',
                 }}
                 className={`${geistSans.variable} ${geistMono.variable}`}>
-                {pathname !== '/acceso' && (
-                    <AppNavbar
-                        salon={salon}
-                        setSalon={setSalon}
-                    />
-                )}
                 <SalonContext.Provider value={salon}>
+                    {pathname !== '/acceso' && (
+                        <AppNavbar
+                            salon={salon}
+                            setSalon={setSalon}
+                        />
+                    )}
                     {children}
                 </SalonContext.Provider>
             </body>

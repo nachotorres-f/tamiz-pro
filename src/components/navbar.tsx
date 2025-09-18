@@ -1,10 +1,26 @@
-'use client';
-
-import { useEffect, useState } from 'react';
-import { Navbar, Nav, Container, Button } from 'react-bootstrap';
+import {
+    Navbar,
+    Nav,
+    Container,
+    Button,
+    ToastContainer,
+} from 'react-bootstrap';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import logo from '../../public/logo_white.png'; // Adjust the path as necessary
+import { usePathname } from 'next/navigation';
+import { Slide, toast } from 'react-toastify';
+import { obtenerNombreSalon } from '@/lib/nameSalon';
+import { useEffect, useState } from 'react';
+
+interface Route {
+    path: string;
+    title: string;
+}
+
+interface User {
+    rol: string;
+}
 
 export default function AppNavbar({
     salon,
@@ -13,56 +29,69 @@ export default function AppNavbar({
     salon: string;
     setSalon: (salon: string) => void;
 }) {
-    const [loggedIn, setLoggedIn] = useState(false);
     const router = useRouter();
-
-    useEffect(() => {
-        const salon = localStorage.getItem('filtroSalon');
-        if (!salon) {
-            localStorage.setItem('filtroSalon', 'A');
-            setSalon('A');
-        } else {
-            setSalon(salon);
-        }
-
-        fetch('/api/session')
-            .then((res) => res.json())
-            .then((data) => {
-                setLoggedIn(data.loggedIn);
-                if (data.loggedIn) {
-                    router.push('/calendario');
-                } else {
-                    router.push('/acceso');
-                }
-            })
-            .catch(() => {
-                setLoggedIn(false);
-                router.push('/acceso');
-            });
-    }, [router]);
+    const pathname = usePathname();
+    const [user, setUser] = useState<User>({ rol: '' });
 
     const handleLogout = async () => {
         await fetch('/api/logout', { method: 'POST' });
-        setLoggedIn(false);
         router.push('/acceso');
     };
 
+    useEffect(() => {
+        fetch('/api/usuarios/actual')
+            .then((res) => res.json())
+            .then((data) => {
+                setUser(data.user);
+                const salonData =
+                    data.user?.salon === '0' ? 'A' : data.user?.salon;
+                setSalon(salonData);
+            });
+    }, [setSalon]);
+
     function handleSalonChange(): void {
-        const savedFiltro = localStorage.getItem('filtroSalon');
+        const salonChange = salon === 'A' ? 'B' : 'A';
 
-        if (!savedFiltro) {
-            localStorage.setItem('filtroSalon', 'A');
-            setSalon('A');
-        }
+        toast.info('Salon cambiado a ' + obtenerNombreSalon(salonChange), {
+            position: 'bottom-right',
+            theme: 'colored',
+            transition: Slide,
+        });
 
-        if (savedFiltro === 'A') {
-            localStorage.setItem('filtroSalon', 'B');
-            setSalon('B');
-        } else {
-            localStorage.setItem('filtroSalon', 'A');
-            setSalon('A');
-        }
+        setSalon(salon === 'A' ? 'B' : 'A');
     }
+
+    const routeList: Route[] = [
+        {
+            path: 'importar',
+            title: 'Importar',
+        },
+        {
+            path: 'calendario',
+            title: 'Calendario',
+        },
+        {
+            path: 'planificacion',
+            title: 'Planificacion',
+        },
+        {
+            path: 'produccion',
+            title: 'Produccion',
+        },
+        {
+            path: 'produccionPrevia',
+            title: 'Entrega de MP',
+        },
+        {
+            path: 'expedicion',
+            title: 'Expedicion',
+        },
+        {
+            path: 'picking',
+            title: 'Picking',
+        },
+        { path: 'usuarios', title: 'Usuarios' },
+    ];
 
     return (
         <Navbar
@@ -71,6 +100,7 @@ export default function AppNavbar({
             expand="lg"
             style={{ height: '10vh' }}>
             <Container>
+                <ToastContainer />
                 <Navbar.Brand>
                     <Image
                         src={logo}
@@ -81,91 +111,40 @@ export default function AppNavbar({
                             width: 'auto',
                         }}
                         className="d-inline-block align-top"
+                        onClick={() => router.push('/calendario')}
                     />
                 </Navbar.Brand>
                 <Navbar.Toggle aria-controls="basic-navbar-nav" />
                 <Navbar.Collapse id="basic-navbar-nav">
                     <Nav className="me-auto">
-                        {loggedIn && (
-                            <>
-                                {/* <Nav.Link onClick={() => router.push('/')}>
-                                    Inicio
-                                </Nav.Link> */}
-
-                                <Nav.Link
-                                    onClick={() => router.push('/importar')}>
-                                    Importar
-                                </Nav.Link>
-
-                                <Nav.Link
-                                    onClick={() => router.push('/calendario')}>
-                                    Calendario
-                                </Nav.Link>
-
-                                <Nav.Link
-                                    onClick={() =>
-                                        router.push('/planificacion')
-                                    }>
-                                    Planificación
-                                </Nav.Link>
-
-                                <Nav.Link
-                                    onClick={() => router.push('/produccion')}>
-                                    Produccion
-                                </Nav.Link>
-
-                                <Nav.Link
-                                    onClick={() =>
-                                        router.push('/produccionPrevia')
-                                    }>
-                                    Entrega de MP
-                                </Nav.Link>
-
-                                <Nav.Link
-                                    onClick={() => router.push('/expedicion')}>
-                                    Expedicion
-                                </Nav.Link>
-
-                                <Nav.Link
-                                    onClick={() => router.push('/picking')}>
-                                    Picking
-                                </Nav.Link>
-
-                                {/* <Nav.Link
-                                    onClick={() => router.push('/entregaMP')}>
-                                    Entrega de MP
-                                </Nav.Link>
-
-                                <Nav.Link
-                                    onClick={() => router.push('/expedicion')}>
-                                    Expedicion
-                                </Nav.Link> */}
-                            </>
-                        )}
+                        {routeList.map(({ path, title }) => (
+                            <Nav.Link
+                                active={pathname === path}
+                                key={path}
+                                onClick={() => router.push(path)}>
+                                {title}
+                            </Nav.Link>
+                        ))}
                     </Nav>
-                    {loggedIn ? (
-                        <>
-                            <Button
-                                variant="outline-light"
-                                className="me-2 d-block"
-                                onClick={handleLogout}>
-                                Cerrar sesión
-                            </Button>
-                            <Button
-                                variant="outline-light"
-                                className="d-block"
-                                onClick={handleSalonChange}>
-                                Cambiar salon
-                            </Button>
-                            <p className="text-white align-self-center ms-3 mb-0 text-bold">
-                                {salon === 'A'
-                                    ? 'Rut Haus / Origami'
-                                    : 'El Central / La Rural'}
-                            </p>
-                        </>
-                    ) : (
-                        <></>
+                    <p className="text-white align-self-center mt-3 me-2 fw-bold">
+                        {obtenerNombreSalon(salon)}
+                    </p>
+
+                    {user.rol === 'admin' && (
+                        <Button
+                            variant="light"
+                            className="me-2 d-block btn-sm"
+                            onClick={handleSalonChange}>
+                            Cambiar salon
+                        </Button>
                     )}
+
+                    <Button
+                        variant="outline-light"
+                        className="d-block btn-sm"
+                        onClick={handleLogout}>
+                        Cerrar sesión
+                    </Button>
                 </Navbar.Collapse>
             </Container>
         </Navbar>

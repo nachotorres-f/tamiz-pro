@@ -12,8 +12,8 @@ import bootstrap5Plugin from '@fullcalendar/bootstrap5';
 import esLocale from '@fullcalendar/core/locales/es';
 import { addDays, format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { MoonLoader } from 'react-spinners';
 import { SalonContext } from '@/components/filtroPlatos';
+import { Loading } from '@/components/loading';
 
 export default function ExpedicionPage() {
     const salon = useContext(SalonContext);
@@ -137,28 +137,7 @@ export default function ExpedicionPage() {
     const weekStart = new Date();
 
     if (loading) {
-        return (
-            <>
-                <div
-                    style={{
-                        position: 'fixed',
-                        top: 0,
-                        left: 0,
-                        width: '100vw',
-                        height: '100vh',
-                        backgroundColor: 'rgba(0,0,0,0.5)',
-                        display: 'flex',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        zIndex: 9999,
-                    }}>
-                    <MoonLoader
-                        color="#fff"
-                        speedMultiplier={0.5}
-                    />
-                </div>
-            </>
-        );
+        return <Loading />;
     }
 
     return (

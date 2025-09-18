@@ -26,9 +26,9 @@ import { NavegacionSemanal } from '@/components/navegacionSemanal';
 import { TablaPlanificacion } from '@/components/tablaPlanificacion';
 import TablaEventosPlanificacion from '@/components/tablaEventosPlanificacion';
 import AgregarPlato from '@/components/agregarPlato';
-import { MoonLoader } from 'react-spinners';
 import { Slide, toast, ToastContainer } from 'react-toastify';
 import { SalonContext } from '@/components/filtroPlatos';
+import { Loading } from '@/components/loading';
 
 export default function PlanificacionPage() {
     const salon = useContext(SalonContext);
@@ -204,28 +204,7 @@ export default function PlanificacionPage() {
     };
 
     if (loading) {
-        return (
-            <>
-                <div
-                    style={{
-                        position: 'fixed',
-                        top: 0,
-                        left: 0,
-                        width: '100vw',
-                        height: '100vh',
-                        backgroundColor: 'rgba(0,0,0,0.5)',
-                        display: 'flex',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        zIndex: 9999,
-                    }}>
-                    <MoonLoader
-                        color="#fff"
-                        speedMultiplier={0.5}
-                    />
-                </div>
-            </>
-        );
+        return <Loading />;
     }
 
     return (

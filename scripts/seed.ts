@@ -13,7 +13,7 @@ async function main() {
 }
 
 main()
-    .catch((e) => {})
+    .catch(() => {})
     .finally(() => {
         prisma.$disconnect();
     });

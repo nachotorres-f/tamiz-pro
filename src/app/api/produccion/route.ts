@@ -89,6 +89,7 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = req.nextUrl;
     const fechaInicio = searchParams.get('fechaInicio');
+    const previa = searchParams.get('previa');
 
     if (!fechaInicio) {
         return NextResponse.json(
@@ -120,7 +121,7 @@ export async function GET(req: NextRequest) {
 
         if (existingPlato) {
             existingPlato.produccion.push({
-                fecha: addDays(produccion.fecha, 1),
+                fecha: addDays(produccion.fecha, previa ? -1 : 1),
                 cantidad: produccion.cantidad,
                 comentario: produccion.observacionProduccion || '',
             });
@@ -129,7 +130,7 @@ export async function GET(req: NextRequest) {
                 plato: produccion.plato,
                 produccion: [
                     {
-                        fecha: addDays(produccion.fecha, 1),
+                        fecha: addDays(produccion.fecha, previa ? -1 : 1),
                         cantidad: produccion.cantidad,
                         comentario: produccion.observacionProduccion || '',
                     },

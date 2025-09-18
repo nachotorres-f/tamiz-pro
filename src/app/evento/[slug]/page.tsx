@@ -5,6 +5,7 @@ import React, { useEffect } from 'react';
 import { Card, Col, Container, ListGroup, Row, Table } from 'react-bootstrap';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { Loading } from '@/components/loading';
 
 type Evento = {
     nombre: string;
@@ -105,7 +106,7 @@ export default function EventoPage() {
                             </Table>
                         </>
                     ) : (
-                        <div>Cargando evento...</div>
+                        <Loading />
                     )}
                 </Col>
             </Row>

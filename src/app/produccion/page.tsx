@@ -10,6 +10,7 @@ import {
     Button,
     Col,
     Container,
+    Dropdown,
     FloatingLabel,
     Form,
     Modal,
@@ -21,13 +22,14 @@ import {
     ArrowRight,
     ArrowsFullscreen,
     ChatLeftText,
+    EyeFill,
 } from 'react-bootstrap-icons';
-import { MoonLoader } from 'react-spinners';
 import { Slide, toast } from 'react-toastify';
 import AgregarPlato from '@/components/agregarPlato';
 import { SalonContext } from '@/components/filtroPlatos';
 import { generarPDFReceta } from '@/lib/generarPDF';
 import { ToastContainer } from 'react-toastify';
+import { Loading } from '@/components/loading';
 
 export default function ProduccionPage() {
     const salon = useContext(SalonContext);
@@ -256,27 +258,7 @@ export default function ProduccionPage() {
     };
 
     if (loading) {
-        return (
-            <div
-                style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    width: '100vw',
-                    height: '100vh',
-                    backgroundColor: 'rgba(0,0,0,0.5)',
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    zIndex: 9999,
-                }}>
-                <MoonLoader
-                    color="#fff"
-                    size={100}
-                    speedMultiplier={0.5}
-                />
-            </div>
-        );
+        return <Loading />;
     }
 
     return (
@@ -503,48 +485,65 @@ export default function ProduccionPage() {
                                                 .join(' ')}{' '}
                                             {datosDelDia.length > 0 && (
                                                 <>
-                                                    <Button
-                                                        className="btn-danger d-inline-block ms-3"
-                                                        size="sm"
-                                                        style={{
-                                                            width: '2rem',
-                                                            height: '2rem',
-                                                            display: 'block',
-                                                            justifyContent:
-                                                                'center',
-                                                            alignItems:
-                                                                'center',
-                                                            margin: '0 auto',
-                                                        }}
-                                                        onClick={() => {
-                                                            setFechaImprimir(
-                                                                dia
-                                                            );
-                                                            setShowModal(true);
-                                                        }}>
-                                                        <FiletypePdf />
-                                                    </Button>
-                                                    {diaActivo && (
-                                                        <Button
-                                                            className="btn-primary d-inline-block ms-3"
-                                                            size="sm"
-                                                            style={{
-                                                                width: '2rem',
-                                                                height: '2rem',
-                                                                display:
-                                                                    'block',
-                                                                justifyContent:
-                                                                    'center',
-                                                                alignItems:
-                                                                    'center',
-                                                                margin: '0 auto',
-                                                            }}
-                                                            onClick={
-                                                                handleFullscreen
-                                                            }>
-                                                            <ArrowsFullscreen />
-                                                        </Button>
-                                                    )}
+                                                    <Dropdown className="btn btn-sm">
+                                                        <Dropdown.Toggle
+                                                            variant="primary"
+                                                            id="dropdown-basic"></Dropdown.Toggle>
+                                                        <Dropdown.Menu>
+                                                            <Dropdown.Item
+                                                                onClick={() => {
+                                                                    setFechaImprimir(
+                                                                        dia
+                                                                    );
+                                                                    setShowModal(
+                                                                        true
+                                                                    );
+                                                                }}>
+                                                                <FiletypePdf className="text-danger" />{' '}
+                                                                Imprimir
+                                                            </Dropdown.Item>
+                                                            <Dropdown.Item
+                                                                onClick={() => {
+                                                                    setDiaActivo(
+                                                                        format(
+                                                                            dia,
+                                                                            'yyyy-MM-dd'
+                                                                        )
+                                                                    );
+
+                                                                    setTimeout(
+                                                                        () => {
+                                                                            handleFullscreen();
+                                                                        },
+                                                                        0
+                                                                    );
+                                                                }}>
+                                                                <ArrowsFullscreen />{' '}
+                                                                Pantalla
+                                                                Completa
+                                                            </Dropdown.Item>
+                                                            <Dropdown.Item
+                                                                onClick={() => {
+                                                                    if (
+                                                                        isFullscreen
+                                                                    )
+                                                                        handleFullscreen();
+                                                                    setDiaActivo(
+                                                                        diaActivo
+                                                                            ? ''
+                                                                            : format(
+                                                                                  dia,
+                                                                                  'yyyy-MM-dd'
+                                                                              )
+                                                                    );
+                                                                }}>
+                                                                <EyeFill />{' '}
+                                                                {diaActivo
+                                                                    ? 'Ver todos'
+                                                                    : 'Ver dia'}
+                                                            </Dropdown.Item>
+                                                        </Dropdown.Menu>
+                                                    </Dropdown>
                                                 </>
                                             )}
                                         </th>

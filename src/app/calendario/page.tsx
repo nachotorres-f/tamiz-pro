@@ -7,8 +7,8 @@ import esLocale from '@fullcalendar/core/locales/es';
 import '@fullcalendar/bootstrap5';
 import { useContext, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { MoonLoader } from 'react-spinners';
 import { SalonContext } from '@/components/filtroPlatos';
+import { Loading } from '@/components/loading';
 // import timeGridPlugin from '@fullcalendar/timegrid';
 // import interactionPlugin from '@fullcalendar/interaction';
 // import '@fullcalendar/core/index.css';
@@ -42,27 +42,7 @@ export default function CalendarioPage() {
     }, [salon]);
 
     if (loading) {
-        return (
-            <div
-                style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    width: '100vw',
-                    height: '100vh',
-                    backgroundColor: 'rgba(0,0,0,0.5)',
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    zIndex: 9999,
-                }}>
-                <MoonLoader
-                    color="#fff"
-                    size={100}
-                    speedMultiplier={0.5}
-                />
-            </div>
-        );
+        return <Loading />;
     }
 
     return (

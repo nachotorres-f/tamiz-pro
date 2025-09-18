@@ -1,11 +1,11 @@
 'use client';
 
 import { SalonContext } from '@/components/filtroPlatos';
+import { Loading } from '@/components/loading';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useContext, useEffect, useState } from 'react';
-import { Accordion, Container, Table } from 'react-bootstrap';
-import { MoonLoader } from 'react-spinners';
+import { Accordion, Container, Form, Table } from 'react-bootstrap';
 
 interface Evento {
     Plato: Plato[];
@@ -47,6 +47,7 @@ export default function PickingPage() {
 
     const [data, setData] = useState<Data[]>([]);
     const [loading, setLoading] = useState(true);
+    const [filtroPlato, setFiltroPlato] = useState('');
 
     useEffect(() => {
         fetch('/api/picking?salon=' + salon)
@@ -57,38 +58,34 @@ export default function PickingPage() {
             .finally(() => {
                 setLoading(false);
             });
-    }, []);
+    }, [salon]);
+
+    const filterPlato = ({ semi }: { semi: string }) => {
+        if (!filtroPlato) return true;
+
+        return semi.toLowerCase().includes(filtroPlato.toLowerCase());
+    };
 
     if (loading) {
-        return (
-            <>
-                <div
-                    style={{
-                        position: 'fixed',
-                        top: 0,
-                        left: 0,
-                        width: '100vw',
-                        height: '100vh',
-                        backgroundColor: 'rgba(0,0,0,0.5)',
-                        display: 'flex',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        zIndex: 9999,
-                    }}>
-                    <MoonLoader
-                        color="#fff"
-                        speedMultiplier={0.5}
-                    />
-                </div>
-            </>
-        );
+        return <Loading />;
     }
 
     return (
         <Container className="mt-5">
             <h2 className="text-center mb-4">Picking</h2>
 
-            {data.map((plato, i) => (
+            <Form.Group className="mb-5">
+                <Form.Label>Buscar Plato</Form.Label>
+                <Form.Control
+                    type="text"
+                    placeholder="Buscar plato ..."
+                    onChange={(e) => {
+                        setFiltroPlato(e.target.value);
+                    }}
+                />
+            </Form.Group>
+
+            {data.filter(filterPlato).map((plato, i) => (
                 <Accordion
                     defaultActiveKey="0"
                     className="mb-3"
