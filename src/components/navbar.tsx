@@ -8,7 +8,6 @@ import {
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import logo from '../../public/logo_white.png'; // Adjust the path as necessary
-import { usePathname } from 'next/navigation';
 import { Slide, toast } from 'react-toastify';
 import { obtenerNombreSalon } from '@/lib/nameSalon';
 import { useEffect, useState } from 'react';
@@ -23,14 +22,15 @@ interface User {
 }
 
 export default function AppNavbar({
+    pathname,
     salon,
     setSalon,
 }: {
+    pathname: string;
     salon: string;
     setSalon: (salon: string) => void;
 }) {
     const router = useRouter();
-    const pathname = usePathname();
     const [user, setUser] = useState<User>({ rol: '' });
 
     const handleLogout = async () => {
@@ -63,31 +63,31 @@ export default function AppNavbar({
 
     const routeList: Route[] = [
         {
-            path: 'importar',
+            path: '/importar',
             title: 'Importar',
         },
         {
-            path: 'calendario',
+            path: '/calendario',
             title: 'Calendario',
         },
         {
-            path: 'planificacion',
+            path: '/planificacion',
             title: 'Planificacion',
         },
         {
-            path: 'produccion',
+            path: '/produccion',
             title: 'Produccion',
         },
         {
-            path: 'produccionPrevia',
+            path: '/entregaMP',
             title: 'Entrega de MP',
         },
         {
-            path: 'expedicion',
+            path: '/expedicion',
             title: 'Expedicion',
         },
         {
-            path: 'picking',
+            path: '/picking',
             title: 'Picking',
         },
         { path: 'usuarios', title: 'Usuarios' },

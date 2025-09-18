@@ -42,6 +42,7 @@ export default function RootLayout({
                 <SalonContext.Provider value={salon}>
                     {pathname !== '/acceso' && (
                         <AppNavbar
+                            pathname={pathname}
                             salon={salon}
                             setSalon={setSalon}
                         />
