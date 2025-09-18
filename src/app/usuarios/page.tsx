@@ -153,7 +153,7 @@ export default function UsuariosPage() {
     };
 
     const eliminarUsuario = () => {
-        fetch('/api/usuarios?id' + user.id, {
+        fetch('/api/usuarios?id=' + user.id, {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
         })
