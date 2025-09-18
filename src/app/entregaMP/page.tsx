@@ -447,7 +447,10 @@ export default function ProduccionPage() {
                                                                         [
                                                                             dato.plato,
                                                                         ],
-                                                                        dia,
+                                                                        addDays(
+                                                                            dia,
+                                                                            2
+                                                                        ),
                                                                         filtroSalon ||
                                                                             'A',
                                                                         'unico',
