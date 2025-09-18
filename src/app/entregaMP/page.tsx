@@ -137,7 +137,7 @@ export default function ProduccionPage() {
 
         generarPDFReceta(
             [],
-            fechaImprimir || new Date(),
+            fechaImprimir ? addDays(fechaImprimir, 2) : addDays(new Date(), 2),
             filtroSalon || 'A',
             modo,
             true
