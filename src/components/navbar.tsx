@@ -131,7 +131,7 @@ export default function AppNavbar({
                         {obtenerNombreSalon(salon)}
                     </p>
 
-                    {user.rol === 'admin' && (
+                    {user?.rol === 'admin' && (
                         <Button
                             variant="light"
                             className="me-2 d-block btn-sm"
