@@ -126,6 +126,7 @@ export default function AppNavbar({
                             </Nav.Link>
                         ))}
                     </Nav>
+
                     <p className="text-white align-self-center mt-3 me-2 fw-bold">
                         {obtenerNombreSalon(salon)}
                     </p>
