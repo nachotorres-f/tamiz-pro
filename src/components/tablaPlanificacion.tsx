@@ -211,7 +211,7 @@ export function TablaPlanificacion({
                                 left: '',
                                 zIndex: 4,
                             }}>
-                            Plato Padre
+                            Plato | Elaboracion
                         </th>
                         <th
                             style={{
@@ -220,7 +220,7 @@ export function TablaPlanificacion({
                                 left: '2.8rem',
                                 zIndex: 4,
                             }}>
-                            Plato
+                            Plato | Semi Elaborado
                         </th>
                         <th
                             style={{

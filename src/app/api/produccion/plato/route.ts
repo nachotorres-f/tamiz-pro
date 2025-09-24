@@ -17,6 +17,7 @@ export async function POST(req: NextRequest) {
     const data = await prisma.produccion.findFirst({
         where: {
             plato,
+            platoPadre: '',
             fecha: new Date(fecha.split('T')[0]),
             cantidad: parseFloat(cantidad),
             salon,
@@ -32,6 +33,7 @@ export async function POST(req: NextRequest) {
         await prisma.produccion.create({
             data: {
                 plato,
+                platoPadre: '',
                 cantidad: parseFloat(cantidad),
                 fecha: new Date(fecha.split('T')[0]),
                 salon,

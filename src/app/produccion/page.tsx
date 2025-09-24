@@ -6,12 +6,15 @@ import { addDays, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import React, { useContext, useEffect, useRef, useState } from 'react';
 import {
+    Accordion,
     Button,
+    Col,
     Container,
     Dropdown,
     FloatingLabel,
     Form,
     Modal,
+    Row,
     Table,
 } from 'react-bootstrap';
 import {
@@ -27,6 +30,7 @@ import { MoonLoader } from 'react-spinners';
 import { SalonContext } from '@/components/filtroPlatos';
 import { Slide, toast, ToastContainer } from 'react-toastify';
 import { generarPDFReceta } from '@/lib/generarPDF';
+import AgregarPlato from '@/components/agregarPlato';
 
 export default function ProduccionPage() {
     const salon = useContext(SalonContext);
@@ -175,15 +179,15 @@ export default function ProduccionPage() {
         return produccion?.cantidad > 0;
     };
 
-    const formatFecha = (dia: Date) => {
-        const nombreDia = format(dia, 'EEEE', { locale: es }); // "lunes"
-        const letraDia = nombreDia.startsWith('mi')
-            ? 'X'
-            : nombreDia.charAt(0).toUpperCase(); // "L"
-        const diaNumero = format(dia, 'd'); // "5"
-        const mesNumero = format(dia, 'M'); // "8"
-        return `${letraDia} ${diaNumero}-${mesNumero}`;
-    };
+    // const formatFecha = (dia: Date) => {
+    //     const nombreDia = format(dia, 'EEEE', { locale: es }); // "lunes"
+    //     const letraDia = nombreDia.startsWith('mi')
+    //         ? 'X'
+    //         : nombreDia.charAt(0).toUpperCase(); // "L"
+    //     const diaNumero = format(dia, 'd'); // "5"
+    //     const mesNumero = format(dia, 'M'); // "8"
+    //     return `${letraDia} ${diaNumero}-${mesNumero}`;
+    // };
 
     function guardarComentario() {
         toast.warn('Agregando Comentario', {
@@ -297,9 +301,31 @@ export default function ProduccionPage() {
     return (
         <>
             <Container className="mt-5">
-                <h2 className="text-center mb-4">Entrega de MP</h2>
+                <h2 className="text-center mb-4">Produccion</h2>
 
                 <ToastContainer />
+
+                <Container className="mb-3">
+                    <Row>
+                        <Col>
+                            <Accordion className="mb-5">
+                                <Accordion.Item eventKey="0">
+                                    <Accordion.Header>
+                                        Agregar plato
+                                    </Accordion.Header>
+                                    <Accordion.Body>
+                                        <AgregarPlato
+                                            salon={salon}
+                                            produccion={true}
+                                            setSemanaBase={setSemanaBase}
+                                        />
+                                    </Accordion.Body>
+                                </Accordion.Item>
+                            </Accordion>
+                        </Col>
+                    </Row>
+                </Container>
+
                 <Modal
                     show={showModal}
                     onHide={handleClose}>
@@ -531,10 +557,12 @@ export default function ProduccionPage() {
                                 })}
                         </tr>
                         <tr style={{ textAlign: 'center' }}>
-                            <th>Plato Padre</th>
-                            <th>Plato</th>
+                            <th>Plato | Elaboracion</th>
+                            <th>Plato | Semi Elaborado</th>
                             {diasSemana.filter(filterDias).map((dia, idx) => (
-                                <th key={idx}>{formatFecha(dia)}</th>
+                                <th key={idx}>
+                                    {format(dia, 'EEE, dd-MM', { locale: es })}
+                                </th>
                             ))}
                         </tr>
                     </thead>

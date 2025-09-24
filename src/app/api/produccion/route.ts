@@ -128,6 +128,13 @@ export async function GET(req: NextRequest) {
         );
 
         if (existingPlato) {
+            if (produccion.observacionProduccion) {
+                existingPlato.comentario =
+                    existingPlato.comentario +
+                    produccion.observacionProduccion +
+                    '\n';
+            }
+
             existingPlato.produccion.push({
                 fecha: addDays(produccion.fecha, previa ? -1 : 1),
                 cantidad: produccion.cantidad,

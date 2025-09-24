@@ -179,15 +179,15 @@ export default function ProduccionPreviaPage() {
         return produccion?.cantidad > 0;
     };
 
-    const formatFecha = (dia: Date) => {
-        const nombreDia = format(dia, 'EEEE', { locale: es }); // "lunes"
-        const letraDia = nombreDia.startsWith('mi')
-            ? 'X'
-            : nombreDia.charAt(0).toUpperCase(); // "L"
-        const diaNumero = format(dia, 'd'); // "5"
-        const mesNumero = format(dia, 'M'); // "8"
-        return `${letraDia} ${diaNumero}-${mesNumero}`;
-    };
+    // const formatFecha = (dia: Date) => {
+    //     const nombreDia = format(dia, 'EEEE', { locale: es }); // "lunes"
+    //     const letraDia = nombreDia.startsWith('mi')
+    //         ? 'X'
+    //         : nombreDia.charAt(0).toUpperCase(); // "L"
+    //     const diaNumero = format(dia, 'd'); // "5"
+    //     const mesNumero = format(dia, 'M'); // "8"
+    //     return `${letraDia} ${diaNumero}-${mesNumero}`;
+    // };
 
     function guardarComentario() {
         toast.warn('Agregando Comentario', {
@@ -548,10 +548,12 @@ export default function ProduccionPreviaPage() {
                                 })}
                         </tr>
                         <tr style={{ textAlign: 'center' }}>
-                            <th>Plato Padre</th>
-                            <th>Plato</th>
+                            <th>Plato | Elaboracion</th>
+                            <th>Plato | Semi Elaborado</th>
                             {diasSemana.filter(filterDias).map((dia, idx) => (
-                                <th key={idx}>{formatFecha(dia)}</th>
+                                <th key={idx}>
+                                    {format(dia, 'EEE, dd-MM', { locale: es })}
+                                </th>
                             ))}
                         </tr>
                     </thead>
