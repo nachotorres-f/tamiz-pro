@@ -1,11 +1,12 @@
 import { prisma } from '@/lib/prisma';
+import { addDays } from 'date-fns';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(req: NextRequest) {
     process.env.TZ = 'America/Argentina/Buenos_Aires';
 
     const body = await req.json();
-    const { plato, cantidad, fecha, comentario, platoPadre } = body;
+    const { plato, cantidad, fecha, platoPadre } = body;
 
     if (!plato || !cantidad || !fecha || typeof platoPadre !== 'string') {
         return NextResponse.json(
@@ -13,6 +14,8 @@ export async function POST(req: NextRequest) {
             { status: 400 }
         );
     }
+
+    console.log(plato, cantidad, fecha, platoPadre);
 
     const data = await prisma.produccion.findFirst({
         where: {
@@ -32,7 +35,7 @@ export async function POST(req: NextRequest) {
 
     await prisma.produccion.update({
         where: { id: data.id },
-        data: { observacionProduccion: comentario },
+        data: { fecha: addDays(fecha.split('T')[0], 1) },
     });
 
     return NextResponse.json({ ok: true });

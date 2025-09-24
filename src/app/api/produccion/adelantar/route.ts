@@ -6,9 +6,9 @@ export async function POST(req: NextRequest) {
     process.env.TZ = 'America/Argentina/Buenos_Aires';
 
     const body = await req.json();
-    const { plato, cantidad, fecha } = body;
+    const { plato, cantidad, fecha, platoPadre } = body;
 
-    if (!plato || !cantidad || !fecha) {
+    if (!plato || !cantidad || !fecha || typeof platoPadre !== 'string') {
         return NextResponse.json(
             { error: 'Datos incompletos' },
             { status: 400 }
@@ -18,6 +18,7 @@ export async function POST(req: NextRequest) {
     const data = await prisma.produccion.findFirst({
         where: {
             plato,
+            platoPadre,
             fecha: new Date(fecha.split('T')[0]),
             cantidad,
         },
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest) {
 
     await prisma.produccion.update({
         where: { id: data.id },
-        data: { fecha: addDays(fecha.split('T')[0], 1) },
+        data: { fecha: addDays(fecha.split('T')[0], -1) },
     });
 
     return NextResponse.json({ ok: true });

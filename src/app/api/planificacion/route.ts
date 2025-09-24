@@ -358,6 +358,7 @@ export async function POST(req: NextRequest) {
             await prisma.produccion.updateMany({
                 where: {
                     plato: observacionProduccion.plato,
+                    platoPadre: observacionProduccion.platoPadre,
                     salon: salon,
                     fecha: {
                         gte: new Date(fechaInicio),
@@ -380,6 +381,7 @@ export async function POST(req: NextRequest) {
         const existe = await prisma.produccion.findFirst({
             where: {
                 plato: item.plato,
+                platoPadre: item.platoPadre,
                 fecha: new Date(item.fecha),
                 salon: salon,
             },
@@ -405,6 +407,7 @@ export async function POST(req: NextRequest) {
             await prisma.produccion.create({
                 data: {
                     plato: item.plato,
+                    platoPadre: item.platoPadre,
                     fecha: new Date(item.fecha),
                     cantidad: item.cantidad,
                     salon,
@@ -429,6 +432,7 @@ export async function POST(req: NextRequest) {
 
 type Resultado = {
     plato: string;
+    platoPadre: string;
     fecha: string;
     cantidad: number;
     lugar: string;
@@ -454,18 +458,20 @@ async function calcularIngredientesPT(
 
         for (const receta of subRecetas) {
             const ingrediente = receta.descripcion;
+            const platoPadre = receta.nombreProducto;
             const porcion = receta.porcionBruta || 1;
             const cantidadTotal = cantidad * porcion;
 
             resultado.push({
                 plato: ingrediente,
+                platoPadre: platoPadre,
                 fecha,
                 cantidad: parseFloat(cantidadTotal.toFixed(2)), // Aseguramos que la cantidad sea un número con dos decimales
                 lugar,
             });
 
             if (!visitados.has(ingrediente)) {
-                visitados.add(ingrediente + comandaId);
+                visitados.add(ingrediente + platoPadre + comandaId);
                 await recorrer(
                     ingrediente,
                     fecha,
@@ -491,7 +497,7 @@ async function calcularIngredientesPT(
     const agrupado = new Map<string, Resultado>();
 
     for (const item of resultado) {
-        const key = `${item.plato}_${item.fecha}`;
+        const key = `${item.plato}_${item.platoPadre}_${item.fecha}`;
         if (!agrupado.has(key)) {
             agrupado.set(key, { ...item });
         } else {

@@ -2,30 +2,35 @@
 'use client';
 
 import { NavegacionSemanal } from '@/components/navegacionSemanal';
-import { addDays, format, startOfWeek } from 'date-fns';
+import { addDays, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import React, { useContext, useEffect, useRef, useState } from 'react';
 import {
-    Accordion,
     Button,
-    Col,
     Container,
     Dropdown,
+    FloatingLabel,
     Form,
     Modal,
-    Row,
     Table,
 } from 'react-bootstrap';
-import { FiletypePdf, ArrowsFullscreen, EyeFill } from 'react-bootstrap-icons';
-import { Slide, toast } from 'react-toastify';
-import AgregarPlato from '@/components/agregarPlato';
+import {
+    ArrowReturnLeft,
+    ArrowReturnRight,
+    ChatSquareTextFill,
+    EyeFill,
+    FiletypePdf,
+    Fullscreen,
+    FullscreenExit,
+} from 'react-bootstrap-icons';
+import { MoonLoader } from 'react-spinners';
 import { SalonContext } from '@/components/filtroPlatos';
+import { Slide, toast, ToastContainer } from 'react-toastify';
 import { generarPDFReceta } from '@/lib/generarPDF';
-import { ToastContainer } from 'react-toastify';
-import { Loading } from '@/components/loading';
 
-export default function ProduccionPage() {
+export default function ProduccionPreviaPage() {
     const salon = useContext(SalonContext);
+    const ref = useRef<HTMLTableElement>(null);
 
     //const [filtro, setFiltro] = useState('');
     const [filtro] = useState('');
@@ -34,33 +39,25 @@ export default function ProduccionPage() {
     const [semanaBase, setSemanaBase] = useState(new Date());
     const [datos, setDatos] = useState<any[]>([]);
     const [showModal, setShowModal] = useState(false);
-    const [filtroSalon, setFiltroSalon] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
-    const [isFullscreen, setIsFullscreen] = useState(false);
     const [fechaImprimir, setFechaImprimir] = useState<Date | null>(null);
-
-    const ref = useRef<HTMLTableElement>(null);
-
-    const handleFullscreen = () => {
-        if (ref.current && !isFullscreen) goFullscreen(ref.current);
-
-        if (isFullscreen) {
-            exitFullscreen();
-            setIsFullscreen(false);
-        }
-    };
-
-    useEffect(() => {
-        if (salon) {
-            setFiltroSalon(salon); // sincroniza el estado con el context
-        }
-    }, [salon]);
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const [showModalProduccion, setShowModalProduccion] = useState(false);
+    const [observacionModal, setObservacionModal] = useState('');
+    const [showModalObservacion, setShowModalObservacion] = useState(false);
+    const [platoModalProduccion, setPlatoModalProduccion] = useState({
+        plato: '',
+        platoPadre: '',
+        comentario: undefined,
+        cantidad: 0,
+        fecha: new Date(),
+    });
 
     useEffect(() => {
         setLoading(true);
         fetch(
             '/api/produccion?fechaInicio=' +
-                startOfWeek(semanaBase, { weekStartsOn: 1 }).toISOString() +
+                semanaBase.toISOString() +
                 '&previa=true'
         )
             .then((res) => res.json())
@@ -72,35 +69,22 @@ export default function ProduccionPage() {
     }, [semanaBase]);
 
     useEffect(() => {
+        const inicioSemana = semanaBase;
         const dias = Array.from({ length: 7 }, (_, i) =>
-            addDays(semanaBase, i)
+            addDays(inicioSemana, i)
         );
         setDiasSemana(dias);
         setDiaActivo('');
     }, [semanaBase]);
 
-    const filterDias = (dia: Date) => {
-        if (diaActivo && format(dia, 'yyyy-MM-dd') !== diaActivo) {
-            return false;
+    const handleFullscreen = () => {
+        if (ref.current && !isFullscreen) goFullscreen(ref.current);
+
+        if (isFullscreen) {
+            exitFullscreen();
+            setIsFullscreen(false);
         }
-
-        return true;
     };
-
-    const filterPlatos = (dato: any) => {
-        if (!filtro) return true;
-
-        return dato.plato.toLowerCase().includes(filtro.toLowerCase());
-    };
-
-    const handleClose = () => setShowModal(false);
-
-    const filterSalon = (dato: any) => {
-        if (!filtroSalon) return true;
-
-        return dato.salon === filtroSalon;
-    };
-
     function goFullscreen(element: HTMLElement) {
         if (element.requestFullscreen) {
             element.requestFullscreen();
@@ -128,6 +112,24 @@ export default function ProduccionPage() {
         }
     }
 
+    const filterDias = (dia: Date) => {
+        if (diaActivo && format(addDays(dia, -1), 'yyyy-MM-dd') === diaActivo) {
+            return true;
+        }
+
+        if (diaActivo && format(dia, 'yyyy-MM-dd') !== diaActivo) {
+            return false;
+        }
+
+        return true;
+    };
+
+    const filterPlatos = (dato: any) => {
+        if (!filtro) return true;
+
+        return dato.plato.toLowerCase().includes(filtro.toLowerCase());
+    };
+
     const generarPDF = (modo: 'unico' | 'separado') => {
         toast.info('Imprimiendo recetas', {
             position: 'bottom-right',
@@ -135,25 +137,179 @@ export default function ProduccionPage() {
             transition: Slide,
         });
 
-        generarPDFReceta(
-            [],
-            fechaImprimir ? addDays(fechaImprimir, 2) : addDays(new Date(), 2),
-            filtroSalon || 'A',
-            modo,
-            true
-        );
+        generarPDFReceta([], fechaImprimir || new Date(), salon, modo, true);
 
         handleClose();
     };
 
+    const handleClose = () => setShowModal(false);
+    const handleCloseModalProduccion = () => setShowModalProduccion(false);
+    const handleCloseModalObservacion = () => setShowModalObservacion(false);
+
+    const filterSalon = (dato: any) => {
+        if (!salon) return true;
+
+        return dato.salon === salon;
+    };
+
+    const filterPlatosPorDia = (dato: any) => {
+        if (!diaActivo) {
+            return true;
+        }
+
+        const dia = addDays(new Date(diaActivo), 1);
+        const diaSiguiente = addDays(dia, 1);
+
+        dia.setHours(0, 0, 0, 0);
+        diaSiguiente.setHours(0, 0, 0, 0);
+        console.log(dia, diaSiguiente);
+
+        const produccion = dato.produccion.find((prod: any) => {
+            const fecha = new Date(prod.fecha);
+            fecha.setHours(0, 0, 0, 0);
+
+            return (
+                fecha.getTime() === dia.getTime() ||
+                fecha.getTime() === diaSiguiente.getTime()
+            );
+        });
+
+        console.log(produccion);
+
+        return produccion?.cantidad > 0;
+    };
+
+    const formatFecha = (dia: Date) => {
+        const nombreDia = format(dia, 'EEEE', { locale: es }); // "lunes"
+        const letraDia = nombreDia.startsWith('mi')
+            ? 'X'
+            : nombreDia.charAt(0).toUpperCase(); // "L"
+        const diaNumero = format(dia, 'd'); // "5"
+        const mesNumero = format(dia, 'M'); // "8"
+        return `${letraDia} ${diaNumero}-${mesNumero}`;
+    };
+
+    function guardarComentario() {
+        toast.warn('Agregando Comentario', {
+            position: 'bottom-right',
+            theme: 'colored',
+            transition: Slide,
+        });
+
+        fetch('api/produccion/comentario', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                plato: platoModalProduccion.plato,
+                platoPadre: platoModalProduccion.platoPadre,
+                cantidad: platoModalProduccion.cantidad,
+                fecha: addDays(platoModalProduccion.fecha, 2),
+                comentario: observacionModal,
+            }),
+        })
+            .then(() => {
+                toast.success('Comentario guardado', {
+                    position: 'bottom-right',
+                    theme: 'colored',
+                    transition: Slide,
+                });
+                setLoading(true);
+                fetch(
+                    '/api/produccion?fechaInicio=' +
+                        semanaBase.toISOString() +
+                        '&previa=true'
+                )
+                    .then((res) => res.json())
+                    .then((res) => res.data)
+                    .then(setDatos)
+                    .finally(() => {
+                        setLoading(false);
+                    });
+            })
+            .catch(() => {
+                toast.error('Error al guardar el comentario', {
+                    position: 'bottom-right',
+                    theme: 'colored',
+                    transition: Slide,
+                });
+                setLoading(false);
+            });
+    }
+
+    const pasarProduccion = async (accion: 'adelantar' | 'atrasar') => {
+        toast.warn('Pasando produccion', {
+            position: 'bottom-right',
+            theme: 'colored',
+            transition: Slide,
+        });
+
+        fetch('api/produccion/' + accion, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                plato: platoModalProduccion.plato,
+                platoPadre: platoModalProduccion.platoPadre,
+                cantidad: platoModalProduccion.cantidad,
+                fecha: addDays(platoModalProduccion.fecha, 2),
+            }),
+        })
+            .then(() => {
+                toast.success(`Producción ${accion.replace('r', 'ada')}`, {
+                    position: 'bottom-right',
+                    theme: 'colored',
+                    transition: Slide,
+                });
+                setLoading(true);
+                fetch(
+                    '/api/produccion?fechaInicio=' +
+                        semanaBase.toISOString() +
+                        '&previa=true'
+                )
+                    .then((res) => res.json())
+                    .then((res) => res.data)
+                    .then(setDatos)
+                    .finally(() => {
+                        setLoading(false);
+                    });
+            })
+            .catch(() => {
+                toast.error(`Error al ${accion} la producción`, {
+                    position: 'bottom-right',
+                    theme: 'colored',
+                    transition: Slide,
+                });
+                setLoading(false);
+            });
+    };
+
     if (loading) {
-        return <Loading />;
+        return (
+            <div
+                style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    width: '100vw',
+                    height: '100vh',
+                    backgroundColor: 'rgba(0,0,0,0.5)',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    zIndex: 9999,
+                }}>
+                <MoonLoader
+                    color="#fff"
+                    size={100}
+                    speedMultiplier={0.5}
+                />
+            </div>
+        );
     }
 
     return (
         <>
             <Container className="mt-5">
-                <h2 className="text-center mb-4">Produccion</h2>
+                <h2 className="text-center mb-4">Entrega de MP</h2>
 
                 <ToastContainer />
                 <Modal
@@ -183,69 +339,117 @@ export default function ProduccionPage() {
                     </Modal.Footer>
                 </Modal>
 
-                <Container className="mb-3">
-                    <Row>
-                        <Col>
-                            <Accordion className="mb-5">
-                                <Accordion.Item eventKey="0">
-                                    <Accordion.Header>
-                                        Agregar plato
-                                    </Accordion.Header>
-                                    <Accordion.Body>
-                                        <AgregarPlato
-                                            salon={filtroSalon || 'A'}
-                                            produccion={true}
-                                            setSemanaBase={setSemanaBase}
-                                        />
-                                    </Accordion.Body>
-                                </Accordion.Item>
-                            </Accordion>
-                        </Col>
-                    </Row>
-                    <Row>
-                        <Col xs={4}>
-                            <Form.Group>
-                                <Form.Label>Filtrar por dia</Form.Label>
-                                <Form.Select
-                                    value={diaActivo}
-                                    onChange={(e) =>
-                                        setDiaActivo(e.target.value)
-                                    }>
-                                    <option value="">Todos los dias</option>
-                                    {diasSemana.map((dia, i) => {
-                                        const fecha = format(dia, 'yyyy-MM-dd');
-                                        return (
-                                            <option
-                                                key={i}
-                                                value={fecha}>
-                                                {format(
-                                                    dia,
-                                                    "EEEE, dd 'de' MMMM",
-                                                    {
-                                                        locale: es,
-                                                    }
-                                                )
-                                                    .split(' ')
-                                                    .map((word) => {
-                                                        if (word === 'de') {
-                                                            return 'de';
-                                                        }
-                                                        return (
-                                                            word
-                                                                .charAt(0)
-                                                                .toUpperCase() +
-                                                            word.slice(1)
-                                                        );
-                                                    })
-                                                    .join(' ')}
-                                            </option>
-                                        );
-                                    })}
-                                </Form.Select>
-                            </Form.Group>
-                        </Col>
-                    </Row>
-                </Container>
+                <Modal
+                    size="xl"
+                    show={showModalProduccion}
+                    onHide={handleCloseModalProduccion}>
+                    <Modal.Header closeButton>
+                        <Modal.Title>
+                            {platoModalProduccion.plato}{' '}
+                            {platoModalProduccion.platoPadre
+                                ? ' - ' + platoModalProduccion.platoPadre
+                                : ''}
+                        </Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>¿Que accion quieres realizar?</Modal.Body>
+                    <Modal.Footer>
+                        <Button
+                            onClick={() => {
+                                pasarProduccion('adelantar');
+                                handleCloseModalProduccion();
+                            }}>
+                            <ArrowReturnLeft /> Adelantar Produccion
+                        </Button>
+                        <Button
+                            onClick={() => {
+                                pasarProduccion('atrasar');
+                                handleCloseModalProduccion();
+                            }}>
+                            <ArrowReturnRight /> Atrasar Produccion
+                        </Button>
+                        <Button
+                            onClick={() => {
+                                setObservacionModal(
+                                    platoModalProduccion.comentario
+                                        ? platoModalProduccion.comentario
+                                        : ''
+                                );
+                                handleCloseModalProduccion();
+                                setShowModalObservacion(true);
+                            }}>
+                            <ChatSquareTextFill /> Agregar / Editar Comentario
+                        </Button>
+                        <Button
+                            variant="danger"
+                            onClick={() => {
+                                generarPDFReceta(
+                                    [platoModalProduccion.plato],
+                                    addDays(platoModalProduccion.fecha, 2),
+                                    salon,
+                                    'separado',
+                                    true
+                                );
+
+                                toast.info('Imprimiendo receta', {
+                                    position: 'bottom-right',
+                                    theme: 'colored',
+                                    transition: Slide,
+                                });
+                                handleCloseModalProduccion();
+                            }}>
+                            <FiletypePdf /> Imprimir receta
+                        </Button>
+                    </Modal.Footer>
+                </Modal>
+
+                <Modal
+                    show={showModalObservacion}
+                    onHide={handleCloseModalObservacion}>
+                    <Modal.Header closeButton>
+                        <Modal.Title>
+                            Observacion - {platoModalProduccion.plato}{' '}
+                            {platoModalProduccion.platoPadre
+                                ? ' - ' + platoModalProduccion.platoPadre
+                                : ''}
+                        </Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+                        <FloatingLabel
+                            controlId="floatingTextarea"
+                            label="Observación"
+                            className="mb-3">
+                            <Form.Control
+                                as="textarea"
+                                value={observacionModal}
+                                onChange={(
+                                    e: React.ChangeEvent<
+                                        HTMLInputElement | HTMLTextAreaElement
+                                    >
+                                ) => {
+                                    setObservacionModal(e.target.value);
+                                }}
+                                style={{ height: '200px' }}
+                            />
+                        </FloatingLabel>
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button
+                            variant="secondary"
+                            onClick={() => {
+                                handleCloseModalObservacion();
+                            }}>
+                            Cerrar
+                        </Button>
+                        <Button
+                            variant="primary"
+                            onClick={() => {
+                                guardarComentario();
+                                handleCloseModalObservacion();
+                            }}>
+                            Guardar Cambios
+                        </Button>
+                    </Modal.Footer>
+                </Modal>
 
                 <NavegacionSemanal
                     semanaBase={semanaBase}
@@ -254,248 +458,195 @@ export default function ProduccionPage() {
             </Container>
 
             <div
-                className="d-flex flex-row justify-content-evenly mt-3 mx-auto flex-wrap"
-                style={{ width: '100%' }}>
-                {diasSemana.filter(filterDias).map((dia, i) => {
-                    // Primero filtramos y procesamos los datos para este día
-                    const datosDelDia = datos
-                        .filter(filterPlatos)
-                        .filter(filterSalon)
-                        .map((dato) => {
-                            dia.setHours(0, 0, 0, 0);
-                            const produccion = dato.produccion.find(
-                                (prod: any) => {
-                                    const fecha = new Date(prod.fecha);
-                                    fecha.setHours(0, 0, 0, 0);
-                                    return fecha.getTime() === dia.getTime();
-                                }
-                            );
-                            const cantidad = produccion
-                                ? produccion.cantidad
-                                : 0;
-
-                            // Solo incluimos los datos que tienen cantidad
-                            if (cantidad > 0) {
-                                return {
-                                    plato: dato.plato,
-                                    cantidad: cantidad,
-                                    comentario: produccion.comentario,
-                                };
-                            }
-                            return null;
-                        })
-                        .filter(Boolean); // Eliminamos los elementos null
-
-                    return (
-                        <div
-                            key={i}
-                            style={{
-                                height: diaActivo ? 'max-content' : '50vh',
-                                overflow: 'auto',
-                                width: diaActivo ? '100%' : 'max-content',
-                            }}
-                            ref={diaActivo ? ref : null}>
-                            <Table
-                                className="table-striped "
-                                style={{
-                                    width: diaActivo ? '100%' : '300px',
-                                    margin: '',
-                                    maxHeight: diaActivo ? '80vh' : '',
-                                }}
-                                bordered>
-                                <thead className="table-dark sticky-top">
-                                    <tr>
-                                        <th colSpan={4}>
-                                            {format(dia, "EEEE, dd 'de' MMMM", {
-                                                locale: es,
-                                            })
-                                                .split(' ')
-                                                .map((word) => {
-                                                    if (word === 'de') {
-                                                        return 'de';
-                                                    }
-                                                    return (
-                                                        word
-                                                            .charAt(0)
-                                                            .toUpperCase() +
-                                                        word.slice(1)
-                                                    );
-                                                })
-                                                .join(' ')}{' '}
-                                            {datosDelDia.length > 0 && (
-                                                <>
-                                                    <Dropdown className="btn btn-sm">
-                                                        <Dropdown.Toggle
-                                                            variant="primary"
-                                                            id="dropdown-basic"></Dropdown.Toggle>
-                                                        <Dropdown.Menu>
-                                                            <Dropdown.Item
-                                                                onClick={() => {
-                                                                    setFechaImprimir(
-                                                                        dia
-                                                                    );
-                                                                    setShowModal(
-                                                                        true
-                                                                    );
-                                                                }}>
-                                                                <FiletypePdf className="text-danger" />{' '}
-                                                                Imprimir
-                                                            </Dropdown.Item>
-                                                            <Dropdown.Item
-                                                                onClick={() => {
-                                                                    setDiaActivo(
-                                                                        format(
-                                                                            dia,
-                                                                            'yyyy-MM-dd'
-                                                                        )
-                                                                    );
-
-                                                                    setTimeout(
-                                                                        () => {
-                                                                            handleFullscreen();
-                                                                        },
-                                                                        0
-                                                                    );
-                                                                }}>
-                                                                <ArrowsFullscreen />{' '}
-                                                                Pantalla
-                                                                Completa
-                                                            </Dropdown.Item>
-                                                            <Dropdown.Item
-                                                                onClick={() => {
-                                                                    if (
-                                                                        isFullscreen
-                                                                    )
-                                                                        handleFullscreen();
-                                                                    setDiaActivo(
-                                                                        diaActivo
-                                                                            ? ''
-                                                                            : format(
-                                                                                  dia,
-                                                                                  'yyyy-MM-dd'
-                                                                              )
-                                                                    );
-                                                                }}>
-                                                                <EyeFill />{' '}
-                                                                {diaActivo
-                                                                    ? 'Ver todos'
-                                                                    : 'Ver dia'}
-                                                            </Dropdown.Item>
-                                                        </Dropdown.Menu>
-                                                    </Dropdown>
-                                                </>
-                                            )}
-                                        </th>
-                                    </tr>
-                                    <tr>
-                                        <th></th>
-                                        <th>Plato</th>
-                                        <th>
-                                            Cantidad{' '}
-                                            {datosDelDia.length > 0
-                                                ? `(${datosDelDia.length})`
-                                                : ''}
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {datosDelDia.length > 0 ? (
-                                        datosDelDia.map((dato, i) => (
-                                            <React.Fragment
-                                                key={dato && dato.plato}>
-                                                <tr
-                                                    style={{
-                                                        textAlign: 'center',
-                                                        height:
-                                                            datosDelDia.length -
-                                                                1 !==
-                                                            i
-                                                                ? 'max-content'
-                                                                : '',
-                                                    }}>
-                                                    <td>
-                                                        <Button
-                                                            className="btn-danger"
-                                                            size="sm"
-                                                            style={{
-                                                                width: '2rem',
-                                                                height: '2rem',
-                                                                display:
-                                                                    'block',
-                                                                justifyContent:
-                                                                    'center',
-                                                                alignItems:
-                                                                    'center',
-                                                                margin: 'auto',
-                                                            }}
-                                                            onClick={() => {
-                                                                if (dato) {
-                                                                    toast.info(
-                                                                        'Imprimiendo receta',
-                                                                        {
-                                                                            position:
-                                                                                'bottom-right',
-                                                                            theme: 'colored',
-                                                                            transition:
-                                                                                Slide,
-                                                                        }
-                                                                    );
-                                                                    setFechaImprimir(
-                                                                        dia
-                                                                    );
-                                                                    generarPDFReceta(
-                                                                        [
-                                                                            dato.plato,
-                                                                        ],
-                                                                        addDays(
-                                                                            dia,
-                                                                            2
-                                                                        ),
-                                                                        filtroSalon ||
-                                                                            'A',
-                                                                        'unico',
-                                                                        true
-                                                                    );
-                                                                }
-                                                            }}>
-                                                            <FiletypePdf />
-                                                        </Button>
-                                                    </td>
-                                                    <td>
-                                                        {dato && dato.plato}
-                                                    </td>
-                                                    <td>
-                                                        {dato && dato.cantidad}
-                                                    </td>
-                                                </tr>
-
-                                                {dato?.comentario && (
-                                                    <tr className="text-center text-wrap fst-italic fs-6 text-secondary">
-                                                        <td colSpan={4}>
-                                                            {dato.comentario}
-                                                        </td>
-                                                    </tr>
-                                                )}
-                                            </React.Fragment>
-                                        ))
+                className="mt-3 mx-auto"
+                style={{
+                    overflowY: 'auto',
+                    height: '100vh',
+                    width: '100%',
+                }}>
+                <Table
+                    ref={ref}
+                    bordered
+                    striped
+                    id="tabla-produccion">
+                    <thead className="table-dark sticky-top">
+                        <tr style={{ textAlign: 'center' }}>
+                            <th>
+                                <Button onClick={handleFullscreen}>
+                                    {isFullscreen ? (
+                                        <FullscreenExit />
                                     ) : (
+                                        <Fullscreen />
+                                    )}{' '}
+                                    Pantalla Completa
+                                </Button>
+                            </th>
+                            <th></th>
+                            {[0, 1, 2, 3, 4, 5, 6]
+                                .filter(
+                                    (i) =>
+                                        (diaActivo !== '' &&
+                                            (diaActivo ===
+                                                format(
+                                                    diasSemana[i],
+                                                    'yyyy-MM-dd'
+                                                ) ||
+                                                (i > 0 &&
+                                                    diaActivo ===
+                                                        format(
+                                                            diasSemana[i - 1],
+                                                            'yyyy-MM-dd'
+                                                        )))) ||
+                                        diaActivo === ''
+                                )
+                                .map((i) => {
+                                    return (
+                                        <th key={i}>
+                                            <Dropdown className="btn btn-sm">
+                                                <Dropdown.Toggle
+                                                    variant="primary"
+                                                    id="dropdown-basic"></Dropdown.Toggle>
+                                                <Dropdown.Menu>
+                                                    <Dropdown.Item
+                                                        onClick={() => {
+                                                            setFechaImprimir(
+                                                                addDays(
+                                                                    diasSemana[
+                                                                        i
+                                                                    ],
+                                                                    2
+                                                                )
+                                                            );
+                                                            setShowModal(true);
+                                                        }}>
+                                                        <FiletypePdf className="text-danger" />{' '}
+                                                        Imprimir
+                                                    </Dropdown.Item>
+
+                                                    <Dropdown.Item
+                                                        onClick={() => {
+                                                            setDiaActivo(
+                                                                diaActivo
+                                                                    ? ''
+                                                                    : format(
+                                                                          diasSemana[
+                                                                              i
+                                                                          ],
+                                                                          'yyyy-MM-dd'
+                                                                      )
+                                                            );
+                                                        }}>
+                                                        <EyeFill />{' '}
+                                                        {diaActivo
+                                                            ? 'Ver todos'
+                                                            : 'Ver dia'}
+                                                    </Dropdown.Item>
+                                                </Dropdown.Menu>
+                                            </Dropdown>
+                                        </th>
+                                    );
+                                })}
+                        </tr>
+                        <tr style={{ textAlign: 'center' }}>
+                            <th>Plato Padre</th>
+                            <th>Plato</th>
+                            {diasSemana.filter(filterDias).map((dia, idx) => (
+                                <th key={idx}>{formatFecha(dia)}</th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {datos &&
+                            datos
+                                .filter(filterPlatos)
+                                .filter(filterSalon)
+                                .filter((dato) => filterPlatosPorDia(dato))
+                                .map((dato) => (
+                                    <React.Fragment
+                                        key={dato.plato + dato.platoPadre}>
                                         <tr>
-                                            <td
-                                                colSpan={4}
-                                                style={{
-                                                    textAlign: 'center',
-                                                    fontStyle: 'italic',
-                                                    color: '#666',
-                                                }}>
-                                                No hay nada para producir
-                                            </td>
+                                            <td>{dato.platoPadre}</td>
+                                            <td>{dato.plato}</td>
+
+                                            {diasSemana
+                                                .filter(filterDias)
+                                                .map((dia, i) => {
+                                                    dia.setHours(0, 0, 0, 0);
+                                                    console.log('DIA', dia);
+
+                                                    const produccion =
+                                                        dato.produccion.find(
+                                                            (prod: any) => {
+                                                                const fecha =
+                                                                    new Date(
+                                                                        prod.fecha
+                                                                    );
+                                                                fecha.setHours(
+                                                                    0,
+                                                                    0,
+                                                                    0,
+                                                                    0
+                                                                );
+
+                                                                return (
+                                                                    fecha.getTime() ===
+                                                                    dia.getTime()
+                                                                );
+                                                            }
+                                                        );
+                                                    const cantidad = produccion
+                                                        ? produccion.cantidad
+                                                        : 0;
+                                                    return (
+                                                        <td
+                                                            key={i}
+                                                            className={
+                                                                cantidad > 0
+                                                                    ? 'link-pdf'
+                                                                    : ''
+                                                            }
+                                                            onClick={() => {
+                                                                setPlatoModalProduccion(
+                                                                    {
+                                                                        plato: dato.plato,
+                                                                        platoPadre:
+                                                                            dato.platoPadre,
+                                                                        cantidad,
+                                                                        fecha: produccion.fecha,
+                                                                        comentario:
+                                                                            produccion.comentario
+                                                                                ? dato.comentario
+                                                                                : '',
+                                                                    }
+                                                                );
+                                                                setShowModalProduccion(
+                                                                    true
+                                                                );
+                                                            }}>
+                                                            {cantidad || ''}
+                                                        </td>
+                                                    );
+                                                })}
                                         </tr>
-                                    )}
-                                </tbody>
-                            </Table>
-                        </div>
-                    );
-                })}
+                                        {dato.comentario &&
+                                            dato.comentario.replace(
+                                                '\n',
+                                                ''
+                                            ) !== '' && (
+                                                <tr className="fst-italic fs-6 text-secondary">
+                                                    <td className="bg-warning-subtle"></td>
+                                                    <td className="bg-warning-subtle">
+                                                        {dato.comentario}
+                                                    </td>
+                                                    <td
+                                                        className="bg-warning-subtle"
+                                                        colSpan={999}></td>
+                                                </tr>
+                                            )}
+                                    </React.Fragment>
+                                ))}
+                    </tbody>
+                </Table>
             </div>
         </>
     );

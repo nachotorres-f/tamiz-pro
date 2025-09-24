@@ -86,10 +86,17 @@ export async function GET(req: NextRequest) {
         );
     }
 
+    // Calcular el rango de fechas: hoy (00:00:00) hasta 6 días después (23:59:59)
+    const desde = addDays(new Date(fechaInicio), 2);
+    desde.setHours(0, 0, 0, 0);
+    const hasta = addDays(desde, 6);
+    hasta.setHours(0, 0, 0, 0);
+
     const producciones = await prisma.produccion.findMany({
         where: {
             fecha: {
-                gte: addDays(new Date(fechaInicio), -5),
+                gte: desde,
+                lte: hasta,
             },
             cantidad: {
                 gt: 0,
@@ -104,23 +111,31 @@ export async function GET(req: NextRequest) {
 
     for (const produccion of producciones) {
         const existingPlato = groupedProducciones.find(
-            (item: any) => item.plato === produccion.plato
+            (item: any) =>
+                item.plato === produccion.plato &&
+                item.platoPadre === produccion.platoPadre
         );
 
         if (existingPlato) {
             existingPlato.produccion.push({
                 fecha: addDays(produccion.fecha, -1),
                 cantidad: produccion.cantidad,
-                comentario: produccion.observacionProduccion || '',
+                comentario:
+                    existingPlato.comentario +
+                    (produccion.observacionProduccion || '') +
+                    '\n',
             });
         } else {
             groupedProducciones.push({
                 plato: produccion.plato,
+                platoPadre: produccion.platoPadre,
+                comentario: (produccion.observacionProduccion || '') + '\n',
                 produccion: [
                     {
                         fecha: addDays(produccion.fecha, -1),
                         cantidad: produccion.cantidad,
-                        comentario: produccion.observacionProduccion || '',
+                        comentario:
+                            (produccion.observacionProduccion || '') + '\n',
                     },
                 ],
                 salon: produccion.salon,

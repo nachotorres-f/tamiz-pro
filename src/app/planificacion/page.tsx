@@ -46,7 +46,7 @@ export default function PlanificacionPage() {
     const [loading, setLoading] = useState(false);
     const [ciclo, setCiclo] = useState(false);
     const [observaciones, setObservaciones] = useState<
-        { plato: string; observacion: string }[]
+        { plato: string; observacion: string; platoPadre: string }[]
     >([]);
 
     // Referencias para medir el ancho de las celdas
@@ -184,7 +184,17 @@ export default function PlanificacionPage() {
             .finally(() => {});
     };
 
-    const platosUnicos = [...new Set(datosFiltrados.map((d) => d.plato))];
+    const platosUnicos = [
+        ...new Map(
+            datosFiltrados.map((d) => [
+                `${d.plato}-${d.platoPadre}`,
+                {
+                    plato: d.plato,
+                    platoPadre: d.platoPadre,
+                },
+            ])
+        ).values(),
+    ];
 
     const handleLimpiarProduccion = () => {
         setProduccionUpdate([]);
