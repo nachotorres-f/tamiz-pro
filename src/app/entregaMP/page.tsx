@@ -27,12 +27,13 @@ import {
     FullscreenExit,
 } from 'react-bootstrap-icons';
 import { MoonLoader } from 'react-spinners';
-import { SalonContext } from '@/components/filtroPlatos';
+import { RolContext, SalonContext } from '@/components/filtroPlatos';
 import { Slide, toast, ToastContainer } from 'react-toastify';
 import { generarPDFReceta } from '@/lib/generarPDF';
 
 export default function ProduccionPreviaPage() {
     const salon = useContext(SalonContext);
+    const RolProvider = useContext(RolContext);
     const ref = useRef<HTMLTableElement>(null);
 
     const [diasSemana, setDiasSemana] = useState<Date[]>([]);
@@ -486,32 +487,39 @@ export default function ProduccionPreviaPage() {
                     </Modal.Header>
                     <Modal.Body>¿Que accion quieres realizar?</Modal.Body>
                     <Modal.Footer>
-                        <Button
-                            onClick={() => {
-                                pasarProduccion('adelantar');
-                                handleCloseModalProduccion();
-                            }}>
-                            <ArrowReturnLeft /> Adelantar Produccion
-                        </Button>
-                        <Button
-                            onClick={() => {
-                                pasarProduccion('atrasar');
-                                handleCloseModalProduccion();
-                            }}>
-                            <ArrowReturnRight /> Atrasar Produccion
-                        </Button>
-                        <Button
-                            onClick={() => {
-                                setObservacionModal(
-                                    platoModalProduccion.comentario
-                                        ? platoModalProduccion.comentario
-                                        : ''
-                                );
-                                handleCloseModalProduccion();
-                                setShowModalObservacion(true);
-                            }}>
-                            <ChatSquareTextFill /> Agregar / Editar Comentario
-                        </Button>
+                        {RolProvider !== 'consultor' && (
+                            <Button
+                                onClick={() => {
+                                    pasarProduccion('adelantar');
+                                    handleCloseModalProduccion();
+                                }}>
+                                <ArrowReturnLeft /> Adelantar Produccion
+                            </Button>
+                        )}
+                        {RolProvider !== 'consultor' && (
+                            <Button
+                                onClick={() => {
+                                    pasarProduccion('atrasar');
+                                    handleCloseModalProduccion();
+                                }}>
+                                <ArrowReturnRight /> Atrasar Produccion
+                            </Button>
+                        )}
+                        {RolProvider !== 'consultor' && (
+                            <Button
+                                onClick={() => {
+                                    setObservacionModal(
+                                        platoModalProduccion.comentario
+                                            ? platoModalProduccion.comentario
+                                            : ''
+                                    );
+                                    handleCloseModalProduccion();
+                                    setShowModalObservacion(true);
+                                }}>
+                                <ChatSquareTextFill /> Agregar / Editar
+                                Comentario
+                            </Button>
+                        )}
                         <Button
                             variant="danger"
                             onClick={() => {

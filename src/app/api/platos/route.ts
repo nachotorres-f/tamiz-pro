@@ -29,8 +29,6 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Faltan datos' }, { status: 400 });
     }
 
-    console.log('LLEGO POST', { plato, cantidad, fecha });
-
     try {
         const nuevoPlato = await prisma.plato.create({
             data: {

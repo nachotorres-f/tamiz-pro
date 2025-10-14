@@ -13,8 +13,6 @@ export async function POST(req: NextRequest) {
     }
     const body = await req.json();
 
-    console.log('BODY', body);
-
     body.Id = Number(body.Id);
 
     // Decodifica MomnetoId y MomnetoComidaId en un solo paso
@@ -88,18 +86,18 @@ export async function POST(req: NextRequest) {
         },
     });
 
-    const tiposOmitir = [
-        'Vajilla',
-        'Manteleria',
-        'Barra',
-        'Bebida',
-        'Cervezas',
-        'Fernet',
-        'Champagne',
-        'Vino',
-        'Cafe',
-        'Maridaje',
-    ];
+    // const tiposOmitir = [
+    //     'Vajilla',
+    //     'Manteleria',
+    //     'Barra',
+    //     'Bebida',
+    //     'Cervezas',
+    //     'Fernet',
+    //     'Champagne',
+    //     'Vino',
+    //     'Cafe',
+    //     'Maridaje',
+    // ];
 
     // Prepara los platos a upsert en batch
     const platos: {
@@ -116,20 +114,20 @@ export async function POST(req: NextRequest) {
                     ComidaDescripcion?: string;
                     ComidaTotal?: number | string;
                 };
-                if (
-                    platoItem.ComidaFamilia &&
-                    !tiposOmitir.some((tipo) =>
-                        platoItem
-                            .ComidaFamilia!.toLowerCase()
-                            .includes(tipo.toLowerCase())
-                    )
-                ) {
-                    platos.push({
-                        nombre: platoItem.ComidaDescripcion!,
-                        cantidad: Number(platoItem.ComidaTotal),
-                        comandaId: body.Id,
-                    });
-                }
+                // if (
+                // platoItem.ComidaFamilia &&
+                // !tiposOmitir.some((tipo) =>
+                //     platoItem
+                //         .ComidaFamilia!.toLowerCase()
+                //         .includes(tipo.toLowerCase())
+                // )
+                // ) {
+                platos.push({
+                    nombre: platoItem.ComidaDescripcion!,
+                    cantidad: Number(platoItem.ComidaTotal),
+                    comandaId: body.Id,
+                });
+                // }
             });
         }
     });

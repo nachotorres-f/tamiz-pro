@@ -27,13 +27,14 @@ import {
     FullscreenExit,
 } from 'react-bootstrap-icons';
 import { MoonLoader } from 'react-spinners';
-import { SalonContext } from '@/components/filtroPlatos';
+import { RolContext, SalonContext } from '@/components/filtroPlatos';
 import { Slide, toast, ToastContainer } from 'react-toastify';
 import { generarPDFReceta } from '@/lib/generarPDF';
 import AgregarPlato from '@/components/agregarPlato';
 
 export default function ProduccionPage() {
     const salon = useContext(SalonContext);
+    const RolProvider = useContext(RolContext);
     const ref = useRef<HTMLTableElement>(null);
 
     const [diasSemana, setDiasSemana] = useState<Date[]>([]);
@@ -363,24 +364,26 @@ export default function ProduccionPage() {
                 <ToastContainer />
 
                 <Container className="mb-3">
-                    <Row>
-                        <Col>
-                            <Accordion className="mb-5">
-                                <Accordion.Item eventKey="0">
-                                    <Accordion.Header>
-                                        Agregar plato
-                                    </Accordion.Header>
-                                    <Accordion.Body>
-                                        <AgregarPlato
-                                            salon={salon}
-                                            produccion={true}
-                                            setSemanaBase={setSemanaBase}
-                                        />
-                                    </Accordion.Body>
-                                </Accordion.Item>
-                            </Accordion>
-                        </Col>
-                    </Row>
+                    {RolProvider !== 'consultor' && (
+                        <Row>
+                            <Col>
+                                <Accordion className="mb-5">
+                                    <Accordion.Item eventKey="0">
+                                        <Accordion.Header>
+                                            Agregar plato
+                                        </Accordion.Header>
+                                        <Accordion.Body>
+                                            <AgregarPlato
+                                                salon={salon}
+                                                produccion={true}
+                                                setSemanaBase={setSemanaBase}
+                                            />
+                                        </Accordion.Body>
+                                    </Accordion.Item>
+                                </Accordion>
+                            </Col>
+                        </Row>
+                    )}
                     <Row>
                         <Col>
                             <Accordion className="mb-5">
@@ -502,32 +505,39 @@ export default function ProduccionPage() {
                     </Modal.Header>
                     <Modal.Body>¿Que accion quieres realizar?</Modal.Body>
                     <Modal.Footer>
-                        <Button
-                            onClick={() => {
-                                pasarProduccion('adelantar');
-                                handleCloseModalProduccion();
-                            }}>
-                            <ArrowReturnLeft /> Adelantar Produccion
-                        </Button>
-                        <Button
-                            onClick={() => {
-                                pasarProduccion('atrasar');
-                                handleCloseModalProduccion();
-                            }}>
-                            <ArrowReturnRight /> Atrasar Produccion
-                        </Button>
-                        <Button
-                            onClick={() => {
-                                setObservacionModal(
-                                    platoModalProduccion.comentario
-                                        ? platoModalProduccion.comentario
-                                        : ''
-                                );
-                                handleCloseModalProduccion();
-                                setShowModalObservacion(true);
-                            }}>
-                            <ChatSquareTextFill /> Agregar / Editar Comentario
-                        </Button>
+                        {RolProvider !== 'consultor' && (
+                            <Button
+                                onClick={() => {
+                                    pasarProduccion('adelantar');
+                                    handleCloseModalProduccion();
+                                }}>
+                                <ArrowReturnLeft /> Adelantar Produccion
+                            </Button>
+                        )}
+                        {RolProvider !== 'consultor' && (
+                            <Button
+                                onClick={() => {
+                                    pasarProduccion('atrasar');
+                                    handleCloseModalProduccion();
+                                }}>
+                                <ArrowReturnRight /> Atrasar Produccion
+                            </Button>
+                        )}
+                        {RolProvider !== 'consultor' && (
+                            <Button
+                                onClick={() => {
+                                    setObservacionModal(
+                                        platoModalProduccion.comentario
+                                            ? platoModalProduccion.comentario
+                                            : ''
+                                    );
+                                    handleCloseModalProduccion();
+                                    setShowModalObservacion(true);
+                                }}>
+                                <ChatSquareTextFill /> Agregar / Editar
+                                Comentario
+                            </Button>
+                        )}
                         <Button
                             variant="danger"
                             onClick={() => {

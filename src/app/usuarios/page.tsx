@@ -62,7 +62,7 @@ export default function UsuariosPage() {
         label: obtenerNombreSalon(opcion),
     }));
 
-    const roles = ['admin', 'usuario'].map((opcion: string) => ({
+    const roles = ['admin', 'editor', 'consultor'].map((opcion: string) => ({
         value: opcion,
         label: opcion.charAt(0).toUpperCase() + opcion.slice(1).toLowerCase(),
     }));
@@ -138,7 +138,6 @@ export default function UsuariosPage() {
                 fetch('/api/usuarios')
                     .then((res) => res.json())
                     .then((data) => {
-                        console.log(data);
                         return data;
                     })
                     .then(({ users }) => setUsers(users));
@@ -167,7 +166,6 @@ export default function UsuariosPage() {
                 fetch('/api/usuarios')
                     .then((res) => res.json())
                     .then((data) => {
-                        console.log(data);
                         return data;
                     })
                     .then(({ users }) => setUsers(users));
@@ -225,8 +223,6 @@ export default function UsuariosPage() {
 
     const agregarUsuario = () => {
         const { username, rol, salon } = user;
-
-        console.log(user);
 
         if (!username) {
             toast.error('El nombre de usuario es obligatorio', {

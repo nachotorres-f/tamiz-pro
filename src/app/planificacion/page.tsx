@@ -21,11 +21,11 @@ import { addDays, format, startOfWeek } from 'date-fns';
 import React from 'react';
 // import { FiltroPlatos } from '@/components/filtroPlatos';
 // import { SelectorDias } from '@/components/selectorDias';
-import { NavegacionSemanal } from '@/components/navegacionSemanal';
+// import { NavegacionSemanal } from '@/components/navegacionSemanal';
 import { TablaPlanificacion } from '@/components/tablaPlanificacion';
 import AgregarPlato from '@/components/agregarPlato';
 import { Slide, toast, ToastContainer } from 'react-toastify';
-import { SalonContext } from '@/components/filtroPlatos';
+import { RolContext, SalonContext } from '@/components/filtroPlatos';
 import { Loading } from '@/components/loading';
 
 export interface EventoPlanificacion {
@@ -39,6 +39,7 @@ export interface EventoPlanificacion {
 
 export default function PlanificacionPage() {
     const filtroSalon = useContext(SalonContext);
+    const RolProvider = useContext(RolContext);
 
     const [semanaBase, setSemanaBase] = useState(new Date());
     const [diasSemana, setDiasSemana] = useState<Date[]>([]);
@@ -257,29 +258,30 @@ export default function PlanificacionPage() {
 
                 {/* EVENTOS */}
 
-                <Container>
-                    <Row>
-                        <Col>
-                            <Accordion className="mb-5">
-                                <Accordion.Item eventKey="0">
-                                    <Accordion.Header>
-                                        Agregar plato
-                                    </Accordion.Header>
-                                    <Accordion.Body>
-                                        <AgregarPlato
-                                            salon={filtroSalon || 'A'}
-                                            produccion={false}
-                                            setSemanaBase={setSemanaBase}
-                                        />
-                                    </Accordion.Body>
-                                </Accordion.Item>
-                            </Accordion>
-                        </Col>
-                    </Row>
+                {RolProvider !== 'consultor' && (
+                    <Container>
+                        <Row>
+                            <Col>
+                                <Accordion className="mb-5">
+                                    <Accordion.Item eventKey="0">
+                                        <Accordion.Header>
+                                            Agregar plato
+                                        </Accordion.Header>
+                                        <Accordion.Body>
+                                            <AgregarPlato
+                                                salon={filtroSalon || 'A'}
+                                                produccion={false}
+                                                setSemanaBase={setSemanaBase}
+                                            />
+                                        </Accordion.Body>
+                                    </Accordion.Item>
+                                </Accordion>
+                            </Col>
+                        </Row>
 
-                    <Row>
-                        <Col xs={4}>
-                            {/* <Row>
+                        <Row>
+                            <Col xs={4}>
+                                {/* <Row>
                                 <Col>
                                     <Form.Group>
                                         <Form.Label>
@@ -304,41 +306,42 @@ export default function PlanificacionPage() {
                                     </Form.Group>
                                 </Col>
                             </Row> */}
-                        </Col>
-                        <Col>
-                            {/* <TablaEventosPlanificacion
+                            </Col>
+                            <Col>
+                                {/* <TablaEventosPlanificacion
                                 diasSemana={diasSemana}
                                 diaActivo={diaActivo}
                                 filtroSalon={filtroSalon}
                                 // anchoColumna={anchoButton + anchoPlato + anchoTotal}
                             /> */}
-                        </Col>
-                    </Row>
+                            </Col>
+                        </Row>
 
-                    <Row>
-                        <Col xs={4}>
-                            <Button
-                                type="button"
-                                className="btn btn-success mb-3"
-                                onClick={handleGuardarProduccion}>
-                                Guardar Cambios
-                            </Button>
-                            <Button
-                                type="button"
-                                className="btn btn-primary mb-3 ms-2"
-                                onClick={handleLimpiarProduccion}>
-                                Limpiar cambios
-                            </Button>
-                        </Col>
-                        <Col xs={4}></Col>
-                        <Col xs={4}>
-                            <NavegacionSemanal
+                        <Row>
+                            <Col xs={4}>
+                                <Button
+                                    type="button"
+                                    className="btn btn-success mb-3"
+                                    onClick={handleGuardarProduccion}>
+                                    Guardar Cambios
+                                </Button>
+                                <Button
+                                    type="button"
+                                    className="btn btn-primary mb-3 ms-2"
+                                    onClick={handleLimpiarProduccion}>
+                                    Limpiar cambios
+                                </Button>
+                            </Col>
+                            <Col xs={4}></Col>
+                            <Col xs={4}>
+                                {/* <NavegacionSemanal
                                 semanaBase={semanaBase}
                                 setSemanaBase={setSemanaBase}
-                            />
-                        </Col>
-                    </Row>
-                </Container>
+                            /> */}
+                            </Col>
+                        </Row>
+                    </Container>
+                )}
             </Container>
 
             <div

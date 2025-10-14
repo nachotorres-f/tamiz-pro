@@ -6,7 +6,7 @@ import './globals.css';
 import AppNavbar from '../components/navbar';
 import { usePathname } from 'next/navigation';
 import React from 'react';
-import { SalonContext } from '@/components/filtroPlatos';
+import { RolProvider, SalonContext } from '@/components/filtroPlatos';
 
 const geistSans = Geist({
     variable: '--font-geist-sans',
@@ -24,6 +24,7 @@ export default function RootLayout({
     children: React.ReactNode;
 }>) {
     const [salon, setSalon] = React.useState<string>('A');
+    const [rol, setRol] = React.useState<string>('');
     const pathname = usePathname();
 
     return (
@@ -39,16 +40,19 @@ export default function RootLayout({
                     backgroundColor: pathname === '/acceso' ? '#1C1C1C' : '',
                 }}
                 className={`${geistSans.variable} ${geistMono.variable}`}>
-                <SalonContext.Provider value={salon}>
-                    {pathname !== '/acceso' && (
-                        <AppNavbar
-                            pathname={pathname}
-                            salon={salon}
-                            setSalon={setSalon}
-                        />
-                    )}
-                    {children}
-                </SalonContext.Provider>
+                <RolProvider rol={rol}>
+                    <SalonContext.Provider value={salon}>
+                        {pathname !== '/acceso' && (
+                            <AppNavbar
+                                pathname={pathname}
+                                salon={salon}
+                                setSalon={setSalon}
+                                setRol={setRol}
+                            />
+                        )}
+                        {children}
+                    </SalonContext.Provider>
+                </RolProvider>
             </body>
         </html>
     );

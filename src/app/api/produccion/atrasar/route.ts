@@ -21,8 +21,6 @@ export async function POST(req: NextRequest) {
         );
     }
 
-    console.log(plato, cantidad, fecha, platoPadre);
-
     const data = await prisma.produccion.findFirst({
         where: {
             plato,

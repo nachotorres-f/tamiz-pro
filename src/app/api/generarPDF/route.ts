@@ -43,8 +43,6 @@ export async function GET(req: NextRequest) {
             },
         });
 
-        console.log('PRODUCCIONES', producciones);
-
         async function fetchIngredientesRecursivos(
             nombreProducto: string
         ): Promise<any[]> {
@@ -74,8 +72,6 @@ export async function GET(req: NextRequest) {
         }
 
         const ingredientes = await fetchIngredientesRecursivos(plato || '');
-
-        console.log('INGREDIENTES', ingredientes);
 
         function buildTableData(
             ingredientes: any[],
@@ -117,20 +113,12 @@ export async function GET(req: NextRequest) {
 
         const tableData = buildTableData(ingredientes);
 
-        console.log('TABLE DTA', tableData);
-
         const data = producciones.map((produccion) => {
-            console.log('PRE DATA', produccion);
             return {
                 ...produccion,
                 ingredientes: tableData, // Si cada producción tiene ingredientes distintos, deberías obtenerlos aquí
             };
         });
-        producciones.forEach((produccion) => {
-            console.log('POST DATA', produccion);
-        });
-
-        console.log('DATA', data);
 
         return NextResponse.json({ data }, { status: 200 });
     } catch {

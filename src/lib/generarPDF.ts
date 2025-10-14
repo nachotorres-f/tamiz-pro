@@ -53,12 +53,9 @@ export const generarPDFReceta = async (
     }
 
     if (modo === 'separado') {
-        console.log(data);
-
         const zip = new JSZip();
 
         for (const plato of data) {
-            console.log(plato);
             const doc = new jsPDF();
 
             const yPosition = renderEncabezado(doc);

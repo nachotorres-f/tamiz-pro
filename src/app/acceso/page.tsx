@@ -41,8 +41,6 @@ export default function LoginPage() {
 
             const data = await res.json();
 
-            console.log(data);
-
             if (!res.ok) {
                 setErrors({ auth: data.message || 'Credenciales incorrectas' });
                 return;

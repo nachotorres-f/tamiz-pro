@@ -20,10 +20,12 @@ export default function AppNavbar({
     pathname,
     salon,
     setSalon,
+    setRol,
 }: {
     pathname: string;
     salon: string;
     setSalon: (salon: string) => void;
+    setRol: (rol: string) => void;
 }) {
     const router = useRouter();
     const [user, setUser] = useState<User>({ rol: '', username: '' });
@@ -43,11 +45,13 @@ export default function AppNavbar({
                 }
 
                 setUser(data.user);
+                const rolData = data.user?.rol || '';
                 const salonData =
                     data.user?.salon === '0' ? 'A' : data.user?.salon;
                 setSalon(salonData);
+                setRol(rolData);
             });
-    }, [setSalon, router]);
+    }, [setSalon, setRol, router]);
 
     function handleSalonChange(): void {
         const salonChange = salon === 'A' ? 'B' : 'A';

@@ -5,7 +5,6 @@ export async function GET(req: Request) {
     process.env.TZ = 'America/Argentina/Buenos_Aires';
 
     const cookies = req.headers.get('cookie') || '';
-    console.log(cookies);
     const token = cookies
         .split('; ')
         .find((cookie) => cookie.startsWith('token='))

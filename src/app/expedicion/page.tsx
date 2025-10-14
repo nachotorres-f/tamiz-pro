@@ -12,11 +12,12 @@ import bootstrap5Plugin from '@fullcalendar/bootstrap5';
 import esLocale from '@fullcalendar/core/locales/es';
 import { addDays, format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { SalonContext } from '@/components/filtroPlatos';
+import { RolContext, SalonContext } from '@/components/filtroPlatos';
 import { Loading } from '@/components/loading';
 
 export default function ExpedicionPage() {
     const salon = useContext(SalonContext);
+    const RolProvider = useContext(RolContext);
 
     const [events, setEvents] = React.useState<any[]>([]);
     const [, setData] = React.useState<any[]>([]);
@@ -225,6 +226,7 @@ export default function ExpedicionPage() {
                                     type="checkbox"
                                     id={`${i}`}
                                     label={`Marcar todas`}
+                                    disabled={RolProvider === 'consultor'}
                                     checked={data.every(
                                         (ingrediente) => ingrediente.check
                                     )}
@@ -254,6 +256,10 @@ export default function ExpedicionPage() {
                                                             type="checkbox"
                                                             id={`${item.codigo}${item.subCodigo}`}
                                                             label={``}
+                                                            disabled={
+                                                                RolProvider ===
+                                                                'consultor'
+                                                            }
                                                             checked={item.check}
                                                             onChange={(e) => {
                                                                 checkExpedicion(

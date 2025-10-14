@@ -33,3 +33,15 @@ export function SalonProvider({
         <SalonContext.Provider value={salon}>{children}</SalonContext.Provider>
     );
 }
+
+export const RolContext = React.createContext<string>('');
+
+export function RolProvider({
+    rol,
+    children,
+}: {
+    rol: string;
+    children: React.ReactNode;
+}) {
+    return <RolContext.Provider value={rol}>{children}</RolContext.Provider>;
+}

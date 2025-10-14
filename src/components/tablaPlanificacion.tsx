@@ -1,13 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { Button, FloatingLabel, Form, Modal, Table } from 'react-bootstrap';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { PlatoDetalle } from './platoDetalle';
 import { ChatRightText } from 'react-bootstrap-icons';
 import { EventoPlanificacion } from '@/app/planificacion/page';
+import { RolContext } from './filtroPlatos';
 
 export function TablaPlanificacion({
     pageOcultos,
@@ -52,6 +53,8 @@ export function TablaPlanificacion({
     setPlatoExpandido: (value: string | null) => void;
     setEventoAdelantado: (value: number) => void;
 }) {
+    const RolProvider = useContext(RolContext);
+
     const [ocultos, setOcultos] = React.useState<Set<string>>(new Set());
     const [show, setShow] = useState(false);
     const [platoModal, setPlatoModal] = useState('');
@@ -213,39 +216,41 @@ export function TablaPlanificacion({
                         }}>
                         Cerrar
                     </Button>
-                    <Button
-                        variant="primary"
-                        onClick={() => {
-                            const obsExistente = observaciones.find(
-                                (o) =>
-                                    o.plato === platoModal &&
-                                    o.platoPadre === platoPadreModal
-                            );
-                            if (obsExistente) {
-                                obsExistente.observacion = observacionModal;
-                                setObservaciones([
-                                    ...observaciones.filter(
-                                        (o) =>
-                                            o.plato !== platoModal &&
-                                            o.platoPadre !== platoPadreModal
-                                    ),
-                                    obsExistente,
-                                ]);
-                            } else {
-                                setObservaciones([
-                                    ...observaciones,
-                                    {
-                                        plato: platoModal,
-                                        platoPadre: platoPadreModal,
-                                        observacion: observacionModal,
-                                    },
-                                ]);
-                            }
-                            setObservacionModal('');
-                            handleClose();
-                        }}>
-                        Guardar Cambios
-                    </Button>
+                    {RolProvider !== 'consultor' && (
+                        <Button
+                            variant="primary"
+                            onClick={() => {
+                                const obsExistente = observaciones.find(
+                                    (o) =>
+                                        o.plato === platoModal &&
+                                        o.platoPadre === platoPadreModal
+                                );
+                                if (obsExistente) {
+                                    obsExistente.observacion = observacionModal;
+                                    setObservaciones([
+                                        ...observaciones.filter(
+                                            (o) =>
+                                                o.plato !== platoModal &&
+                                                o.platoPadre !== platoPadreModal
+                                        ),
+                                        obsExistente,
+                                    ]);
+                                } else {
+                                    setObservaciones([
+                                        ...observaciones,
+                                        {
+                                            plato: platoModal,
+                                            platoPadre: platoPadreModal,
+                                            observacion: observacionModal,
+                                        },
+                                    ]);
+                                }
+                                setObservacionModal('');
+                                handleClose();
+                            }}>
+                            Guardar Cambios
+                        </Button>
+                    )}
                 </Modal.Footer>
             </Modal>
 
@@ -638,6 +643,11 @@ export function TablaPlanificacion({
                                                 return (
                                                     <td
                                                         onClick={() => {
+                                                            if (
+                                                                RolProvider ===
+                                                                'consultor'
+                                                            )
+                                                                return;
                                                             setAdelantarEvento(
                                                                 evento.id
                                                             );
@@ -818,6 +828,10 @@ export function TablaPlanificacion({
                                                             }>
                                                             <Form.Control
                                                                 type="number"
+                                                                disabled={
+                                                                    RolProvider ===
+                                                                    'consultor'
+                                                                }
                                                                 style={{
                                                                     width: '100%',
                                                                     color: updateCant

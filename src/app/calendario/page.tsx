@@ -41,6 +41,12 @@ export default function CalendarioPage() {
             });
     }, [salon]);
 
+    useEffect(() => {
+        fetch('/api/recetas').catch((error) => {
+            console.error('Error fetching recetas:', error);
+        });
+    });
+
     if (loading) {
         return <Loading />;
     }
