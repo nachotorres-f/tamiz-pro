@@ -1,183 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// import { prisma } from '@/lib/prisma';
-// import { NextRequest, NextResponse } from 'next/server';
-// import { format, startOfWeek, addDays } from 'date-fns';
-
 import { NextRequest, NextResponse } from 'next/server';
 import { startOfWeek, addDays, format } from 'date-fns';
 import { prisma } from '@/lib/prisma'; // Asumiendo que tienes prisma configurado
-// import { calcularIngredientesPT } from '@/lib/calculations'; // Asumiendo la función externa
 
-// Tipos
-interface Receta {
-    nombreProducto: string;
-    descripcion: string;
-    tipo: 'PT' | 'MP';
-    porcionBruta: number;
-}
-
-interface PlatoEvento {
-    comandaId: number;
-    plato: string;
-    fecha: string;
-    cantidad: number;
-    gestionado: boolean;
-    lugar: string;
-}
-
-// Constantes
-const TIMEZONE = 'America/Argentina/Buenos_Aires';
-const DIAS_SEMANA = 9;
-const TIPO_RECETA_PT = 'PT';
-const DIAS_PRODUCCION_EXTRA = { anterior: 5, posterior: 9 };
-
-// Funciones auxiliares
-function validarFechaInicio(fechaInicio: string | null): Date {
-    if (!fechaInicio) {
-        throw new Error('fechaInicio es requerido');
-    }
-    return new Date(fechaInicio);
-}
-
-function calcularRangoSemana(fechaInicio: string): Date {
-    const fechaBase = validarFechaInicio(fechaInicio);
-    return startOfWeek(fechaBase, { weekStartsOn: 1 }); // Lunes como inicio de semana
-    return startOfWeek(addDays(fechaBase, DIAS_SEMANA), { weekStartsOn: 1 }); // Lunes como inicio de semana
-}
-
-async function obtenerNombresRecetasPT(): Promise<Set<string>> {
-    const recetasPT = await prisma.receta.findMany({
-        where: { tipo: TIPO_RECETA_PT },
-        select: { nombreProducto: true },
-    });
-
-    return new Set(recetasPT.map((receta) => receta.nombreProducto));
-}
-
-async function obtenerEventosSemana(
-    inicio: Date,
-    nombresPT: Set<string>,
-    salon: string,
-    ciclo13: boolean
-) {
-    const lugares = ['El Central', 'La Rural'];
-    const usarNotIn = salon === 'A';
-
-    return prisma.comanda.findMany({
-        where: {
-            OR: [
-                {
-                    // condición 1: fecha + plato
-                    fecha: {
-                        gte: inicio,
-                        lte: addDays(
-                            inicio,
-                            ciclo13 ? DIAS_SEMANA : DIAS_SEMANA - 2
-                        ),
-                    },
-                    lugar: usarNotIn ? { notIn: lugares } : { in: lugares },
-                    Plato: {
-                        some: {
-                            nombre: { in: Array.from(nombresPT) },
-                        },
-                    },
-                },
-                {
-                    // condición 2: id = 1
-                    id: 1,
-                },
-            ],
-        },
-        include: {
-            Plato: true,
-        },
-    });
-}
-
-function procesarEventosAPlatos(
-    eventos: any[],
-    nombresPT: Set<string>
-): PlatoEvento[] {
-    const resultado: PlatoEvento[] = [];
-
-    for (const evento of eventos) {
-        for (const plato of evento.Plato) {
-            if (nombresPT.has(plato.nombre)) {
-                if (evento.id === 1) {
-                    // Si el plato tiene una fecha específica, usarla
-                    const fecha = format(new Date(plato.fecha), 'yyyy-MM-dd');
-
-                    resultado.push({
-                        comandaId: evento.id,
-                        plato: plato.nombre,
-                        fecha: format(addDays(fecha, 3), 'yyyy-MM-dd'),
-                        cantidad: plato.cantidad,
-                        gestionado: false,
-                        lugar: '',
-                    });
-                } else {
-                    resultado.push({
-                        comandaId: evento.id,
-                        plato: plato.nombre,
-                        fecha: format(addDays(evento.fecha, 1), 'yyyy-MM-dd'),
-                        cantidad: plato.cantidad,
-                        gestionado: plato.gestionado || false,
-                        lugar: evento.lugar,
-                    });
-                }
-            }
-        }
-    }
-
-    return resultado.sort((a, b) => a.plato.localeCompare(b.plato));
-}
-
-async function obtenerRecetas(): Promise<Receta[]> {
-    const recetasRaw = await prisma.receta.findMany({});
-
-    return recetasRaw.map((receta) => ({
-        nombreProducto: receta.nombreProducto,
-        descripcion: receta.descripcion,
-        tipo: receta.tipo as 'PT' | 'MP',
-        porcionBruta: receta.porcionBruta,
-    }));
-}
-
-async function calcularIngredientesConFormato(
-    platos: PlatoEvento[],
-    recetas: Receta[]
-) {
-    const ingredientes = await calcularIngredientesPT(platos, recetas);
-
-    return ingredientes.map((ingrediente) => ({
-        ...ingrediente,
-        cantidad: parseFloat(ingrediente.cantidad.toFixed(2)),
-    }));
-}
-
-async function obtenerProduccion(inicio: Date, salon: string) {
-    return prisma.produccion.findMany({
-        where: {
-            fecha: {
-                gte: addDays(inicio, -DIAS_PRODUCCION_EXTRA.anterior),
-                lte: addDays(inicio, DIAS_PRODUCCION_EXTRA.posterior),
-            },
-            salon: salon,
-        },
-    });
-}
-
-// Función principal del endpoint
 export async function GET(req: NextRequest) {
-    // Configurar zona horaria
     process.env.TZ = TIMEZONE;
 
     try {
-        // Extraer y validar parámetros
         const { searchParams } = req.nextUrl;
         const fechaInicio = searchParams.get('fechaInicio');
         const salon = searchParams.get('salon') || 'A';
-        const ciclo13 = searchParams.get('ciclo13') === 'true';
 
         if (!fechaInicio) {
             return NextResponse.json(
@@ -202,12 +34,7 @@ export async function GET(req: NextRequest) {
         ]);
 
         // Obtener eventos de la semana
-        const eventos = await obtenerEventosSemana(
-            inicio,
-            nombresPT,
-            salon,
-            ciclo13
-        );
+        const eventos = await obtenerEventosSemana(inicio, nombresPT, salon);
 
         // Procesar eventos a platos
         const platos = procesarEventosAPlatos(eventos, nombresPT);
@@ -232,93 +59,6 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: mensaje }, { status });
     }
 }
-
-// export async function GET(req: NextRequest) {
-//     process.env.TZ = 'America/Argentina/Buenos_Aires';
-
-//     const { searchParams } = req.nextUrl;
-//     const fechaInicio = searchParams.get('fechaInicio');
-
-//     if (!fechaInicio) {
-//         return NextResponse.json(
-//             { error: 'fechaInicio es requerido' },
-//             { status: 400 }
-//         );
-//     }
-
-//     const inicio = startOfWeek(new Date(addDays(fechaInicio, 7)), {
-//         weekStartsOn: 0,
-//     }); //lunes
-
-//     // Obtener todos los nombres de recetas PT de una vez
-//     const recetasPT = await prisma.receta.findMany({
-//         where: { tipo: 'PT' },
-//         select: { nombreProducto: true },
-//     });
-//     const nombresPT = new Set(recetasPT.map((r) => r.nombreProducto));
-
-//     // Traer solo los eventos/platos que coinciden con recetas PT
-//     const eventos = await prisma.comanda.findMany({
-//         where: {
-//             fecha: { gte: inicio, lte: addDays(inicio, 7) },
-//             Plato: {
-//                 some: {
-//                     nombre: { in: Array.from(nombresPT) },
-//                 },
-//             },
-//         },
-//         include: {
-//             Plato: true,
-//         },
-//     });
-
-//     const resultado: {
-//         plato: string;
-//         fecha: string;
-//         cantidad: number;
-//         gestionado: boolean;
-//         lugar: string;
-//     }[] = [];
-
-//     for (const evento of eventos) {
-//         for (const plato of evento.Plato) {
-//             if (nombresPT.has(plato.nombre)) {
-//                 resultado.push({
-//                     plato: plato.nombre,
-//                     fecha: format(addDays(evento.fecha, 2), 'yyyy-MM-dd'),
-//                     cantidad: plato.cantidad,
-//                     gestionado: plato.gestionado || false,
-//                     lugar: evento.lugar,
-//                 });
-//             }
-//         }
-//     }
-
-//     const recetasRaw = await prisma.receta.findMany({});
-//     const recetas: Receta[] = recetasRaw.map((r) => ({
-//         nombreProducto: r.nombreProducto,
-//         descripcion: r.descripcion,
-//         tipo: r.tipo as 'PT' | 'MP',
-//         porcionBruta: r.porcionBruta,
-//     }));
-
-//     const ingredientes = (await calcularIngredientesPT(resultado, recetas)).map(
-//         (i) => ({
-//             ...i,
-//             cantidad: parseFloat(i.cantidad.toFixed(2)), // Aseguramos que la cantidad sea un número con dos decimales
-//         })
-//     );
-
-//     const produccion = await prisma.produccion.findMany({
-//         where: {
-//             fecha: { gte: addDays(inicio, -1), lte: addDays(inicio, 9) },
-//         },
-//     });
-
-//     resultado.sort((a, b) => a.plato.localeCompare(b.plato));
-
-//     return NextResponse.json({ planifacion: ingredientes, produccion });
-// }
 
 export async function POST(req: NextRequest) {
     process.env.TZ = 'America/Argentina/Buenos_Aires';
@@ -422,14 +162,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: 'Producción actualizada' });
 }
 
-// type Plato = {
-//     comandaId: number;
-//     plato: string;
-//     fecha: string;
-//     cantidad: number;
-//     lugar: string;
-// };
-
 type Resultado = {
     plato: string;
     platoPadre: string;
@@ -506,4 +238,182 @@ async function calcularIngredientesPT(
     }
 
     return Array.from(agrupado.values());
+}
+
+// Tipos
+interface Receta {
+    nombreProducto: string;
+    descripcion: string;
+    tipo: 'PT' | 'MP';
+    porcionBruta: number;
+}
+
+interface PlatoEvento {
+    comandaId: number;
+    plato: string;
+    fecha: string;
+    cantidad: number;
+    gestionado: boolean;
+    lugar: string;
+}
+
+// Constantes
+const TIMEZONE = 'America/Argentina/Buenos_Aires';
+const DIAS_SEMANA = 9;
+const TIPO_RECETA_PT = 'PT';
+const DIAS_PRODUCCION_EXTRA = { anterior: 5, posterior: 9 };
+
+// Funciones auxiliares
+function validarFechaInicio(fechaInicio: string | null): Date {
+    if (!fechaInicio) {
+        throw new Error('fechaInicio es requerido');
+    }
+    return new Date(fechaInicio);
+}
+
+function calcularRangoSemana(fechaInicio: string): Date {
+    const fechaBase = validarFechaInicio(fechaInicio);
+    return startOfWeek(fechaBase, { weekStartsOn: 1 }); // Lunes como inicio de semana
+    return startOfWeek(addDays(fechaBase, DIAS_SEMANA), { weekStartsOn: 1 }); // Lunes como inicio de semana
+}
+
+async function obtenerNombresRecetasPT(): Promise<Set<string>> {
+    const recetasPT = await prisma.receta.findMany({
+        where: { tipo: TIPO_RECETA_PT },
+        select: { nombreProducto: true },
+    });
+
+    return new Set(recetasPT.map((receta) => receta.nombreProducto));
+}
+
+async function obtenerEventosSemana(
+    inicio: Date,
+    nombresPT: Set<string>,
+    salon: string
+) {
+    const lugares = ['El Central', 'La Rural'];
+    const usarNotIn = salon === 'A';
+
+    return prisma.comanda.findMany({
+        where: {
+            OR: [
+                {
+                    // condición 1: fecha + plato
+                    fecha: {
+                        gte: inicio,
+                        lte: addDays(inicio, 7),
+                    },
+                    lugar: usarNotIn ? { notIn: lugares } : { in: lugares },
+                    Plato: {
+                        some: {
+                            nombre: { in: Array.from(nombresPT) },
+                        },
+                    },
+                },
+                {
+                    lugar: usarNotIn ? { notIn: lugares } : { in: lugares },
+                    Plato: {
+                        some: {
+                            nombre: { in: Array.from(nombresPT) },
+                            fecha: {
+                                gte: addDays(inicio, 8),
+                            },
+                        },
+                    },
+                },
+                {
+                    // condición 2: id = 1
+                    id: 1,
+                },
+            ],
+        },
+        include: {
+            Plato: {
+                where: {
+                    OR: [
+                        {
+                            fecha: null,
+                            comanda: {
+                                fecha: {
+                                    gte: inicio,
+                                    lte: addDays(inicio, 7),
+                                },
+                            },
+                        },
+                        {
+                            fecha: {
+                                gte: addDays(inicio, 8),
+                            },
+                            comanda: {
+                                fecha: {
+                                    gte: addDays(inicio, 8),
+                                },
+                            },
+                        },
+                    ],
+                },
+            },
+        },
+    });
+}
+
+function procesarEventosAPlatos(
+    eventos: any[],
+    nombresPT: Set<string>
+): PlatoEvento[] {
+    const resultado: PlatoEvento[] = [];
+
+    for (const evento of eventos) {
+        for (const plato of evento.Plato) {
+            if (nombresPT.has(plato.nombre)) {
+                resultado.push({
+                    comandaId: evento.id,
+                    plato: plato.nombre,
+                    fecha: plato.fecha
+                        ? format(addDays(plato.fecha, 1), 'yyyy-MM-dd')
+                        : format(addDays(evento.fecha, 1), 'yyyy-MM-dd'),
+                    cantidad: plato.cantidad,
+                    gestionado: plato.gestionado || false,
+                    lugar: evento.lugar,
+                });
+            }
+        }
+    }
+
+    return resultado.sort((a, b) => a.plato.localeCompare(b.plato));
+}
+
+async function obtenerRecetas(): Promise<Receta[]> {
+    const recetasRaw = await prisma.receta.findMany({});
+
+    return recetasRaw.map((receta) => ({
+        nombreProducto: receta.nombreProducto,
+        descripcion: receta.descripcion,
+        tipo: receta.tipo as 'PT' | 'MP',
+        porcionBruta: receta.porcionBruta,
+    }));
+}
+
+async function calcularIngredientesConFormato(
+    platos: PlatoEvento[],
+    recetas: Receta[]
+) {
+    const ingredientes = await calcularIngredientesPT(platos, recetas);
+
+    return ingredientes.map((ingrediente) => ({
+        ...ingrediente,
+        cantidad: parseFloat(ingrediente.cantidad.toFixed(2)),
+    }));
+}
+
+async function obtenerProduccion(inicio: Date, salon: string) {
+    return prisma.produccion.findMany({
+        where: {
+            fecha: {
+                gte: addDays(inicio, -DIAS_PRODUCCION_EXTRA.anterior),
+                lte: addDays(inicio, DIAS_PRODUCCION_EXTRA.posterior),
+            },
+            salon: salon,
+        },
+    });
 }

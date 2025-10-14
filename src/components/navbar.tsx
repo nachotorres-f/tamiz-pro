@@ -1,10 +1,4 @@
-import {
-    Navbar,
-    Nav,
-    Container,
-    Button,
-    ToastContainer,
-} from 'react-bootstrap';
+import { Navbar, Nav, Button, ToastContainer } from 'react-bootstrap';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import logo from '../../public/logo_white.png'; // Adjust the path as necessary
@@ -19,6 +13,7 @@ interface Route {
 
 interface User {
     rol: string;
+    username: string;
 }
 
 export default function AppNavbar({
@@ -31,7 +26,7 @@ export default function AppNavbar({
     setSalon: (salon: string) => void;
 }) {
     const router = useRouter();
-    const [user, setUser] = useState<User>({ rol: '' });
+    const [user, setUser] = useState<User>({ rol: '', username: '' });
 
     const handleLogout = async () => {
         await fetch('/api/logout', { method: 'POST' });
@@ -42,12 +37,17 @@ export default function AppNavbar({
         fetch('/api/usuarios/actual')
             .then((res) => res.json())
             .then((data) => {
+                if (!data.user) {
+                    router.push('/acceso');
+                    return;
+                }
+
                 setUser(data.user);
                 const salonData =
                     data.user?.salon === '0' ? 'A' : data.user?.salon;
                 setSalon(salonData);
             });
-    }, [setSalon]);
+    }, [setSalon, router]);
 
     function handleSalonChange(): void {
         const salonChange = salon === 'A' ? 'B' : 'A';
@@ -99,55 +99,56 @@ export default function AppNavbar({
             variant="dark"
             expand="lg"
             style={{ height: '10vh' }}>
-            <Container>
-                <ToastContainer />
-                <Navbar.Brand>
-                    <Image
-                        src={logo}
-                        alt="Tamiz Comidas"
-                        style={{
-                            height: '100%',
-                            maxHeight: '50px',
-                            width: 'auto',
-                        }}
-                        className="d-inline-block align-top"
-                        onClick={() => router.push('/calendario')}
-                    />
-                </Navbar.Brand>
-                <Navbar.Toggle aria-controls="basic-navbar-nav" />
-                <Navbar.Collapse id="basic-navbar-nav">
-                    <Nav className="me-auto">
-                        {routeList.map(({ path, title }) => (
-                            <Nav.Link
-                                active={pathname === path}
-                                key={path}
-                                onClick={() => router.push(path)}>
-                                {title}
-                            </Nav.Link>
-                        ))}
-                    </Nav>
+            <ToastContainer />
+            <Navbar.Brand>
+                <Image
+                    src={logo}
+                    alt="Tamiz Comidas"
+                    style={{
+                        height: '100%',
+                        maxHeight: '50px',
+                        width: 'auto',
+                    }}
+                    className="d-inline-block align-top ms-3"
+                    onClick={() => router.push('/calendario')}
+                />
+            </Navbar.Brand>
+            <Navbar.Toggle aria-controls="basic-navbar-nav" />
+            <Navbar.Collapse id="basic-navbar-nav">
+                <Nav className="me-auto">
+                    {routeList.map(({ path, title }) => (
+                        <Nav.Link
+                            active={pathname === path}
+                            key={path}
+                            onClick={() => router.push(path)}>
+                            {title}
+                        </Nav.Link>
+                    ))}
+                </Nav>
 
-                    <p className="text-white align-self-center mt-3 me-2 fw-bold">
-                        {obtenerNombreSalon(salon)}
-                    </p>
+                <p className="text-white align-self-center mt-3 me-2 fw-bold">
+                    {obtenerNombreSalon(salon)}
+                </p>
 
-                    {user?.rol === 'admin' && (
-                        <Button
-                            variant="light"
-                            className="me-2 d-block btn-sm"
-                            onClick={handleSalonChange}>
-                            Cambiar salon
-                        </Button>
-                    )}
-
+                {user?.rol === 'admin' && (
                     <Button
-                        variant="outline-light"
-                        className="d-block btn-sm"
-                        onClick={handleLogout}>
-                        Cerrar sesión
+                        variant="light"
+                        className="me-2 d-block btn-sm"
+                        onClick={handleSalonChange}>
+                        Cambiar salon
                     </Button>
-                </Navbar.Collapse>
-            </Container>
+                )}
+
+                <Button
+                    variant="outline-light"
+                    className="d-block btn-sm"
+                    onClick={handleLogout}>
+                    Cerrar sesión
+                </Button>
+                <p className="text-white align-self-center mt-3 mx-3 fw-bold">
+                    {user?.username}
+                </p>
+            </Navbar.Collapse>
         </Navbar>
     );
 }

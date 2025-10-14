@@ -90,6 +90,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = req.nextUrl;
     const fechaInicio = searchParams.get('fechaInicio');
     const previa = searchParams.get('previa');
+    const salon = searchParams.get('salon');
 
     if (!fechaInicio) {
         return NextResponse.json(
@@ -112,6 +113,7 @@ export async function GET(req: NextRequest) {
             cantidad: {
                 gt: 0,
             },
+            salon,
         },
         orderBy: {
             plato: 'asc',

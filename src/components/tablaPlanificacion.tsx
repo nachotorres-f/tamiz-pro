@@ -7,6 +7,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { PlatoDetalle } from './platoDetalle';
 import { ChatRightText } from 'react-bootstrap-icons';
+import { EventoPlanificacion } from '@/app/planificacion/page';
 
 export function TablaPlanificacion({
     pageOcultos,
@@ -19,8 +20,11 @@ export function TablaPlanificacion({
     produccion,
     produccionUpdate,
     observaciones,
+    eventos,
+    maxCantidadEventosDia,
     setObservaciones,
     setProduccionUpdate,
+    setEventoAdelantado,
 }: // anchoButton,
 // anchoPlato,
 // anchoTotal,
@@ -35,6 +39,8 @@ export function TablaPlanificacion({
     produccion: any[];
     produccionUpdate: any[];
     observaciones: { plato: string; observacion: string; platoPadre: string }[];
+    eventos: EventoPlanificacion[];
+    maxCantidadEventosDia: number;
     setObservaciones: (
         value: { plato: string; observacion: string; platoPadre: string }[]
     ) => void;
@@ -44,12 +50,15 @@ export function TablaPlanificacion({
     // anchoPlato: any;
     // anchoTotal: any;
     setPlatoExpandido: (value: string | null) => void;
+    setEventoAdelantado: (value: number) => void;
 }) {
     const [ocultos, setOcultos] = React.useState<Set<string>>(new Set());
     const [show, setShow] = useState(false);
     const [platoModal, setPlatoModal] = useState('');
     const [platoPadreModal, setPlatoPadreModal] = useState('');
     const [observacionModal, setObservacionModal] = useState('');
+    const [adelantarEvento, setAdelantarEvento] = useState(0);
+    const [platosAdelantados, setPlatosAdelantados] = useState<any[]>([]);
     //const [primeraCargaModal, setPrimeraCargaModal] = useState(true);
 
     useEffect(() => {
@@ -109,6 +118,62 @@ export function TablaPlanificacion({
         return `${letraDia} ${diaNumero}-${mesNumero}`;
     };
     const handleClose = () => setShow(false);
+
+    const handleVerticalScrollLeft = (e: React.UIEvent<HTMLDivElement>) => {
+        const scrollTop = e.currentTarget.scrollTop;
+        const rigthTable = document.getElementById(
+            'right-table'
+        ) as HTMLElement;
+        if (rigthTable) {
+            rigthTable.scrollTop = scrollTop;
+        }
+    };
+
+    const handleVerticalScrollRight = (e: React.UIEvent<HTMLDivElement>) => {
+        const scrollTop = e.currentTarget.scrollTop;
+        const leftTable = document.getElementById('left-table') as HTMLElement;
+        if (leftTable) {
+            leftTable.scrollTop = scrollTop;
+        }
+    };
+
+    useEffect(() => {
+        if (adelantarEvento == 0) return;
+
+        fetch(`/api/planificacion/adelantarEvento?id=${adelantarEvento}`)
+            .then((res) => res.json())
+            .then((data) => {
+                setPlatosAdelantados(data.Plato);
+            })
+            .catch((error) => {
+                console.error('Error al adelantar el evento:', error);
+            });
+    }, [adelantarEvento]);
+
+    const handleCloseAdelantar = () => {
+        setEventoAdelantado(Math.random());
+        setAdelantarEvento(0);
+        setPlatosAdelantados([]);
+    };
+
+    const heightTd = '3rem';
+    const styleTd = {
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        verticalAlign: 'middle',
+        height: heightTd,
+        left: 0,
+        width: '2rem',
+    };
+    const styleEventos = {
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        verticalAlign: 'middle',
+        height: '3rem',
+        width: '12rem',
+    };
 
     return (
         <>
@@ -184,429 +249,669 @@ export function TablaPlanificacion({
                 </Modal.Footer>
             </Modal>
 
-            <Table
+            <Modal
+                size="lg"
+                show={adelantarEvento != 0}
+                onHide={() => handleCloseAdelantar()}>
+                <Modal.Header closeButton>
+                    <Modal.Title>Adelantar Plato Evento</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    {platosAdelantados.length > 0 ? (
+                        <Table>
+                            <thead>
+                                <tr>
+                                    <th>Nombre</th>
+                                    <th>Cantidad</th>
+                                    <th>Adelantar</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {platosAdelantados.map((plato) => (
+                                    <tr key={plato.id}>
+                                        <td>{plato.nombre}</td>
+                                        <td>{plato.cantidad}</td>
+                                        <td>
+                                            <Form.Check
+                                                type="checkbox"
+                                                checked={!!plato.fecha}
+                                                onChange={(e) => {
+                                                    const platoExistente =
+                                                        platosAdelantados.find(
+                                                            (p) =>
+                                                                p.id ===
+                                                                plato.id
+                                                        );
+                                                    if (platoExistente) {
+                                                        platoExistente.fecha = e
+                                                            .target.checked
+                                                            ? new Date()
+                                                            : null;
+                                                        setPlatosAdelantados([
+                                                            ...platosAdelantados.filter(
+                                                                (p) =>
+                                                                    p.id !==
+                                                                    plato.id
+                                                            ),
+                                                            platoExistente,
+                                                        ]);
+                                                    }
+
+                                                    fetch(
+                                                        `/api/planificacion/adelantarEvento`,
+                                                        {
+                                                            method: 'POST',
+                                                            headers: {
+                                                                'Content-Type':
+                                                                    'application/json',
+                                                            },
+                                                            body: JSON.stringify(
+                                                                {
+                                                                    id: plato.id,
+                                                                    adelantar:
+                                                                        e.target
+                                                                            .checked,
+                                                                }
+                                                            ),
+                                                        }
+                                                    );
+                                                }}
+                                            />
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </Table>
+                    ) : (
+                        <></>
+                    )}
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button
+                        variant="secondary"
+                        onClick={() => {
+                            handleCloseAdelantar();
+                        }}>
+                        Cerrar
+                    </Button>
+                </Modal.Footer>
+            </Modal>
+
+            <div
                 style={{
-                    width: '100%',
-                }}
-                className="mx-auto"
-                size="sm"
-                bordered
-                striped>
-                <thead className="table-dark sticky-top">
-                    <tr style={{ textAlign: 'center' }}>
-                        {/* <th ref={anchoButton}></th>
-                    <th ref={anchoPlato}>Plato</th>
-                    <th ref={anchoTotal}>Total</th> */}
-                        <th
-                            style={{
-                                minWidth: '3rem',
-                                // position: 'sticky',
-                                left: 0,
-                                zIndex: 4,
-                            }}></th>
-                        <th
-                            style={{
-                                minWidth: '2rem',
-                                // position: 'sticky',
-                                left: '',
-                                zIndex: 4,
-                            }}>
-                            Plato | Elaboracion
-                        </th>
-                        <th
-                            style={{
-                                minWidth: '2rem',
-                                // position: 'sticky',
-                                left: '2.8rem',
-                                zIndex: 4,
-                            }}>
-                            Plato | Semi Elaborado
-                        </th>
-                        <th
-                            style={{
-                                minWidth: '2rem',
-                                // position: 'sticky',
-                                left: '9.8rem',
-                                zIndex: 4,
-                            }}>
-                            Total
-                        </th>
-                        {diasSemana.filter(filterDias).map((dia, idx) => (
-                            <th key={idx}>
-                                {
-                                    //                                     const nombreDia = format(dia, 'EEEE', { locale: es }); // "sábado"
-                                    // const letraDia = nombreDia.charAt(0).toUpperCase();    // "S"
-                                    // const diaNumero = format(dia, 'd');                    // "5"
-                                    // const mesNumero = format(dia, 'M');                    // "7"
-                                    // const resultado = `${letraDia} ${diaNumero}-${mesNumero}`;
-                                }
-                                {formatFecha(dia)}
-                                {/* {format(dia, 'EEE d-M', {
-                                    locale: es,
-                                })}{' '} */}
-                                {/* "Sáb 5-7" */}
-                            </th>
-                        ))}
-                    </tr>
-                </thead>
-                <tbody>
-                    {platosUnicos
-                        .filter(filterPlatos)
-                        .map(({ plato, platoPadre }) => (
-                            <React.Fragment key={plato + platoPadre}>
-                                <tr style={{ textAlign: 'center' }}>
-                                    {/* <td
-                                    className="align-items-center"
+                    display: 'flex',
+                    // overflowX: 'hidden',
+                    // overflowY: 'auto',
+                    maxHeight: '90vh',
+                }}>
+                <div
+                    id="left-table"
+                    style={{
+                        flexShrink: 0,
+                        // borderCollapse: 'collapse',
+                        overflow: 'auto',
+                        position: 'sticky',
+                        left: 0,
+                        zIndex: 3,
+                    }}
+                    onScroll={handleVerticalScrollLeft}>
+                    <Table
+                        style={{
+                            width: 'max-content',
+                            borderCollapse: 'collapse',
+                        }}
+                        className="mx-auto"
+                        size="sm"
+                        bordered
+                        striped>
+                        <thead className="table-dark sticky-top">
+                            <tr
+                                style={{
+                                    textAlign: 'center',
+                                    width: 'max-content',
+                                }}>
+                                <th
                                     style={{
-                                        minWidth: '3rem',
                                         position: 'sticky',
-                                        left: '0',
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        verticalAlign: 'middle',
+                                        height: '100%',
+                                        width: 'max-content',
+                                        top: 0,
+                                        zIndex: 4,
+                                    }}></th>
+                                <th
+                                    style={{
+                                        position: 'sticky',
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        verticalAlign: 'middle',
+                                        height: '100%',
+                                        top: 0,
                                         zIndex: 4,
                                     }}>
-                                    <Button
-                                        size="sm"
-                                        variant={
-                                            platoExpandido === plato
-                                                ? 'danger'
-                                                : 'outline-primary'
-                                        }
-                                        style={{
-                                            width: '2rem',
-                                            height: '2rem',
-                                            display: 'flex',
-                                            justifyContent: 'center',
-                                            alignItems: 'center',
-                                        }}
-                                        onClick={() => {
-                                            setPlatoExpandido(
-                                                platoExpandido === plato
-                                                    ? null
-                                                    : plato
-                                            );
-                                        }}>
-                                        {platoExpandido === plato ? (
-                                            <Dash />
-                                        ) : (
-                                            <Plus />
-                                        )}
-                                    </Button>
-                                </td> */}
-                                    <td>
-                                        <Button
-                                            size="sm"
-                                            variant="primary"
-                                            style={{
-                                                width: '2rem',
-                                                height: '2rem',
-                                                display: 'flex',
-                                                justifyContent: 'center',
-                                                alignItems: 'center',
-                                            }}
-                                            onClick={() => {
-                                                const observacion =
-                                                    observaciones.find(
-                                                        (o) =>
-                                                            o.plato === plato &&
-                                                            o.platoPadre ===
-                                                                platoPadre
-                                                    )?.observacion ||
-                                                    observacionModal;
+                                    Plato
+                                </th>
+                                <th
+                                    style={{
+                                        position: 'sticky',
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        verticalAlign: 'middle',
+                                        height: '100%',
+                                        top: 0,
+                                        zIndex: 4,
+                                    }}>
+                                    Elaboracion
+                                </th>
+                                <th
+                                    style={{
+                                        position: 'sticky',
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        verticalAlign: 'middle',
+                                        height: '100%',
+                                        top: 0,
+                                        zIndex: 4,
+                                    }}>
+                                    Total
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {Array.from({ length: maxCantidadEventosDia }).map(
+                                (_, index) => (
+                                    <tr
+                                        key={`spacer-${index}`}
+                                        style={styleEventos}>
+                                        <td style={styleTd}>&nbsp;</td>
+                                        <td style={styleTd}>&nbsp;</td>
+                                        <td style={styleTd}>&nbsp;</td>
+                                        <td style={styleTd}>&nbsp;</td>
+                                    </tr>
+                                )
+                            )}
+                            {platosUnicos
+                                .filter(filterPlatos)
+                                .map(({ plato, platoPadre }) => (
+                                    <React.Fragment key={plato + platoPadre}>
+                                        <tr style={{ textAlign: 'center' }}>
+                                            <td style={styleTd}>
+                                                <Button
+                                                    size="sm"
+                                                    variant="primary"
+                                                    style={{
+                                                        width: '2rem',
+                                                        height: '2.2rem',
+                                                        display: 'flex',
+                                                        justifyContent:
+                                                            'center',
+                                                        alignItems: 'center',
+                                                    }}
+                                                    onClick={() => {
+                                                        const observacion =
+                                                            observaciones.find(
+                                                                (o) =>
+                                                                    o.plato ===
+                                                                        plato &&
+                                                                    o.platoPadre ===
+                                                                        platoPadre
+                                                            )?.observacion ||
+                                                            observacionModal;
 
-                                                if (observacion) {
-                                                    setObservacionModal(
-                                                        observacion
-                                                    );
-                                                } else {
-                                                    const prod =
-                                                        produccion.filter(
-                                                            (p) =>
-                                                                p.plato ===
-                                                                    plato &&
-                                                                p.platoPadre ===
-                                                                    platoPadre &&
-                                                                p.observacion
-                                                        );
-
-                                                    if (prod.length > 0) {
-                                                        setObservacionModal(
-                                                            prod[0].observacion
-                                                        );
-                                                    } else {
-                                                        setObservacionModal('');
-                                                    }
-                                                }
-
-                                                setPlatoModal(plato);
-                                                setPlatoPadreModal(platoPadre);
-                                                setShow(true);
-                                            }}>
-                                            <ChatRightText />
-                                        </Button>
-                                    </td>
-                                    <td>{platoPadre}</td>
-                                    <td
-                                        style={{
-                                            minWidth: '2rem',
-                                            left: '2.9rem',
-                                            width: '3rem',
-                                            zIndex: 4,
-                                        }}>
-                                        {plato}
-                                    </td>
-                                    {
-                                        <td
-                                            className={
-                                                datos
-                                                    .filter(
-                                                        (dato) =>
-                                                            dato.plato ===
-                                                                plato &&
-                                                            dato.platoPadre ===
-                                                                platoPadre
-                                                    )
-                                                    .reduce(
-                                                        (sum, d) =>
-                                                            sum + d.cantidad,
-                                                        0
-                                                    ) >
-                                                produccion
-                                                    .filter(
-                                                        (d) =>
-                                                            d.plato === plato &&
-                                                            d.platoPadre ===
-                                                                platoPadre
-                                                    )
-                                                    .reduce(
-                                                        (sum, d) =>
-                                                            sum + d.cantidad,
-                                                        0
-                                                    )
-                                                    ? 'text-danger'
-                                                    : ''
-                                            }
-                                            style={{
-                                                minWidth: '2rem',
-                                                position: 'sticky',
-                                                left: '9.8rem',
-                                                zIndex: 4,
-                                            }}>
-                                            {parseFloat(
-                                                datos
-                                                    .filter(
-                                                        (dato) =>
-                                                            dato.plato ===
-                                                                plato &&
-                                                            dato.platoPadre ===
-                                                                platoPadre
-                                                    )
-                                                    .reduce(
-                                                        (sum, d) =>
-                                                            sum + d.cantidad,
-                                                        0
-                                                    )
-                                            ).toFixed(2)}
-                                        </td>
-                                    }
-                                    {/* <td rowSpan={2}>
-                                    {(() => {
-                                        const gestionados = datos
-                                            .filter(
-                                                (dato) => dato.plato === plato
-                                            )
-                                            .map((dato) => dato.gestionado);
-                                        if (
-                                            gestionados.length === 0 ||
-                                            gestionados.every(
-                                                (g) => g === false
-                                            )
-                                        )
-                                            return 'No gestionado';
-                                        if (
-                                            gestionados.every((g) => g === true)
-                                        )
-                                            return 'Gestionado';
-                                        return 'Parcialmente gestionado';
-                                    })()}
-                                </td> */}
-                                    {diasSemana
-                                        .filter(filterDias)
-                                        .map((dia, i) => {
-                                            const diaLimpio = new Date(dia);
-                                            diaLimpio.setHours(0, 0, 0, 0);
-
-                                            const total = produccion.filter(
-                                                (d) => {
-                                                    const fecha = new Date(
-                                                        d.fecha
-                                                    );
-                                                    fecha.setHours(0, 0, 0, 0);
-                                                    fecha.setDate(
-                                                        fecha.getDate() + 1
-                                                    ); // Ajuste para comparar con el día limpio
-
-                                                    return (
-                                                        d.plato === plato &&
-                                                        d.platoPadre ===
-                                                            platoPadre &&
-                                                        fecha.getTime() ===
-                                                            diaLimpio.getTime()
-                                                    );
-                                                }
-                                            );
-
-                                            const update =
-                                                produccionUpdate.filter((d) => {
-                                                    const fecha = new Date(
-                                                        d.fecha
-                                                    );
-                                                    fecha.setHours(0, 0, 0, 0);
-                                                    fecha.setDate(
-                                                        fecha.getDate() + 1
-                                                    ); // Ajuste para comparar con el día limpio
-
-                                                    return (
-                                                        d.plato === plato &&
-                                                        d.platoPadre ===
-                                                            platoPadre &&
-                                                        fecha.getTime() ===
-                                                            diaLimpio.getTime()
-                                                    );
-                                                });
-
-                                            const totalConsumo = datos
-                                                .filter((d) => {
-                                                    const fecha = new Date(
-                                                        d.fecha
-                                                    );
-                                                    fecha.setHours(0, 0, 0, 0);
-
-                                                    return (
-                                                        d.plato === plato &&
-                                                        d.platoPadre ===
-                                                            platoPadre &&
-                                                        fecha.getTime() ===
-                                                            dia.getTime()
-                                                    );
-                                                })
-                                                .reduce(
-                                                    (sum, d) =>
-                                                        sum + d.cantidad,
-                                                    0
-                                                );
-
-                                            let cantidad = '';
-
-                                            if (total.length > 0) {
-                                                cantidad = total.reduce(
-                                                    (sum, d) =>
-                                                        sum + d.cantidad,
-                                                    0
-                                                );
-                                            }
-
-                                            let updateCant = false;
-
-                                            if (update.length > 0) {
-                                                cantidad = update.reduce(
-                                                    (sum, d) =>
-                                                        sum + d.cantidad,
-                                                    0
-                                                );
-
-                                                updateCant = true;
-                                            }
-
-                                            return (
-                                                <td
-                                                    key={
-                                                        plato + platoPadre + i
-                                                    }>
-                                                    <Form.Control
-                                                        type="number"
-                                                        style={{
-                                                            width: '5.5rem',
-                                                            color: updateCant
-                                                                ? '#ff0000'
-                                                                : '#000000',
-                                                        }}
-                                                        className="form-control form-control-sm input"
-                                                        value={cantidad}
-                                                        placeholder={
-                                                            totalConsumo
-                                                                ? totalConsumo.toString()
-                                                                : ''
-                                                        }
-                                                        step={0.1}
-                                                        min={0}
-                                                        onChange={(e) => {
-                                                            const cantidad =
-                                                                parseFloat(
-                                                                    e.target
-                                                                        .value
-                                                                );
-                                                            // if (isNaN(cantidad)) {
-                                                            //     return;
-                                                            // }
-                                                            const fecha =
-                                                                format(
-                                                                    diaLimpio,
-                                                                    'yyyy-MM-dd'
-                                                                );
-                                                            const nuevaProduccion =
-                                                                [
-                                                                    ...produccionUpdate,
-                                                                ];
-                                                            const index =
-                                                                nuevaProduccion.findIndex(
+                                                        if (observacion) {
+                                                            setObservacionModal(
+                                                                observacion
+                                                            );
+                                                        } else {
+                                                            const prod =
+                                                                produccion.filter(
                                                                     (p) =>
                                                                         p.plato ===
                                                                             plato &&
                                                                         p.platoPadre ===
                                                                             platoPadre &&
-                                                                        p.fecha ===
-                                                                            fecha
+                                                                        p.observacion
                                                                 );
 
-                                                            if (index > -1) {
-                                                                nuevaProduccion[
-                                                                    index
-                                                                ].cantidad =
-                                                                    cantidad;
+                                                            if (
+                                                                prod.length > 0
+                                                            ) {
+                                                                setObservacionModal(
+                                                                    prod[0]
+                                                                        .observacion
+                                                                );
                                                             } else {
-                                                                nuevaProduccion.push(
-                                                                    {
-                                                                        plato,
-                                                                        platoPadre,
-                                                                        fecha,
-                                                                        cantidad,
-                                                                    }
+                                                                setObservacionModal(
+                                                                    ''
                                                                 );
                                                             }
-                                                            setProduccionUpdate(
-                                                                nuevaProduccion
-                                                            );
-                                                            localStorage.setItem(
-                                                                'produccionUpdate',
-                                                                JSON.stringify(
-                                                                    nuevaProduccion
-                                                                )
+                                                        }
+
+                                                        setPlatoModal(plato);
+                                                        setPlatoPadreModal(
+                                                            platoPadre
+                                                        );
+                                                        setShow(true);
+                                                    }}>
+                                                    <ChatRightText />
+                                                </Button>
+                                            </td>
+                                            <td style={styleTd}>
+                                                {platoPadre}
+                                            </td>
+                                            <td style={styleTd}>{plato}</td>
+                                            <td
+                                                className={
+                                                    datos
+                                                        .filter(
+                                                            (dato) =>
+                                                                dato.plato ===
+                                                                    plato &&
+                                                                dato.platoPadre ===
+                                                                    platoPadre
+                                                        )
+                                                        .reduce(
+                                                            (sum, d) =>
+                                                                sum +
+                                                                d.cantidad,
+                                                            0
+                                                        ) >
+                                                    produccion
+                                                        .filter(
+                                                            (d) =>
+                                                                d.plato ===
+                                                                    plato &&
+                                                                d.platoPadre ===
+                                                                    platoPadre
+                                                        )
+                                                        .reduce(
+                                                            (sum, d) =>
+                                                                sum +
+                                                                d.cantidad,
+                                                            0
+                                                        )
+                                                        ? 'text-danger'
+                                                        : ''
+                                                }
+                                                style={styleTd}>
+                                                {parseFloat(
+                                                    datos
+                                                        .filter(
+                                                            (dato) =>
+                                                                dato.plato ===
+                                                                    plato &&
+                                                                dato.platoPadre ===
+                                                                    platoPadre
+                                                        )
+                                                        .reduce(
+                                                            (sum, d) =>
+                                                                sum +
+                                                                d.cantidad,
+                                                            0
+                                                        )
+                                                ).toFixed(2)}
+                                            </td>
+                                        </tr>
+                                    </React.Fragment>
+                                ))}
+                        </tbody>
+                    </Table>
+                </div>
+                <div
+                    id="right-table"
+                    style={{
+                        overflowX: 'auto',
+                        overflowY: 'auto',
+                        flexGrow: 1,
+                    }}
+                    onScroll={handleVerticalScrollRight}>
+                    <Table
+                        style={{
+                            width: '100%',
+                        }}
+                        className="mx-auto"
+                        size="sm"
+                        bordered
+                        striped>
+                        <thead className="table-dark sticky-top">
+                            <tr style={{ textAlign: 'center' }}>
+                                {diasSemana
+                                    .filter(filterDias)
+                                    .map((dia, idx) => (
+                                        <th
+                                            key={idx}
+                                            style={{
+                                                position: 'sticky',
+                                                top: 0,
+                                                zIndex: 2,
+                                                width: 'max-content',
+                                            }}>
+                                            {
+                                                //                                     const nombreDia = format(dia, 'EEEE', { locale: es }); // "sábado"
+                                                // const letraDia = nombreDia.charAt(0).toUpperCase();    // "S"
+                                                // const diaNumero = format(dia, 'd');                    // "5"
+                                                // const mesNumero = format(dia, 'M');                    // "7"
+                                                // const resultado = `${letraDia} ${diaNumero}-${mesNumero}`;
+                                            }
+                                            {formatFecha(dia)}
+                                            {/* {format(dia, 'EEE d-M', {
+                                    locale: es,
+                                })}{' '} */}
+                                            {/* "Sáb 5-7" */}
+                                        </th>
+                                    ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {Array.from({ length: maxCantidadEventosDia }).map(
+                                (_, index) => (
+                                    <tr
+                                        key={`spacer-${index}`}
+                                        style={{
+                                            height: heightTd,
+                                            width: 'max-content',
+                                        }}>
+                                        {diasSemana.map((dia, i) => {
+                                            const diaLimpio = new Date(dia);
+                                            diaLimpio.setHours(0, 0, 0, 0);
+                                            const eventosDia = eventos.filter(
+                                                (d) => {
+                                                    const fecha = new Date(
+                                                        d.fecha
+                                                    );
+                                                    fecha.setHours(0, 0, 0, 0);
+                                                    return (
+                                                        fecha.getTime() ===
+                                                        diaLimpio.getTime()
+                                                    );
+                                                }
+                                            );
+                                            if (eventosDia.length > index) {
+                                                const evento =
+                                                    eventosDia[index];
+                                                return (
+                                                    <td
+                                                        onClick={() => {
+                                                            setAdelantarEvento(
+                                                                evento.id
                                                             );
                                                         }}
-                                                    />
-                                                </td>
-                                            );
+                                                        key={i + index}
+                                                        style={{
+                                                            ...styleEventos,
+                                                            verticalAlign:
+                                                                'middle',
+                                                        }}>
+                                                        <strong>
+                                                            {evento.nombre}
+                                                        </strong>
+                                                        {' - '}
+                                                        {evento.lugar}
+                                                        {' - '}
+                                                        {evento.salon}
+                                                    </td>
+                                                );
+                                            } else {
+                                                return (
+                                                    <td
+                                                        key={i + index}
+                                                        style={{
+                                                            ...styleEventos,
+                                                            verticalAlign:
+                                                                'middle',
+                                                        }}>
+                                                        &nbsp;
+                                                    </td>
+                                                );
+                                            }
                                         })}
-                                </tr>
-                                {platoExpandido === plato && (
-                                    <PlatoDetalle
-                                        plato={plato}
-                                        diasSemanaProp={diasSemana}
-                                    />
-                                )}
-                            </React.Fragment>
-                        ))}
-                </tbody>
-            </Table>
+                                    </tr>
+                                )
+                            )}
+                            {platosUnicos
+                                .filter(filterPlatos)
+                                .map(({ plato, platoPadre }) => (
+                                    <React.Fragment key={plato + platoPadre}>
+                                        <tr style={{ textAlign: 'center' }}>
+                                            {diasSemana
+                                                .filter(filterDias)
+                                                .map((dia, i) => {
+                                                    const diaLimpio = new Date(
+                                                        dia
+                                                    );
+                                                    diaLimpio.setHours(
+                                                        0,
+                                                        0,
+                                                        0,
+                                                        0
+                                                    );
+
+                                                    const total =
+                                                        produccion.filter(
+                                                            (d) => {
+                                                                const fecha =
+                                                                    new Date(
+                                                                        d.fecha
+                                                                    );
+                                                                fecha.setHours(
+                                                                    0,
+                                                                    0,
+                                                                    0,
+                                                                    0
+                                                                );
+                                                                fecha.setDate(
+                                                                    fecha.getDate() +
+                                                                        1
+                                                                ); // Ajuste para comparar con el día limpio
+
+                                                                return (
+                                                                    d.plato ===
+                                                                        plato &&
+                                                                    d.platoPadre ===
+                                                                        platoPadre &&
+                                                                    fecha.getTime() ===
+                                                                        diaLimpio.getTime()
+                                                                );
+                                                            }
+                                                        );
+
+                                                    const update =
+                                                        produccionUpdate.filter(
+                                                            (d) => {
+                                                                const fecha =
+                                                                    new Date(
+                                                                        d.fecha
+                                                                    );
+                                                                fecha.setHours(
+                                                                    0,
+                                                                    0,
+                                                                    0,
+                                                                    0
+                                                                );
+                                                                fecha.setDate(
+                                                                    fecha.getDate() +
+                                                                        1
+                                                                ); // Ajuste para comparar con el día limpio
+
+                                                                return (
+                                                                    d.plato ===
+                                                                        plato &&
+                                                                    d.platoPadre ===
+                                                                        platoPadre &&
+                                                                    fecha.getTime() ===
+                                                                        diaLimpio.getTime()
+                                                                );
+                                                            }
+                                                        );
+
+                                                    const totalConsumo = datos
+                                                        .filter((d) => {
+                                                            const fecha =
+                                                                new Date(
+                                                                    d.fecha
+                                                                );
+                                                            fecha.setHours(
+                                                                0,
+                                                                0,
+                                                                0,
+                                                                0
+                                                            );
+
+                                                            return (
+                                                                d.plato ===
+                                                                    plato &&
+                                                                d.platoPadre ===
+                                                                    platoPadre &&
+                                                                fecha.getTime() ===
+                                                                    dia.getTime()
+                                                            );
+                                                        })
+                                                        .reduce(
+                                                            (sum, d) =>
+                                                                sum +
+                                                                d.cantidad,
+                                                            0
+                                                        );
+
+                                                    let cantidad = '';
+
+                                                    if (total.length > 0) {
+                                                        cantidad = total.reduce(
+                                                            (sum, d) =>
+                                                                sum +
+                                                                d.cantidad,
+                                                            0
+                                                        );
+                                                    }
+
+                                                    let updateCant = false;
+
+                                                    if (update.length > 0) {
+                                                        cantidad =
+                                                            update.reduce(
+                                                                (sum, d) =>
+                                                                    sum +
+                                                                    d.cantidad,
+                                                                0
+                                                            );
+
+                                                        updateCant = true;
+                                                    }
+
+                                                    return (
+                                                        <td
+                                                            style={{
+                                                                height: heightTd,
+                                                                verticalAlign:
+                                                                    'middle',
+                                                            }}
+                                                            key={
+                                                                plato +
+                                                                platoPadre +
+                                                                i
+                                                            }>
+                                                            <Form.Control
+                                                                type="number"
+                                                                style={{
+                                                                    width: '100%',
+                                                                    color: updateCant
+                                                                        ? '#ff0000'
+                                                                        : '#000000',
+                                                                }}
+                                                                className="form-control form-control-sm input"
+                                                                value={cantidad}
+                                                                placeholder={
+                                                                    totalConsumo
+                                                                        ? totalConsumo.toString()
+                                                                        : ''
+                                                                }
+                                                                step={0.1}
+                                                                min={0}
+                                                                onChange={(
+                                                                    e
+                                                                ) => {
+                                                                    const cantidad =
+                                                                        parseFloat(
+                                                                            e
+                                                                                .target
+                                                                                .value
+                                                                        );
+                                                                    // if (isNaN(cantidad)) {
+                                                                    //     return;
+                                                                    // }
+                                                                    const fecha =
+                                                                        format(
+                                                                            diaLimpio,
+                                                                            'yyyy-MM-dd'
+                                                                        );
+                                                                    const nuevaProduccion =
+                                                                        [
+                                                                            ...produccionUpdate,
+                                                                        ];
+                                                                    const index =
+                                                                        nuevaProduccion.findIndex(
+                                                                            (
+                                                                                p
+                                                                            ) =>
+                                                                                p.plato ===
+                                                                                    plato &&
+                                                                                p.platoPadre ===
+                                                                                    platoPadre &&
+                                                                                p.fecha ===
+                                                                                    fecha
+                                                                        );
+
+                                                                    if (
+                                                                        index >
+                                                                        -1
+                                                                    ) {
+                                                                        nuevaProduccion[
+                                                                            index
+                                                                        ].cantidad =
+                                                                            cantidad;
+                                                                    } else {
+                                                                        nuevaProduccion.push(
+                                                                            {
+                                                                                plato,
+                                                                                platoPadre,
+                                                                                fecha,
+                                                                                cantidad,
+                                                                            }
+                                                                        );
+                                                                    }
+                                                                    setProduccionUpdate(
+                                                                        nuevaProduccion
+                                                                    );
+                                                                    localStorage.setItem(
+                                                                        'produccionUpdate',
+                                                                        JSON.stringify(
+                                                                            nuevaProduccion
+                                                                        )
+                                                                    );
+                                                                }}
+                                                            />
+                                                        </td>
+                                                    );
+                                                })}
+                                        </tr>
+                                        {platoExpandido === plato && (
+                                            <PlatoDetalle
+                                                plato={plato}
+                                                diasSemanaProp={diasSemana}
+                                            />
+                                        )}
+                                    </React.Fragment>
+                                ))}
+                        </tbody>
+                    </Table>
+                </div>
+            </div>
         </>
     );
 }

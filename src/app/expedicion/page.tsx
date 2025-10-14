@@ -4,7 +4,7 @@
 import React, { useContext, useState } from 'react';
 import { useEffect } from 'react';
 
-import { Accordion, Container, Form, Table } from 'react-bootstrap';
+import { Accordion, Button, Container, Form, Table } from 'react-bootstrap';
 
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -39,11 +39,35 @@ export default function ExpedicionPage() {
         unidadMedida: string;
         porcionBruta: number;
         check: boolean;
+        cantidadPadre: number;
     };
 
     type InfoArray = InfoItem[];
 
     const [info, setInfo] = React.useState<InfoArray[]>([]);
+
+    // Exportar a Excel
+    const exportToExcel = () => {
+        // aplanar info
+        const flatData = info.flat().map((item) => ({
+            Codigo: item.codigo,
+            Producto: item.nombreProducto,
+            'Sub Codigo': item.subCodigo,
+            'Sub Producto': item.descripcion,
+            Tipo: item.tipo,
+            'Unidad Medida': item.unidadMedida,
+            'Porcion Bruta': item.porcionBruta,
+            Expedido: item.check ? 'Sí' : 'No',
+        }));
+
+        // importar xlsx dinámicamente
+        import('xlsx').then((XLSX) => {
+            const worksheet = XLSX.utils.json_to_sheet(flatData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'Expedicion');
+            XLSX.writeFile(workbook, 'expedicion.xlsx');
+        });
+    };
 
     useEffect(() => {
         setLoading(true);
@@ -177,6 +201,12 @@ export default function ExpedicionPage() {
 
             <h2 className="text-center mt-5">{title}</h2>
 
+            <Button
+                className="mb-3 btn-success"
+                onClick={exportToExcel}>
+                Exportar a Excel
+            </Button>
+
             {info.map((data, i) => {
                 if (data.length === 0) return;
                 return (
@@ -186,7 +216,8 @@ export default function ExpedicionPage() {
                         key={i}>
                         <Accordion.Item eventKey={i.toString()}>
                             <Accordion.Header>
-                                {data[0].nombreProducto}
+                                {data[0].nombreProducto} -{' '}
+                                {data[0].cantidadPadre}
                             </Accordion.Header>
                             <Accordion.Body>
                                 <Form.Check

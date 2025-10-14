@@ -5,9 +5,15 @@ export async function POST(req: NextRequest) {
     process.env.TZ = 'America/Argentina/Buenos_Aires';
 
     const body = await req.json();
-    const { plato, cantidad, fecha, comentario, platoPadre } = body;
+    const { plato, cantidad, fecha, comentario, platoPadre, salon } = body;
 
-    if (!plato || !cantidad || !fecha || typeof platoPadre !== 'string') {
+    if (
+        !plato ||
+        !cantidad ||
+        !fecha ||
+        typeof platoPadre !== 'string' ||
+        !salon
+    ) {
         return NextResponse.json(
             { error: 'Datos incompletos' },
             { status: 400 }
@@ -20,6 +26,7 @@ export async function POST(req: NextRequest) {
             platoPadre,
             fecha: new Date(fecha.split('T')[0]),
             cantidad,
+            salon,
         },
     });
 

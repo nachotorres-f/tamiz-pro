@@ -6,12 +6,15 @@ import { addDays, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import React, { useContext, useEffect, useRef, useState } from 'react';
 import {
+    Accordion,
     Button,
+    Col,
     Container,
     Dropdown,
     FloatingLabel,
     Form,
     Modal,
+    Row,
     Table,
 } from 'react-bootstrap';
 import {
@@ -32,11 +35,10 @@ export default function ProduccionPreviaPage() {
     const salon = useContext(SalonContext);
     const ref = useRef<HTMLTableElement>(null);
 
-    //const [filtro, setFiltro] = useState('');
-    const [filtro] = useState('');
     const [diasSemana, setDiasSemana] = useState<Date[]>([]);
     const [diaActivo, setDiaActivo] = useState('');
     const [semanaBase, setSemanaBase] = useState(new Date());
+    const [datosApi, setDatosApi] = useState<any[]>([]);
     const [datos, setDatos] = useState<any[]>([]);
     const [showModal, setShowModal] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -45,6 +47,13 @@ export default function ProduccionPreviaPage() {
     const [showModalProduccion, setShowModalProduccion] = useState(false);
     const [observacionModal, setObservacionModal] = useState('');
     const [showModalObservacion, setShowModalObservacion] = useState(false);
+    const [paginado, setPaginado] = useState(false);
+    const [registrosPagina, setRegistrosPagina] = useState(30);
+    const [paginaActual, setPaginaActual] = useState(0);
+    const [totalPaginas, setTotalPaginas] = useState(0);
+    const [intervaloSegundos, setIntervaloSegundos] = useState(30);
+    const [intervaloPaginado, setIntervaloPaginado] =
+        useState<ReturnType<typeof setInterval>>();
     const [platoModalProduccion, setPlatoModalProduccion] = useState({
         plato: '',
         platoPadre: '',
@@ -58,15 +67,20 @@ export default function ProduccionPreviaPage() {
         fetch(
             '/api/produccion?fechaInicio=' +
                 semanaBase.toISOString() +
-                '&previa=true'
+                '&previa=true' +
+                '&salon=' +
+                salon
         )
             .then((res) => res.json())
             .then((res) => res.data)
-            .then(setDatos)
+            .then((data) => {
+                setDatosApi(data);
+                setDatos(data);
+            })
             .finally(() => {
                 setLoading(false);
             });
-    }, [semanaBase]);
+    }, [semanaBase, salon]);
 
     useEffect(() => {
         const inicioSemana = semanaBase;
@@ -124,12 +138,6 @@ export default function ProduccionPreviaPage() {
         return true;
     };
 
-    const filterPlatos = (dato: any) => {
-        if (!filtro) return true;
-
-        return dato.plato.toLowerCase().includes(filtro.toLowerCase());
-    };
-
     const generarPDF = (modo: 'unico' | 'separado') => {
         toast.info('Imprimiendo recetas', {
             position: 'bottom-right',
@@ -146,12 +154,6 @@ export default function ProduccionPreviaPage() {
     const handleCloseModalProduccion = () => setShowModalProduccion(false);
     const handleCloseModalObservacion = () => setShowModalObservacion(false);
 
-    const filterSalon = (dato: any) => {
-        if (!salon) return true;
-
-        return dato.salon === salon;
-    };
-
     const filterPlatosPorDia = (dato: any) => {
         if (!diaActivo) {
             return true;
@@ -162,7 +164,6 @@ export default function ProduccionPreviaPage() {
 
         dia.setHours(0, 0, 0, 0);
         diaSiguiente.setHours(0, 0, 0, 0);
-        console.log(dia, diaSiguiente);
 
         const produccion = dato.produccion.find((prod: any) => {
             const fecha = new Date(prod.fecha);
@@ -174,20 +175,8 @@ export default function ProduccionPreviaPage() {
             );
         });
 
-        console.log(produccion);
-
         return produccion?.cantidad > 0;
     };
-
-    // const formatFecha = (dia: Date) => {
-    //     const nombreDia = format(dia, 'EEEE', { locale: es }); // "lunes"
-    //     const letraDia = nombreDia.startsWith('mi')
-    //         ? 'X'
-    //         : nombreDia.charAt(0).toUpperCase(); // "L"
-    //     const diaNumero = format(dia, 'd'); // "5"
-    //     const mesNumero = format(dia, 'M'); // "8"
-    //     return `${letraDia} ${diaNumero}-${mesNumero}`;
-    // };
 
     function guardarComentario() {
         toast.warn('Agregando Comentario', {
@@ -205,6 +194,7 @@ export default function ProduccionPreviaPage() {
                 cantidad: platoModalProduccion.cantidad,
                 fecha: addDays(platoModalProduccion.fecha, 2),
                 comentario: observacionModal,
+                salon,
             }),
         })
             .then(() => {
@@ -217,11 +207,13 @@ export default function ProduccionPreviaPage() {
                 fetch(
                     '/api/produccion?fechaInicio=' +
                         semanaBase.toISOString() +
-                        '&previa=true'
+                        '&previa=true' +
+                        '&salon=' +
+                        salon
                 )
                     .then((res) => res.json())
                     .then((res) => res.data)
-                    .then(setDatos)
+                    .then(setDatosApi)
                     .finally(() => {
                         setLoading(false);
                     });
@@ -251,6 +243,7 @@ export default function ProduccionPreviaPage() {
                 platoPadre: platoModalProduccion.platoPadre,
                 cantidad: platoModalProduccion.cantidad,
                 fecha: addDays(platoModalProduccion.fecha, 2),
+                salon,
             }),
         })
             .then(() => {
@@ -263,11 +256,13 @@ export default function ProduccionPreviaPage() {
                 fetch(
                     '/api/produccion?fechaInicio=' +
                         semanaBase.toISOString() +
-                        '&previa=true'
+                        '&previa=true' +
+                        '&salon=' +
+                        salon
                 )
                     .then((res) => res.json())
                     .then((res) => res.data)
-                    .then(setDatos)
+                    .then(setDatosApi)
                     .finally(() => {
                         setLoading(false);
                     });
@@ -281,6 +276,62 @@ export default function ProduccionPreviaPage() {
                 setLoading(false);
             });
     };
+
+    const tooglePaginado = () => {
+        if (paginado) {
+            setPaginado(false);
+            clearInterval(intervaloPaginado);
+            setDatos(datosApi);
+            return;
+        }
+
+        const totalPags = Math.ceil(datosApi.length / registrosPagina);
+
+        setPaginado(true);
+        setTotalPaginas(totalPags);
+        setPaginaActual(0);
+    };
+
+    useEffect(() => {
+        if (!paginado) return;
+        if (totalPaginas === 0) return;
+
+        const intervalo = setInterval(() => {
+            setPaginaActual((prevPagina) => {
+                const nuevaPagina = prevPagina + 1;
+                if (nuevaPagina >= totalPaginas) {
+                    return 0;
+                }
+                return nuevaPagina;
+            });
+        }, intervaloSegundos * 1000);
+
+        setIntervaloPaginado(intervalo);
+
+        return () => clearInterval(intervaloPaginado);
+    }, [paginado, totalPaginas, intervaloSegundos]);
+
+    useEffect(() => {
+        if (!paginado) return;
+
+        const inicio = paginaActual * registrosPagina;
+        const fin = inicio + registrosPagina;
+        const datosPaginados = datosApi
+            .filter(filterPlatosPorDia)
+            .slice(inicio, fin);
+
+        setDatos(datosPaginados);
+    }, [paginado, paginaActual, registrosPagina]);
+
+    useEffect(() => {
+        if (!paginado) return;
+
+        const totalPags = Math.ceil(
+            datosApi.filter(filterPlatosPorDia).length / registrosPagina
+        );
+        setTotalPaginas(totalPags);
+        setPaginaActual(0);
+    }, [diaActivo, paginado, registrosPagina]);
 
     if (loading) {
         return (
@@ -312,6 +363,88 @@ export default function ProduccionPreviaPage() {
                 <h2 className="text-center mb-4">Entrega de MP</h2>
 
                 <ToastContainer />
+
+                <Container>
+                    <Row>
+                        <Col>
+                            <Accordion className="mb-5">
+                                <Accordion.Item eventKey="0">
+                                    <Accordion.Header>
+                                        Paginar platos
+                                    </Accordion.Header>
+                                    <Accordion.Body>
+                                        <Container>
+                                            <Row>
+                                                <Col>
+                                                    <Form.Group>
+                                                        <Form.Label>
+                                                            Cantidad de platos
+                                                        </Form.Label>
+                                                        <Form.Control
+                                                            type="text"
+                                                            step="1"
+                                                            min={1}
+                                                            placeholder="Ingresa la cantidad de platos"
+                                                            value={
+                                                                registrosPagina
+                                                            }
+                                                            disabled={paginado}
+                                                            onChange={(e) =>
+                                                                setRegistrosPagina(
+                                                                    Number(
+                                                                        e.target
+                                                                            .value
+                                                                    )
+                                                                )
+                                                            }></Form.Control>
+                                                    </Form.Group>
+                                                </Col>
+                                                <Col>
+                                                    <Form.Group>
+                                                        <Form.Label>
+                                                            Intervalo (segundos)
+                                                        </Form.Label>
+                                                        <Form.Control
+                                                            type="text"
+                                                            step="any"
+                                                            placeholder="Ingresa el intervalo en segundos"
+                                                            value={
+                                                                intervaloSegundos
+                                                            }
+                                                            disabled={paginado}
+                                                            onChange={(e) =>
+                                                                setIntervaloSegundos(
+                                                                    Number(
+                                                                        e.target
+                                                                            .value
+                                                                    )
+                                                                )
+                                                            }></Form.Control>
+                                                    </Form.Group>
+                                                </Col>
+                                                <Col>
+                                                    <Button
+                                                        style={{
+                                                            marginTop: '2rem',
+                                                        }}
+                                                        className="d-block mx-auto"
+                                                        onClick={() =>
+                                                            tooglePaginado()
+                                                        }>
+                                                        {paginado
+                                                            ? 'Detener'
+                                                            : 'Iniciar'}
+                                                    </Button>
+                                                </Col>
+                                            </Row>
+                                        </Container>
+                                    </Accordion.Body>
+                                </Accordion.Item>
+                            </Accordion>
+                        </Col>
+                    </Row>
+                </Container>
+
                 <Modal
                     show={showModal}
                     onHide={handleClose}>
@@ -458,6 +591,7 @@ export default function ProduccionPreviaPage() {
             </Container>
 
             <div
+                ref={ref}
                 className="mt-3 mx-auto"
                 style={{
                     overflowY: 'auto',
@@ -465,7 +599,6 @@ export default function ProduccionPreviaPage() {
                     width: '100%',
                 }}>
                 <Table
-                    ref={ref}
                     bordered
                     striped
                     id="tabla-produccion">
@@ -481,7 +614,13 @@ export default function ProduccionPreviaPage() {
                                     Pantalla Completa
                                 </Button>
                             </th>
-                            <th></th>
+                            <th>
+                                {paginado
+                                    ? `Pagina: ${
+                                          paginaActual + 1
+                                      } / ${totalPaginas}`
+                                    : 'Todos los platos'}
+                            </th>
                             {[0, 1, 2, 3, 4, 5, 6]
                                 .filter(
                                     (i) =>
@@ -548,8 +687,8 @@ export default function ProduccionPreviaPage() {
                                 })}
                         </tr>
                         <tr style={{ textAlign: 'center' }}>
-                            <th>Plato | Elaboracion</th>
-                            <th>Plato | Semi Elaborado</th>
+                            <th>Plato</th>
+                            <th>Elaboracion</th>
                             {diasSemana.filter(filterDias).map((dia, idx) => (
                                 <th key={idx}>
                                     {format(dia, 'EEE, dd-MM', { locale: es })}
@@ -560,8 +699,6 @@ export default function ProduccionPreviaPage() {
                     <tbody>
                         {datos &&
                             datos
-                                .filter(filterPlatos)
-                                .filter(filterSalon)
                                 .filter((dato) => filterPlatosPorDia(dato))
                                 .map((dato) => (
                                     <React.Fragment
@@ -574,7 +711,6 @@ export default function ProduccionPreviaPage() {
                                                 .filter(filterDias)
                                                 .map((dia, i) => {
                                                     dia.setHours(0, 0, 0, 0);
-                                                    console.log('DIA', dia);
 
                                                     const produccion =
                                                         dato.produccion.find(

@@ -1,5 +1,6 @@
-import { addDays, format } from 'date-fns';
-import React, { useEffect } from 'react';
+import { format } from 'date-fns';
+import React, { useContext, useEffect } from 'react';
+import { SalonContext } from './filtroPlatos';
 // import { ListGroup } from 'react-bootstrap';
 
 interface EventoPlanificacion {
@@ -11,18 +12,18 @@ interface EventoPlanificacion {
 }
 
 export default function TablaEventosPlanificacion({
-    ciclo13,
     diasSemana,
     diaActivo,
     filtroSalon,
 }: // anchoColumna,
 {
-    ciclo13: boolean;
     diasSemana: Date[];
     diaActivo: string;
     filtroSalon: string | null;
     // anchoColumna?: number;
 }) {
+    const salon = useContext(SalonContext);
+
     const [eventos, setEventos] = React.useState<EventoPlanificacion[]>([]);
     const [eventosFiltrados, setEventosFiltrados] = React.useState<
         EventoPlanificacion[]
@@ -41,14 +42,13 @@ export default function TablaEventosPlanificacion({
             '/api/eventosPlanificacion?fechaInicio=' +
                 format(fechaInicio, 'yyyy-MM-dd') +
                 '&fechaFinal=' +
-                format(
-                    ciclo13 ? addDays(fechaFinal, 2) : fechaFinal,
-                    'yyyy-MM-dd'
-                )
+                format(fechaFinal, 'yyyy-MM-dd') +
+                '&salon=' +
+                salon
         )
             .then((res) => res.json())
-            .then((data) => setEventos(data));
-    }, [diasSemana, ciclo13]);
+            .then((data) => setEventos(data.eventos));
+    }, [diasSemana, salon]);
 
     useEffect(() => {
         if (filtroSalon) {

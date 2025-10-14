@@ -48,7 +48,6 @@ export default function CalendarioPage() {
     return (
         <>
             <h3 className="my-5 text-center">Calendario de eventos</h3>
-
             {/* <Container className="mb-3">
                 <Row>
                     <Col xs={4}>
@@ -73,6 +72,7 @@ export default function CalendarioPage() {
                 </Row>
             </Container> */}
 
+            {/*             
             <p
                 className="mx-auto p-3 text-center bg-warning-subtle"
                 style={{ width: 'max-content' }}>
@@ -82,7 +82,9 @@ export default function CalendarioPage() {
                     0
                 )}
             </p>
-            {weeks.map(({ semana, totalInvitados }, i) => (
+            */}
+
+            {weeks.map(({ semana }, i) => (
                 <div
                     key={i}
                     className="d-flex flex-row justify-content-center">
@@ -121,15 +123,16 @@ export default function CalendarioPage() {
                             }}
                         />
                     </div>
+                    {/* 
                     <p
                         className="ms-5 bg-warning-subtle p-3 text-center align-items-start"
                         style={{ minWidth: '10%', maxHeight: 'min-content' }}>
                         <span className="fw-bold">Pax semanal: </span>
                         {totalInvitados}
                     </p>
+ */}
                 </div>
             ))}
-
             {/* <FullCalendar
                 plugins={[dayGridPlugin, bootstrap5Plugin]}
                 themeSystem="bootstrap5"

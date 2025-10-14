@@ -41,6 +41,8 @@ export default function LoginPage() {
 
             const data = await res.json();
 
+            console.log(data);
+
             if (!res.ok) {
                 setErrors({ auth: data.message || 'Credenciales incorrectas' });
                 return;
@@ -128,6 +130,9 @@ export default function LoginPage() {
                             )}
                         </Button>
                     </div>
+                    <p className="text-danger text-center mt-3">
+                        {errors.auth}
+                    </p>
                 </Form>
             </Container>
         </>

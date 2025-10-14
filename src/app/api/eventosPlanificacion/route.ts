@@ -1,6 +1,10 @@
 import { prisma } from '@/lib/prisma';
-import { addDays, startOfWeek } from 'date-fns';
+import { addDays } from 'date-fns';
 import { NextRequest, NextResponse } from 'next/server';
+
+interface Evento {
+    fecha: Date;
+}
 
 export async function GET(req: NextRequest) {
     process.env.TZ = 'America/Argentina/Buenos_Aires';
@@ -8,32 +12,49 @@ export async function GET(req: NextRequest) {
     const { searchParams } = req.nextUrl;
     const fechaInicio = searchParams.get('fechaInicio');
     const fechaFinal = searchParams.get('fechaFinal');
+    const salon = searchParams.get('salon');
 
-    if (!fechaInicio || !fechaFinal) {
+    if (!fechaInicio || !fechaFinal || !salon) {
         return NextResponse.json(
             { error: 'Faltan parámetros de fecha' },
             { status: 400 }
         );
     }
 
-    const inicio = startOfWeek(new Date(fechaInicio), {
-        weekStartsOn: 1, // Lunes como inicio de semana
-    });
-
     const final = new Date(fechaFinal);
 
     const eventos = await prisma.comanda.findMany({
         where: {
             fecha: {
-                gte: inicio,
+                gte: new Date(fechaInicio),
                 lte: addDays(final, 2),
             },
+            lugar:
+                salon === 'A'
+                    ? { notIn: ['El Central', 'La Rural'] }
+                    : { in: ['El Central', 'La Rural'] },
         },
         orderBy: {
             fecha: 'asc',
         },
     });
 
-    const res = NextResponse.json(eventos);
+    const res = NextResponse.json({
+        eventos,
+        maxRepeticion: maxRepeticionesPorDia(eventos),
+    });
     return res;
+}
+
+function maxRepeticionesPorDia(array: Evento[]) {
+    const contador: { [dia: string]: number } = {};
+
+    array.forEach((item) => {
+        const dia = new Date(item.fecha).toISOString().split('T')[0];
+        contador[dia] = (contador[dia] || 0) + 1;
+    });
+
+    const max = Math.max(...Object.values(contador));
+
+    return max;
 }

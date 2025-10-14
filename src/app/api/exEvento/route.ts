@@ -56,6 +56,7 @@ export async function GET(req: NextRequest) {
                             ...receta,
                             porcionBruta: (porcionBruta * cantidad).toFixed(2),
                             check: !!checkExpedicion,
+                            cantidadPadre: cantidad,
                         };
                     }
                 )

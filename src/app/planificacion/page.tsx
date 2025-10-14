@@ -12,23 +12,30 @@ import {
     Button,
     Col,
     Container,
-    Form,
     Row,
     // Form
 } from 'react-bootstrap';
 // import Row from 'react-bootstrap/Row';
 // import Col from 'react-bootstrap/Col';
-import { addDays, startOfWeek } from 'date-fns';
+import { addDays, format, startOfWeek } from 'date-fns';
 import React from 'react';
 // import { FiltroPlatos } from '@/components/filtroPlatos';
 // import { SelectorDias } from '@/components/selectorDias';
 import { NavegacionSemanal } from '@/components/navegacionSemanal';
 import { TablaPlanificacion } from '@/components/tablaPlanificacion';
-import TablaEventosPlanificacion from '@/components/tablaEventosPlanificacion';
 import AgregarPlato from '@/components/agregarPlato';
 import { Slide, toast, ToastContainer } from 'react-toastify';
 import { SalonContext } from '@/components/filtroPlatos';
 import { Loading } from '@/components/loading';
+
+export interface EventoPlanificacion {
+    id: number;
+    fecha: string;
+    lugar: string;
+    nombre: string;
+    salon: string;
+    // agrega aquí otras propiedades si existen
+}
 
 export default function PlanificacionPage() {
     const filtroSalon = useContext(SalonContext);
@@ -36,18 +43,19 @@ export default function PlanificacionPage() {
     const [semanaBase, setSemanaBase] = useState(new Date());
     const [diasSemana, setDiasSemana] = useState<Date[]>([]);
     const [datos, setDatos] = useState<any[]>([]);
+    const [eventos, setEventos] = React.useState<EventoPlanificacion[]>([]);
+    const [maxCantidadEventosDia, setMaxCantidadEventosDia] = useState(0);
     const [produccion, setProduccion] = useState<any[]>([]);
     const [datosFiltrados, setDatosFiltrados] = useState<any[]>([]);
-    // const [filtro, setFiltro] = useState('');
     const [filtro] = useState('');
     const [diaActivo, setDiaActivo] = useState('');
     const [platoExpandido, setPlatoExpandido] = useState<string | null>(null);
     const [produccionUpdate, setProduccionUpdate] = React.useState<any[]>([]);
     const [loading, setLoading] = useState(false);
-    const [ciclo, setCiclo] = useState(false);
     const [observaciones, setObservaciones] = useState<
         { plato: string; observacion: string; platoPadre: string }[]
     >([]);
+    const [eventoAdelantado, setEventoAdelantado] = useState(0);
 
     // Referencias para medir el ancho de las celdas
     // const buttonRef = useRef<HTMLTableCellElement>(null);
@@ -77,9 +85,7 @@ export default function PlanificacionPage() {
                     weekStartsOn: 1,
                 }).toISOString() +
                 '&salon=' +
-                (filtroSalon || 'A') +
-                '&ciclo13=' +
-                ciclo.toString()
+                (filtroSalon || 'A')
         ) // jueves
             .then((res) => res.json())
             .then((data) => {
@@ -93,16 +99,34 @@ export default function PlanificacionPage() {
         setProduccionUpdate(
             JSON.parse(localStorage.getItem('produccionUpdate') || '[]')
         );
-    }, [semanaBase, filtroSalon, ciclo]);
+    }, [semanaBase, filtroSalon, eventoAdelantado]);
+
+    useEffect(() => {
+        if (diasSemana.length === 0) return;
+
+        fetch(
+            '/api/eventosPlanificacion?fechaInicio=' +
+                format(diasSemana[4], 'yyyy-MM-dd') +
+                '&fechaFinal=' +
+                format(diasSemana[diasSemana.length - 1], 'yyyy-MM-dd') +
+                '&salon=' +
+                filtroSalon
+        )
+            .then((res) => res.json())
+            .then((data) => {
+                setEventos(data.eventos);
+                setMaxCantidadEventosDia(data.maxRepeticion);
+            });
+    }, [diasSemana, filtroSalon]);
 
     useEffect(() => {
         const inicioSemana = startOfWeek(semanaBase, { weekStartsOn: 4 }); // jueves
-        const dias = Array.from({ length: ciclo ? 13 : 11 }, (_, i) =>
+        const dias = Array.from({ length: 60 }, (_, i) =>
             addDays(inicioSemana, i)
         );
         setDiasSemana(dias);
         setDiaActivo('');
-    }, [semanaBase, ciclo]);
+    }, [semanaBase]);
 
     useEffect(() => {
         if (filtroSalon) {
@@ -172,9 +196,7 @@ export default function PlanificacionPage() {
                     weekStartsOn: 1,
                 }).toISOString() +
                 '&salon=' +
-                (filtroSalon || 'A') +
-                '&ciclo13=' +
-                ciclo.toString()
+                (filtroSalon || 'A')
         ) // jueves
             .then((res) => res.json())
             .then((data) => {
@@ -282,28 +304,14 @@ export default function PlanificacionPage() {
                                     </Form.Group>
                                 </Col>
                             </Row> */}
-                            <Row>
-                                <Col>
-                                    <Form.Check
-                                        className="mt-3"
-                                        type="checkbox"
-                                        label="Ciclo 13 dias"
-                                        checked={ciclo}
-                                        onChange={() => {
-                                            setCiclo(!ciclo);
-                                        }}
-                                    />
-                                </Col>
-                            </Row>
                         </Col>
                         <Col>
-                            <TablaEventosPlanificacion
+                            {/* <TablaEventosPlanificacion
                                 diasSemana={diasSemana}
                                 diaActivo={diaActivo}
                                 filtroSalon={filtroSalon}
-                                ciclo13={ciclo}
                                 // anchoColumna={anchoButton + anchoPlato + anchoTotal}
-                            />
+                            /> */}
                         </Col>
                     </Row>
 
@@ -351,6 +359,11 @@ export default function PlanificacionPage() {
                     setProduccionUpdate={setProduccionUpdate}
                     observaciones={observaciones}
                     setObservaciones={setObservaciones}
+                    maxCantidadEventosDia={maxCantidadEventosDia}
+                    eventos={eventos}
+                    setEventoAdelantado={setEventoAdelantado}
+                    // Referencias para medir el ancho de las celdas
+                    // buttonRef={buttonRef}
                     // anchoButton={anchoButton}
                     // anchoPlato={anchoPlato}
                     // anchoTotal={anchoTotal}

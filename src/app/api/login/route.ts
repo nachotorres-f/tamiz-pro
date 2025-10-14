@@ -13,7 +13,10 @@ export async function POST(req: NextRequest) {
 
         if (!user) {
             return NextResponse.json(
-                { success: false, message: 'Usuario no encontrado' },
+                {
+                    success: false,
+                    message: 'Usuario y/o contraseña incorrectos',
+                },
                 { status: 401 }
             );
         }
@@ -22,7 +25,10 @@ export async function POST(req: NextRequest) {
 
         if (!isValid) {
             return NextResponse.json(
-                { success: false, message: 'Contraseña incorrecta' },
+                {
+                    success: false,
+                    message: 'Usuario y/o contraseña incorrectos',
+                },
                 { status: 401 }
             );
         }
@@ -44,7 +50,7 @@ export async function POST(req: NextRequest) {
         return res;
     } catch {
         return NextResponse.json(
-            { success: false, message: 'Error interno' },
+            { success: false, message: 'Error en el servidor' },
             { status: 500 }
         );
     }
