@@ -345,7 +345,8 @@ export default function PlanificacionPage() {
             </Container>
 
             <div
-                className="mb-3"
+                id="container-planificacion"
+                className="mb-3 no-scrollbar"
                 style={{ overflow: 'auto', height: '80vh' }}>
                 <TablaPlanificacion
                     platosUnicos={platosUnicos}

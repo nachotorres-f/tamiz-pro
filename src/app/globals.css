@@ -104,3 +104,11 @@ input[type='number'] {
     color: darkblue;
     text-decoration: underline;
 }
+
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
+#container-planificacion::-webkit-scrollbar {
+    display: none; /* Chrome, Safari and Opera */
+}

@@ -351,6 +351,7 @@ export function TablaPlanificacion({
                 }}>
                 <div
                     id="left-table"
+                    className="no-scrollbar"
                     style={{
                         flexShrink: 0,
                         // borderCollapse: 'collapse',
@@ -570,6 +571,7 @@ export function TablaPlanificacion({
                 </div>
                 <div
                     id="right-table"
+                    className="no-scrollbar"
                     style={{
                         overflowX: 'auto',
                         overflowY: 'auto',
@@ -595,20 +597,9 @@ export function TablaPlanificacion({
                                                 position: 'sticky',
                                                 top: 0,
                                                 zIndex: 2,
-                                                width: 'max-content',
+                                                minWidth: '5rem',
                                             }}>
-                                            {
-                                                //                                     const nombreDia = format(dia, 'EEEE', { locale: es }); // "sábado"
-                                                // const letraDia = nombreDia.charAt(0).toUpperCase();    // "S"
-                                                // const diaNumero = format(dia, 'd');                    // "5"
-                                                // const mesNumero = format(dia, 'M');                    // "7"
-                                                // const resultado = `${letraDia} ${diaNumero}-${mesNumero}`;
-                                            }
                                             {formatFecha(dia)}
-                                            {/* {format(dia, 'EEE d-M', {
-                                    locale: es,
-                                })}{' '} */}
-                                            {/* "Sáb 5-7" */}
                                         </th>
                                     ))}
                             </tr>
@@ -642,6 +633,7 @@ export function TablaPlanificacion({
                                                     eventosDia[index];
                                                 return (
                                                     <td
+                                                        className="link-pdf"
                                                         onClick={() => {
                                                             if (
                                                                 RolProvider ===
