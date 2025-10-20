@@ -328,7 +328,7 @@ export function TablaPlanificacion({
                             </tbody>
                         </Table>
                     ) : (
-                        <></>
+                        <p>No hay platos</p>
                     )}
                 </Modal.Body>
                 <Modal.Footer>
