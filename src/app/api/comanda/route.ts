@@ -114,20 +114,20 @@ export async function POST(req: NextRequest) {
                     ComidaDescripcion?: string;
                     ComidaTotal?: number | string;
                 };
-                // if (
-                // platoItem.ComidaFamilia &&
-                // !tiposOmitir.some((tipo) =>
-                //     platoItem
-                //         .ComidaFamilia!.toLowerCase()
-                //         .includes(tipo.toLowerCase())
-                // )
-                // ) {
-                platos.push({
-                    nombre: platoItem.ComidaDescripcion!,
-                    cantidad: Number(platoItem.ComidaTotal),
-                    comandaId: body.Id,
-                });
-                // }
+                // Only persist items with a valid description and numeric quantity
+                const descripcion =
+                    typeof platoItem.ComidaDescripcion === 'string'
+                        ? platoItem.ComidaDescripcion.trim()
+                        : '';
+                const cantidad = Number(platoItem.ComidaTotal);
+
+                if (descripcion && Number.isFinite(cantidad)) {
+                    platos.push({
+                        nombre: descripcion,
+                        cantidad,
+                        comandaId: body.Id,
+                    });
+                }
             });
         }
     });
