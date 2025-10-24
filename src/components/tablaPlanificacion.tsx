@@ -2,7 +2,15 @@
 'use client';
 
 import React, { useContext, useEffect, useState } from 'react';
-import { Button, FloatingLabel, Form, Modal, Table } from 'react-bootstrap';
+import {
+    Button,
+    FloatingLabel,
+    Form,
+    Modal,
+    OverlayTrigger,
+    Table,
+    Tooltip,
+} from 'react-bootstrap';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { PlatoDetalle } from './platoDetalle';
@@ -104,6 +112,13 @@ export function TablaPlanificacion({
         return plato.toLowerCase().includes(filtro.toLowerCase());
     };
 
+    const abreviar = (lugar: string) => {
+        if (lugar === 'El Central') return 'CEN';
+        if (lugar === 'La Rural') return 'RUR';
+        if (lugar === 'Rüt Haus') return 'RUT';
+        if (lugar === 'Origami') return 'ORI';
+    };
+
     const filterDias = (dia: Date) => {
         if (diaActivo && format(dia, 'yyyy-MM-dd') !== diaActivo) {
             return false;
@@ -168,6 +183,7 @@ export function TablaPlanificacion({
         height: heightTd,
         left: 0,
         width: '2rem',
+        maxWidth: '15rem',
     };
     const styleEventos = {
         whiteSpace: 'nowrap',
@@ -509,9 +525,34 @@ export function TablaPlanificacion({
                                                 </Button>
                                             </td>
                                             <td style={styleTd}>
+                                                <OverlayTrigger
+                                                    overlay={
+                                                        <Tooltip
+                                                            id={
+                                                                plato +
+                                                                platoPadre
+                                                            }>
+                                                            {platoPadre}
+                                                        </Tooltip>
+                                                    }>
+                                                    <span>{platoPadre}</span>
+                                                </OverlayTrigger>
                                                 {platoPadre}
                                             </td>
-                                            <td style={styleTd}>{plato}</td>
+                                            <td style={styleTd}>
+                                                <OverlayTrigger
+                                                    overlay={
+                                                        <Tooltip
+                                                            id={
+                                                                platoPadre +
+                                                                plato
+                                                            }>
+                                                            {plato}
+                                                        </Tooltip>
+                                                    }>
+                                                    <span>{plato}</span>
+                                                </OverlayTrigger>
+                                            </td>
                                             <td
                                                 className={
                                                     datos
@@ -597,7 +638,7 @@ export function TablaPlanificacion({
                                                 position: 'sticky',
                                                 top: 0,
                                                 zIndex: 2,
-                                                minWidth: '5rem',
+                                                minWidth: '15rem',
                                             }}>
                                             {formatFecha(dia)}
                                         </th>
@@ -650,11 +691,7 @@ export function TablaPlanificacion({
                                                             verticalAlign:
                                                                 'middle',
                                                         }}>
-                                                        <strong>
-                                                            {evento.nombre}
-                                                        </strong>
-                                                        {' - '}
-                                                        {evento.lugar}
+                                                        {abreviar(evento.lugar)}
                                                         {' - '}
                                                         {evento.salon}
                                                     </td>
