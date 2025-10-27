@@ -537,7 +537,6 @@ export function TablaPlanificacion({
                                                     }>
                                                     <span>{platoPadre}</span>
                                                 </OverlayTrigger>
-                                                {platoPadre}
                                             </td>
                                             <td style={styleTd}>
                                                 <OverlayTrigger
