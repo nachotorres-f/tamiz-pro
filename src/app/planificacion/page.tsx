@@ -8,7 +8,7 @@ import {
     useState,
 } from 'react';
 import {
-    Accordion,
+    // Accordion,
     Button,
     Col,
     Container,
@@ -23,7 +23,7 @@ import React from 'react';
 // import { SelectorDias } from '@/components/selectorDias';
 // import { NavegacionSemanal } from '@/components/navegacionSemanal';
 import { TablaPlanificacion } from '@/components/tablaPlanificacion';
-import AgregarPlato from '@/components/agregarPlato';
+// import AgregarPlato from '@/components/agregarPlato';
 import { Slide, toast, ToastContainer } from 'react-toastify';
 import { RolContext, SalonContext } from '@/components/filtroPlatos';
 import { Loading } from '@/components/loading';
@@ -41,7 +41,7 @@ export default function PlanificacionPage() {
     const filtroSalon = useContext(SalonContext);
     const RolProvider = useContext(RolContext);
 
-    const [semanaBase, setSemanaBase] = useState(new Date());
+    const [semanaBase] = useState(new Date());
     const [diasSemana, setDiasSemana] = useState<Date[]>([]);
     const [datos, setDatos] = useState<any[]>([]);
     const [eventos, setEventos] = React.useState<EventoPlanificacion[]>([]);
@@ -262,7 +262,7 @@ export default function PlanificacionPage() {
                     <Container>
                         <Row>
                             <Col>
-                                <Accordion className="mb-5">
+                                {/* <Accordion className="mb-5">
                                     <Accordion.Item eventKey="0">
                                         <Accordion.Header>
                                             Agregar plato
@@ -275,7 +275,7 @@ export default function PlanificacionPage() {
                                             />
                                         </Accordion.Body>
                                     </Accordion.Item>
-                                </Accordion>
+                                </Accordion> */}
                             </Col>
                         </Row>
 

@@ -149,10 +149,47 @@ export function TablaPlanificacion({
 
     const handleVerticalScrollRight = (e: React.UIEvent<HTMLDivElement>) => {
         const scrollTop = e.currentTarget.scrollTop;
+        const scrollLeft = e.currentTarget.scrollLeft;
+
         const leftTable = document.getElementById('left-table') as HTMLElement;
+        const fakeScroll = document.getElementById(
+            'fake-scroll'
+        ) as HTMLElement;
+
+        if (!isSyncingScroll) {
+            isSyncingScroll = true;
+
+            if (fakeScroll) {
+                fakeScroll.scrollLeft = scrollLeft;
+            }
+
+            requestAnimationFrame(() => {
+                isSyncingScroll = false;
+            });
+        }
+
         if (leftTable) {
             leftTable.scrollTop = scrollTop;
         }
+    };
+
+    const handleFakeScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        if (isSyncingScroll) return;
+        isSyncingScroll = true;
+
+        const scrollLeft = e.currentTarget.scrollLeft;
+
+        const rightTable = document.getElementById(
+            'right-table'
+        ) as HTMLElement;
+
+        if (rightTable) {
+            rightTable.scrollLeft = scrollLeft;
+        }
+
+        requestAnimationFrame(() => {
+            isSyncingScroll = false;
+        });
     };
 
     useEffect(() => {
@@ -193,6 +230,8 @@ export function TablaPlanificacion({
         height: '3rem',
         width: '12rem',
     };
+
+    let isSyncingScroll = false;
 
     return (
         <>
@@ -360,9 +399,18 @@ export function TablaPlanificacion({
 
             <div
                 style={{
+                    overflowX: 'auto',
+                    overflowY: 'hidden',
+                    height: '14px',
+                }}
+                onScroll={handleFakeScroll}
+                id="fake-scroll">
+                <div style={{ width: '15000px', height: '1px' }}></div>
+            </div>
+
+            <div
+                style={{
                     display: 'flex',
-                    // overflowX: 'hidden',
-                    // overflowY: 'auto',
                     maxHeight: '90vh',
                 }}>
                 <div
@@ -386,8 +434,38 @@ export function TablaPlanificacion({
                         size="sm"
                         bordered
                         striped>
-                        <thead className="table-dark sticky-top">
+                        <thead className="sticky-top">
+                            {Array.from({ length: maxCantidadEventosDia }).map(
+                                (_, index) => (
+                                    <tr
+                                        key={`spacer-${index}`}
+                                        style={{
+                                            ...styleEventos,
+                                            backgroundColor:
+                                                index % 2 !== 0
+                                                    ? 'rgb(242,242,242)'
+                                                    : '',
+                                        }}>
+                                        {Array.from({ length: 4 }).map(
+                                            (_, i) => (
+                                                <td
+                                                    key={i}
+                                                    style={{
+                                                        ...styleTd,
+                                                        backgroundColor:
+                                                            index % 2 !== 0
+                                                                ? 'rgb(242,242,242)'
+                                                                : '',
+                                                    }}>
+                                                    &nbsp;
+                                                </td>
+                                            )
+                                        )}
+                                    </tr>
+                                )
+                            )}
                             <tr
+                                className="table-dark"
                                 style={{
                                     textAlign: 'center',
                                     width: 'max-content',
@@ -446,18 +524,6 @@ export function TablaPlanificacion({
                             </tr>
                         </thead>
                         <tbody>
-                            {Array.from({ length: maxCantidadEventosDia }).map(
-                                (_, index) => (
-                                    <tr
-                                        key={`spacer-${index}`}
-                                        style={styleEventos}>
-                                        <td style={styleTd}>&nbsp;</td>
-                                        <td style={styleTd}>&nbsp;</td>
-                                        <td style={styleTd}>&nbsp;</td>
-                                        <td style={styleTd}>&nbsp;</td>
-                                    </tr>
-                                )
-                            )}
                             {platosUnicos
                                 .filter(filterPlatos)
                                 .map(({ plato, platoPadre }) => (
@@ -613,7 +679,7 @@ export function TablaPlanificacion({
                     id="right-table"
                     className="no-scrollbar"
                     style={{
-                        overflowX: 'auto',
+                        overflowX: 'scroll',
                         overflowY: 'auto',
                         flexGrow: 1,
                     }}
@@ -626,25 +692,7 @@ export function TablaPlanificacion({
                         size="sm"
                         bordered
                         striped>
-                        <thead className="table-dark sticky-top">
-                            <tr style={{ textAlign: 'center' }}>
-                                {diasSemana
-                                    .filter(filterDias)
-                                    .map((dia, idx) => (
-                                        <th
-                                            key={idx}
-                                            style={{
-                                                position: 'sticky',
-                                                top: 0,
-                                                zIndex: 2,
-                                                minWidth: '15rem',
-                                            }}>
-                                            {formatFecha(dia)}
-                                        </th>
-                                    ))}
-                            </tr>
-                        </thead>
-                        <tbody>
+                        <thead className="sticky-top">
                             {Array.from({ length: maxCantidadEventosDia }).map(
                                 (_, index) => (
                                     <tr
@@ -689,6 +737,10 @@ export function TablaPlanificacion({
                                                             ...styleEventos,
                                                             verticalAlign:
                                                                 'middle',
+                                                            backgroundColor:
+                                                                index % 2 !== 0
+                                                                    ? 'rgb(242,242,242)'
+                                                                    : '',
                                                         }}>
                                                         {abreviar(evento.lugar)}
                                                         {' - '}
@@ -703,6 +755,10 @@ export function TablaPlanificacion({
                                                             ...styleEventos,
                                                             verticalAlign:
                                                                 'middle',
+                                                            backgroundColor:
+                                                                index % 2 !== 0
+                                                                    ? 'rgb(242,242,242)'
+                                                                    : '',
                                                         }}>
                                                         &nbsp;
                                                     </td>
@@ -712,6 +768,29 @@ export function TablaPlanificacion({
                                     </tr>
                                 )
                             )}
+                            <tr style={{ textAlign: 'center' }}>
+                                {diasSemana
+                                    .filter(filterDias)
+                                    .map((dia, idx) => (
+                                        <th
+                                            key={idx}
+                                            style={{
+                                                position: 'sticky',
+                                                top: 0,
+                                                zIndex: 2,
+                                                minWidth: '15rem',
+                                            }}
+                                            className={
+                                                idx < 14
+                                                    ? 'bg-info text-dark'
+                                                    : 'bg-dark text-white'
+                                            }>
+                                            {formatFecha(dia)}
+                                        </th>
+                                    ))}
+                            </tr>
+                        </thead>
+                        <tbody>
                             {platosUnicos
                                 .filter(filterPlatos)
                                 .map(({ plato, platoPadre }) => (

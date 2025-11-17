@@ -3,6 +3,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { startOfWeek, addDays, format } from 'date-fns';
 import { prisma } from '@/lib/prisma'; // Asumiendo que tienes prisma configurado
 
+// Constantes
+const TIMEZONE = 'America/Argentina/Buenos_Aires';
+const DIAS_SEMANA = 9;
+const TIPO_RECETA_PT = 'PT';
+const DIAS_PRODUCCION_EXTRA = { anterior: 5, posterior: 9 };
+
 export async function GET(req: NextRequest) {
     process.env.TZ = TIMEZONE;
 
@@ -257,12 +263,6 @@ interface PlatoEvento {
     lugar: string;
 }
 
-// Constantes
-const TIMEZONE = 'America/Argentina/Buenos_Aires';
-const DIAS_SEMANA = 9;
-const TIPO_RECETA_PT = 'PT';
-const DIAS_PRODUCCION_EXTRA = { anterior: 5, posterior: 9 };
-
 // Funciones auxiliares
 function validarFechaInicio(fechaInicio: string | null): Date {
     if (!fechaInicio) {
@@ -301,7 +301,7 @@ async function obtenerEventosSemana(
                     // condición 1: fecha + plato
                     fecha: {
                         gte: inicio,
-                        lte: addDays(inicio, 7),
+                        lte: addDays(inicio, 9),
                     },
                     lugar: usarNotIn ? { notIn: lugares } : { in: lugares },
                     Plato: {
@@ -316,7 +316,7 @@ async function obtenerEventosSemana(
                         some: {
                             nombre: { in: Array.from(nombresPT) },
                             fecha: {
-                                gte: addDays(inicio, 8),
+                                gte: addDays(inicio, 9),
                             },
                         },
                     },
@@ -336,17 +336,17 @@ async function obtenerEventosSemana(
                             comanda: {
                                 fecha: {
                                     gte: inicio,
-                                    lte: addDays(inicio, 7),
+                                    lte: addDays(inicio, 9),
                                 },
                             },
                         },
                         {
                             fecha: {
-                                gte: addDays(inicio, 8),
+                                gte: addDays(inicio, 9),
                             },
                             comanda: {
                                 fecha: {
-                                    gte: addDays(inicio, 8),
+                                    gte: addDays(inicio, 9),
                                 },
                             },
                         },
@@ -407,7 +407,7 @@ async function calcularIngredientesConFormato(
 }
 
 async function obtenerProduccion(inicio: Date, salon: string) {
-    return prisma.produccion.findMany({
+    const produccion = await prisma.produccion.findMany({
         where: {
             fecha: {
                 gte: addDays(inicio, -DIAS_PRODUCCION_EXTRA.anterior),
@@ -416,4 +416,9 @@ async function obtenerProduccion(inicio: Date, salon: string) {
             salon: salon,
         },
     });
+
+    return produccion.map((prod) => ({
+        ...prod,
+        cantidad: parseFloat(prod.cantidad.toFixed(2)),
+    }));
 }
