@@ -14,6 +14,7 @@ interface Route {
 interface User {
     rol: string;
     username: string;
+    salon: string;
 }
 
 export default function AppNavbar({
@@ -28,7 +29,11 @@ export default function AppNavbar({
     setRol: (rol: string) => void;
 }) {
     const router = useRouter();
-    const [user, setUser] = useState<User>({ rol: '', username: '' });
+    const [user, setUser] = useState<User>({
+        rol: '',
+        username: '',
+        salon: '',
+    });
 
     const handleLogout = async () => {
         await fetch('/api/logout', { method: 'POST' });
@@ -134,7 +139,7 @@ export default function AppNavbar({
                     {obtenerNombreSalon(salon)}
                 </p>
 
-                {user?.rol === 'admin' && (
+                {user?.salon === '0' && (
                     <Button
                         variant="light"
                         className="me-2 d-block btn-sm"

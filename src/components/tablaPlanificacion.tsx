@@ -149,47 +149,24 @@ export function TablaPlanificacion({
 
     const handleVerticalScrollRight = (e: React.UIEvent<HTMLDivElement>) => {
         const scrollTop = e.currentTarget.scrollTop;
-        const scrollLeft = e.currentTarget.scrollLeft;
 
         const leftTable = document.getElementById('left-table') as HTMLElement;
-        const fakeScroll = document.getElementById(
-            'fake-scroll'
-        ) as HTMLElement;
 
-        if (!isSyncingScroll) {
-            isSyncingScroll = true;
+        // if (!isSyncingScroll) {
+        //     isSyncingScroll = true;
 
-            if (fakeScroll) {
-                fakeScroll.scrollLeft = scrollLeft;
-            }
+        //     if (fakeScroll) {
+        //         fakeScroll.scrollLeft = scrollLeft;
+        //     }
 
-            requestAnimationFrame(() => {
-                isSyncingScroll = false;
-            });
-        }
+        //     requestAnimationFrame(() => {
+        //         isSyncingScroll = false;
+        //     });
+        // }
 
         if (leftTable) {
             leftTable.scrollTop = scrollTop;
         }
-    };
-
-    const handleFakeScroll = (e: React.UIEvent<HTMLDivElement>) => {
-        if (isSyncingScroll) return;
-        isSyncingScroll = true;
-
-        const scrollLeft = e.currentTarget.scrollLeft;
-
-        const rightTable = document.getElementById(
-            'right-table'
-        ) as HTMLElement;
-
-        if (rightTable) {
-            rightTable.scrollLeft = scrollLeft;
-        }
-
-        requestAnimationFrame(() => {
-            isSyncingScroll = false;
-        });
     };
 
     useEffect(() => {
@@ -230,8 +207,6 @@ export function TablaPlanificacion({
         height: '3rem',
         width: '12rem',
     };
-
-    let isSyncingScroll = false;
 
     return (
         <>
@@ -399,17 +374,6 @@ export function TablaPlanificacion({
 
             <div
                 style={{
-                    overflowX: 'auto',
-                    overflowY: 'hidden',
-                    height: '14px',
-                }}
-                onScroll={handleFakeScroll}
-                id="fake-scroll">
-                <div style={{ width: '15000px', height: '1px' }}></div>
-            </div>
-
-            <div
-                style={{
                     display: 'flex',
                     maxHeight: '90vh',
                 }}>
@@ -441,10 +405,6 @@ export function TablaPlanificacion({
                                         key={`spacer-${index}`}
                                         style={{
                                             ...styleEventos,
-                                            backgroundColor:
-                                                index % 2 !== 0
-                                                    ? 'rgb(242,242,242)'
-                                                    : '',
                                         }}>
                                         {Array.from({ length: 4 }).map(
                                             (_, i) => (
@@ -452,10 +412,6 @@ export function TablaPlanificacion({
                                                     key={i}
                                                     style={{
                                                         ...styleTd,
-                                                        backgroundColor:
-                                                            index % 2 !== 0
-                                                                ? 'rgb(242,242,242)'
-                                                                : '',
                                                     }}>
                                                     &nbsp;
                                                 </td>
@@ -677,7 +633,7 @@ export function TablaPlanificacion({
                 </div>
                 <div
                     id="right-table"
-                    className="no-scrollbar"
+                    className="no-scrollbr"
                     style={{
                         overflowX: 'scroll',
                         overflowY: 'auto',
@@ -716,9 +672,13 @@ export function TablaPlanificacion({
                                                     );
                                                 }
                                             );
-                                            if (eventosDia.length > index) {
+                                            const offset =
+                                                maxCantidadEventosDia -
+                                                eventosDia.length;
+                                            const eventoIndex = index - offset;
+                                            if (eventoIndex >= 0) {
                                                 const evento =
-                                                    eventosDia[index];
+                                                    eventosDia[eventoIndex];
                                                 return (
                                                     <td
                                                         className="link-pdf"
@@ -737,10 +697,6 @@ export function TablaPlanificacion({
                                                             ...styleEventos,
                                                             verticalAlign:
                                                                 'middle',
-                                                            backgroundColor:
-                                                                index % 2 !== 0
-                                                                    ? 'rgb(242,242,242)'
-                                                                    : '',
                                                         }}>
                                                         {abreviar(evento.lugar)}
                                                         {' - '}
@@ -755,10 +711,6 @@ export function TablaPlanificacion({
                                                             ...styleEventos,
                                                             verticalAlign:
                                                                 'middle',
-                                                            backgroundColor:
-                                                                index % 2 !== 0
-                                                                    ? 'rgb(242,242,242)'
-                                                                    : '',
                                                         }}>
                                                         &nbsp;
                                                     </td>
@@ -1033,6 +985,17 @@ export function TablaPlanificacion({
                     </Table>
                 </div>
             </div>
+
+            {/* <div
+                style={{
+                    overflowX: 'auto',
+                    overflowY: 'hidden',
+                    height: '14px',
+                }}
+                onScroll={handleFakeScroll}
+                id="fake-scroll">
+                <div style={{ width: '15000px', height: '1px' }}></div>
+            </div> */}
         </>
     );
 }

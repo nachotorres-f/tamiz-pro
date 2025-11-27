@@ -1,0 +1,26 @@
+Importar:
+    - Automatizar recetas @created(25-11-18 18:59)
+
+Planificacion:
+    - Barra de desplazamiento abajo @created(25-11-18 19:00)
+    - No mostrar tragos @created(25-11-18 19:00)
+    - Comandas de abajo hacia arriba @created(25-11-18 19:00)
+    - Comandas blancas @created(25-11-18 19:00)
+    - Usuario que no puede cambiar de salon @created(25-11-18 19:00)
+    - Mostrar personal que se necesita para la elaboracion @created(25-11-18 19:01)
+    - Revisar consumos @created(25-11-18 19:01)
+    - Hacer pruebas de guardado @created(25-11-18 19:02)
+    - Agregar opcion para guardar segun vida util @created(25-11-18 19:02)
+    - Poder arrastrar valores @created(25-11-18 19:02)
+
+Produccion - Entrega MP:
+    - Indicar la unidad de medida del plato a producir @created(25-11-18 19:01)
+
+Usuarios:
+
+Otros:
+    - Hacer listado de las funcionalidades del sistema @created(25-11-18 19:03)
+    - Revisar como se comportan las fechas @created(25-11-18 19:03)
+    - Refactorizar sistema @created(25-11-18 19:03)
+    - Revisar consultas de informacion con fechas @created(25-11-18 19:03)
+    - Mirar servidores para implementar @created(25-11-18 19:04)
