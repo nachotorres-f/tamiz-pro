@@ -346,8 +346,8 @@ export default function PlanificacionPage() {
 
             <div
                 id="container-planificacion"
-                className="mb-3 no-scrollbar"
-                style={{ overflow: 'auto', height: '80vh' }}>
+                className="mb-3"
+                style={{ overflow: 'auto', height: '90vh' }}>
                 <TablaPlanificacion
                     platosUnicos={platosUnicos}
                     diasSemana={diasSemana}

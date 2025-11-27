@@ -633,10 +633,9 @@ export function TablaPlanificacion({
                 </div>
                 <div
                     id="right-table"
-                    className="no-scrollbr"
+                    className="no-scrollbar"
                     style={{
-                        overflowX: 'scroll',
-                        overflowY: 'auto',
+                        overflow: 'auto',
                         flexGrow: 1,
                     }}
                     onScroll={handleVerticalScrollRight}>

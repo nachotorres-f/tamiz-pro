@@ -105,10 +105,25 @@ input[type='number'] {
     text-decoration: underline;
 }
 
-.no-scrollbar::-webkit-scrollbar {
-    display: none;
+.no-scrollbar {
+    overflow-x: auto; /* muestra horizontal */
+    overflow-y: auto; /* permite scroll vertical */
 }
 
-#container-planificacion::-webkit-scrollbar {
-    display: none; /* Chrome, Safari and Opera */
+/* --- WebKit (Chrome / Safari) --- */
+
+/* Control global del scrollbar */
+.no-scrollbar::-webkit-scrollbar {
+    width: 0;
+    height: 10px;
+}
+
+.no-scrollbar::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+.no-scrollbar::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 10px;
 }
