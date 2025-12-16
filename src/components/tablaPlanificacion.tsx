@@ -396,7 +396,6 @@ export function TablaPlanificacion({
                         }}
                         className="mx-auto"
                         size="sm"
-                        bordered
                         striped>
                         <thead className="sticky-top">
                             {Array.from({ length: maxCantidadEventosDia }).map(
@@ -405,6 +404,7 @@ export function TablaPlanificacion({
                                         key={`spacer-${index}`}
                                         style={{
                                             ...styleEventos,
+                                            border: 'none',
                                         }}>
                                         {Array.from({ length: 4 }).map(
                                             (_, i) => (
@@ -412,6 +412,7 @@ export function TablaPlanificacion({
                                                     key={i}
                                                     style={{
                                                         ...styleTd,
+                                                        border: 'none',
                                                     }}>
                                                     &nbsp;
                                                 </td>
@@ -421,10 +422,10 @@ export function TablaPlanificacion({
                                 )
                             )}
                             <tr
-                                className="table-dark"
                                 style={{
                                     textAlign: 'center',
                                     width: 'max-content',
+                                    backgroundColor: '#BDBDBD',
                                 }}>
                                 <th
                                     style={{
@@ -437,6 +438,7 @@ export function TablaPlanificacion({
                                         width: 'max-content',
                                         top: 0,
                                         zIndex: 4,
+                                        backgroundColor: '#BDBDBD',
                                     }}></th>
                                 <th
                                     style={{
@@ -448,6 +450,7 @@ export function TablaPlanificacion({
                                         height: '100%',
                                         top: 0,
                                         zIndex: 4,
+                                        backgroundColor: '#BDBDBD',
                                     }}>
                                     Plato
                                 </th>
@@ -461,6 +464,7 @@ export function TablaPlanificacion({
                                         height: '100%',
                                         top: 0,
                                         zIndex: 4,
+                                        backgroundColor: '#BDBDBD',
                                     }}>
                                     Elaboracion
                                 </th>
@@ -474,6 +478,7 @@ export function TablaPlanificacion({
                                         height: '100%',
                                         top: 0,
                                         zIndex: 4,
+                                        backgroundColor: '#BDBDBD',
                                     }}>
                                     Total
                                 </th>
@@ -645,7 +650,6 @@ export function TablaPlanificacion({
                         }}
                         className="mx-auto"
                         size="sm"
-                        bordered
                         striped>
                         <thead className="sticky-top">
                             {Array.from({ length: maxCantidadEventosDia }).map(
@@ -655,6 +659,7 @@ export function TablaPlanificacion({
                                         style={{
                                             height: heightTd,
                                             width: 'max-content',
+                                            border: 'none',
                                         }}>
                                         {diasSemana.map((dia, i) => {
                                             const diaLimpio = new Date(dia);
@@ -696,6 +701,7 @@ export function TablaPlanificacion({
                                                             ...styleEventos,
                                                             verticalAlign:
                                                                 'middle',
+                                                            border: 'none',
                                                         }}>
                                                         {abreviar(evento.lugar)}
                                                         {' - '}
@@ -710,6 +716,7 @@ export function TablaPlanificacion({
                                                             ...styleEventos,
                                                             verticalAlign:
                                                                 'middle',
+                                                            border: 'none',
                                                         }}>
                                                         &nbsp;
                                                     </td>
@@ -730,12 +737,11 @@ export function TablaPlanificacion({
                                                 top: 0,
                                                 zIndex: 2,
                                                 minWidth: '15rem',
-                                            }}
-                                            className={
-                                                idx < 14
-                                                    ? 'bg-info text-dark'
-                                                    : 'bg-dark text-white'
-                                            }>
+                                                backgroundColor:
+                                                    idx < 14
+                                                        ? 'rgb(255, 255, 0)'
+                                                        : '#BDBDBD',
+                                            }}>
                                             {formatFecha(dia)}
                                         </th>
                                     ))}
