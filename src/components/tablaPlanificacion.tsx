@@ -51,7 +51,7 @@ export function TablaPlanificacion({
     eventos: EventoPlanificacion[];
     maxCantidadEventosDia: number;
     setObservaciones: (
-        value: { plato: string; observacion: string; platoPadre: string }[]
+        value: { plato: string; observacion: string; platoPadre: string }[],
     ) => void;
     setProduccion: (value: any[]) => void;
     setProduccionUpdate: (value: any[]) => void;
@@ -140,7 +140,7 @@ export function TablaPlanificacion({
     const handleVerticalScrollLeft = (e: React.UIEvent<HTMLDivElement>) => {
         const scrollTop = e.currentTarget.scrollTop;
         const rigthTable = document.getElementById(
-            'right-table'
+            'right-table',
         ) as HTMLElement;
         if (rigthTable) {
             rigthTable.scrollTop = scrollTop;
@@ -229,7 +229,7 @@ export function TablaPlanificacion({
                             onChange={(
                                 e: React.ChangeEvent<
                                     HTMLInputElement | HTMLTextAreaElement
-                                >
+                                >,
                             ) => {
                                 setObservacionModal(e.target.value);
                             }}
@@ -253,7 +253,7 @@ export function TablaPlanificacion({
                                 const obsExistente = observaciones.find(
                                     (o) =>
                                         o.plato === platoModal &&
-                                        o.platoPadre === platoPadreModal
+                                        o.platoPadre === platoPadreModal,
                                 );
                                 if (obsExistente) {
                                     obsExistente.observacion = observacionModal;
@@ -261,7 +261,8 @@ export function TablaPlanificacion({
                                         ...observaciones.filter(
                                             (o) =>
                                                 o.plato !== platoModal &&
-                                                o.platoPadre !== platoPadreModal
+                                                o.platoPadre !==
+                                                    platoPadreModal,
                                         ),
                                         obsExistente,
                                     ]);
@@ -315,7 +316,7 @@ export function TablaPlanificacion({
                                                         platosAdelantados.find(
                                                             (p) =>
                                                                 p.id ===
-                                                                plato.id
+                                                                plato.id,
                                                         );
                                                     if (platoExistente) {
                                                         platoExistente.fecha = e
@@ -326,7 +327,7 @@ export function TablaPlanificacion({
                                                             ...platosAdelantados.filter(
                                                                 (p) =>
                                                                     p.id !==
-                                                                    plato.id
+                                                                    plato.id,
                                                             ),
                                                             platoExistente,
                                                         ]);
@@ -346,9 +347,9 @@ export function TablaPlanificacion({
                                                                     adelantar:
                                                                         e.target
                                                                             .checked,
-                                                                }
+                                                                },
                                                             ),
-                                                        }
+                                                        },
                                                     );
                                                 }}
                                             />
@@ -416,10 +417,10 @@ export function TablaPlanificacion({
                                                     }}>
                                                     &nbsp;
                                                 </td>
-                                            )
+                                            ),
                                         )}
                                     </tr>
-                                )
+                                ),
                             )}
                             <tr
                                 style={{
@@ -509,13 +510,13 @@ export function TablaPlanificacion({
                                                                     o.plato ===
                                                                         plato &&
                                                                     o.platoPadre ===
-                                                                        platoPadre
+                                                                        platoPadre,
                                                             )?.observacion ||
                                                             observacionModal;
 
                                                         if (observacion) {
                                                             setObservacionModal(
-                                                                observacion
+                                                                observacion,
                                                             );
                                                         } else {
                                                             const prod =
@@ -525,7 +526,7 @@ export function TablaPlanificacion({
                                                                             plato &&
                                                                         p.platoPadre ===
                                                                             platoPadre &&
-                                                                        p.observacion
+                                                                        p.observacion,
                                                                 );
 
                                                             if (
@@ -533,18 +534,18 @@ export function TablaPlanificacion({
                                                             ) {
                                                                 setObservacionModal(
                                                                     prod[0]
-                                                                        .observacion
+                                                                        .observacion,
                                                                 );
                                                             } else {
                                                                 setObservacionModal(
-                                                                    ''
+                                                                    '',
                                                                 );
                                                             }
                                                         }
 
                                                         setPlatoModal(plato);
                                                         setPlatoPadreModal(
-                                                            platoPadre
+                                                            platoPadre,
                                                         );
                                                         setShow(true);
                                                     }}>
@@ -587,13 +588,13 @@ export function TablaPlanificacion({
                                                                 dato.plato ===
                                                                     plato &&
                                                                 dato.platoPadre ===
-                                                                    platoPadre
+                                                                    platoPadre,
                                                         )
                                                         .reduce(
                                                             (sum, d) =>
                                                                 sum +
                                                                 d.cantidad,
-                                                            0
+                                                            0,
                                                         ) >
                                                     produccion
                                                         .filter(
@@ -601,13 +602,13 @@ export function TablaPlanificacion({
                                                                 d.plato ===
                                                                     plato &&
                                                                 d.platoPadre ===
-                                                                    platoPadre
+                                                                    platoPadre,
                                                         )
                                                         .reduce(
                                                             (sum, d) =>
                                                                 sum +
                                                                 d.cantidad,
-                                                            0
+                                                            0,
                                                         )
                                                         ? 'text-danger'
                                                         : ''
@@ -620,14 +621,14 @@ export function TablaPlanificacion({
                                                                 dato.plato ===
                                                                     plato &&
                                                                 dato.platoPadre ===
-                                                                    platoPadre
+                                                                    platoPadre,
                                                         )
                                                         .reduce(
                                                             (sum, d) =>
                                                                 sum +
                                                                 d.cantidad,
-                                                            0
-                                                        )
+                                                            0,
+                                                        ),
                                                 ).toFixed(2)}
                                             </td>
                                         </tr>
@@ -667,14 +668,14 @@ export function TablaPlanificacion({
                                             const eventosDia = eventos.filter(
                                                 (d) => {
                                                     const fecha = new Date(
-                                                        d.fecha
+                                                        d.fecha,
                                                     );
                                                     fecha.setHours(0, 0, 0, 0);
                                                     return (
                                                         fecha.getTime() ===
                                                         diaLimpio.getTime()
                                                     );
-                                                }
+                                                },
                                             );
                                             const offset =
                                                 maxCantidadEventosDia -
@@ -693,7 +694,7 @@ export function TablaPlanificacion({
                                                             )
                                                                 return;
                                                             setAdelantarEvento(
-                                                                evento.id
+                                                                evento.id,
                                                             );
                                                         }}
                                                         key={i + index}
@@ -724,7 +725,7 @@ export function TablaPlanificacion({
                                             }
                                         })}
                                     </tr>
-                                )
+                                ),
                             )}
                             <tr style={{ textAlign: 'center' }}>
                                 {diasSemana
@@ -738,7 +739,7 @@ export function TablaPlanificacion({
                                                 zIndex: 2,
                                                 minWidth: '15rem',
                                                 backgroundColor:
-                                                    idx < 14
+                                                    idx < 11
                                                         ? 'rgb(255, 255, 0)'
                                                         : '#BDBDBD',
                                             }}>
@@ -757,13 +758,13 @@ export function TablaPlanificacion({
                                                 .filter(filterDias)
                                                 .map((dia, i) => {
                                                     const diaLimpio = new Date(
-                                                        dia
+                                                        dia,
                                                     );
                                                     diaLimpio.setHours(
                                                         0,
                                                         0,
                                                         0,
-                                                        0
+                                                        0,
                                                     );
 
                                                     const total =
@@ -771,17 +772,17 @@ export function TablaPlanificacion({
                                                             (d) => {
                                                                 const fecha =
                                                                     new Date(
-                                                                        d.fecha
+                                                                        d.fecha,
                                                                     );
                                                                 fecha.setHours(
                                                                     0,
                                                                     0,
                                                                     0,
-                                                                    0
+                                                                    0,
                                                                 );
                                                                 fecha.setDate(
                                                                     fecha.getDate() +
-                                                                        1
+                                                                        1,
                                                                 ); // Ajuste para comparar con el día limpio
 
                                                                 return (
@@ -792,7 +793,7 @@ export function TablaPlanificacion({
                                                                     fecha.getTime() ===
                                                                         diaLimpio.getTime()
                                                                 );
-                                                            }
+                                                            },
                                                         );
 
                                                     const update =
@@ -800,17 +801,17 @@ export function TablaPlanificacion({
                                                             (d) => {
                                                                 const fecha =
                                                                     new Date(
-                                                                        d.fecha
+                                                                        d.fecha,
                                                                     );
                                                                 fecha.setHours(
                                                                     0,
                                                                     0,
                                                                     0,
-                                                                    0
+                                                                    0,
                                                                 );
                                                                 fecha.setDate(
                                                                     fecha.getDate() +
-                                                                        1
+                                                                        1,
                                                                 ); // Ajuste para comparar con el día limpio
 
                                                                 return (
@@ -821,20 +822,20 @@ export function TablaPlanificacion({
                                                                     fecha.getTime() ===
                                                                         diaLimpio.getTime()
                                                                 );
-                                                            }
+                                                            },
                                                         );
 
                                                     const totalConsumo = datos
                                                         .filter((d) => {
                                                             const fecha =
                                                                 new Date(
-                                                                    d.fecha
+                                                                    d.fecha,
                                                                 );
                                                             fecha.setHours(
                                                                 0,
                                                                 0,
                                                                 0,
-                                                                0
+                                                                0,
                                                             );
 
                                                             return (
@@ -850,7 +851,7 @@ export function TablaPlanificacion({
                                                             (sum, d) =>
                                                                 sum +
                                                                 d.cantidad,
-                                                            0
+                                                            0,
                                                         );
 
                                                     let cantidad = '';
@@ -860,7 +861,7 @@ export function TablaPlanificacion({
                                                             (sum, d) =>
                                                                 sum +
                                                                 d.cantidad,
-                                                            0
+                                                            0,
                                                         );
                                                     }
 
@@ -872,7 +873,7 @@ export function TablaPlanificacion({
                                                                 (sum, d) =>
                                                                     sum +
                                                                     d.cantidad,
-                                                                0
+                                                                0,
                                                             );
 
                                                         updateCant = true;
@@ -912,13 +913,13 @@ export function TablaPlanificacion({
                                                                 step={0.1}
                                                                 min={0}
                                                                 onChange={(
-                                                                    e
+                                                                    e,
                                                                 ) => {
                                                                     const cantidad =
                                                                         parseFloat(
                                                                             e
                                                                                 .target
-                                                                                .value
+                                                                                .value,
                                                                         );
                                                                     // if (isNaN(cantidad)) {
                                                                     //     return;
@@ -926,7 +927,7 @@ export function TablaPlanificacion({
                                                                     const fecha =
                                                                         format(
                                                                             diaLimpio,
-                                                                            'yyyy-MM-dd'
+                                                                            'yyyy-MM-dd',
                                                                         );
                                                                     const nuevaProduccion =
                                                                         [
@@ -935,14 +936,14 @@ export function TablaPlanificacion({
                                                                     const index =
                                                                         nuevaProduccion.findIndex(
                                                                             (
-                                                                                p
+                                                                                p,
                                                                             ) =>
                                                                                 p.plato ===
                                                                                     plato &&
                                                                                 p.platoPadre ===
                                                                                     platoPadre &&
                                                                                 p.fecha ===
-                                                                                    fecha
+                                                                                    fecha,
                                                                         );
 
                                                                     if (
@@ -960,17 +961,17 @@ export function TablaPlanificacion({
                                                                                 platoPadre,
                                                                                 fecha,
                                                                                 cantidad,
-                                                                            }
+                                                                            },
                                                                         );
                                                                     }
                                                                     setProduccionUpdate(
-                                                                        nuevaProduccion
+                                                                        nuevaProduccion,
                                                                     );
                                                                     localStorage.setItem(
                                                                         'produccionUpdate',
                                                                         JSON.stringify(
-                                                                            nuevaProduccion
-                                                                        )
+                                                                            nuevaProduccion,
+                                                                        ),
                                                                     );
                                                                 }}
                                                             />
