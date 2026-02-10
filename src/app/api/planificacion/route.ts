@@ -20,14 +20,14 @@ export async function GET(req: NextRequest) {
         if (!fechaInicio) {
             return NextResponse.json(
                 { error: 'fechaInicio es requerido' },
-                { status: 400 }
+                { status: 400 },
             );
         }
 
         if (!['A', 'B'].includes(salon)) {
             return NextResponse.json(
                 { error: 'salon debe ser "A" o "B"' },
-                { status: 400 }
+                { status: 400 },
             );
         }
 
@@ -74,28 +74,28 @@ export async function POST(req: NextRequest) {
     if (!Array.isArray(produccion)) {
         return NextResponse.json(
             { error: 'El cuerpo debe ser un array de producciones' },
-            { status: 400 }
+            { status: 400 },
         );
     }
 
     if (!Array.isArray(observaciones)) {
         return NextResponse.json(
             { error: 'El cuerpo debe ser un array de observaciones' },
-            { status: 400 }
+            { status: 400 },
         );
     }
 
     if (!salon) {
         return NextResponse.json(
             { error: 'El salón es requerido' },
-            { status: 400 }
+            { status: 400 },
         );
     }
 
     if (!fechaInicio) {
         return NextResponse.json(
             { error: 'La fecha es requerido' },
-            { status: 400 }
+            { status: 400 },
         );
     }
 
@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
         if (!item.plato || !item.fecha || typeof item.cantidad !== 'number') {
             return NextResponse.json(
                 { error: 'Cada item debe tener plato, fecha y cantidad' },
-                { status: 400 }
+                { status: 400 },
             );
         }
 
@@ -178,7 +178,7 @@ type Resultado = {
 
 async function calcularIngredientesPT(
     platos: PlatoEvento[],
-    recetas: Receta[]
+    recetas: Receta[],
 ): Promise<Resultado[]> {
     const resultado: Resultado[] = [];
     const visitados = new Set<string>(); // para evitar loops
@@ -188,10 +188,10 @@ async function calcularIngredientesPT(
         fecha: string,
         cantidad: number,
         lugar: string,
-        comandaId: number
+        comandaId: number,
     ) {
         const subRecetas = recetas.filter(
-            (r) => r.nombreProducto === nombre && r.tipo === 'PT'
+            (r) => r.nombreProducto === nombre && r.tipo === 'PT',
         );
 
         for (const receta of subRecetas) {
@@ -215,7 +215,7 @@ async function calcularIngredientesPT(
                     fecha,
                     parseFloat(cantidadTotal.toFixed(2)),
                     lugar,
-                    comandaId
+                    comandaId,
                 );
             }
         }
@@ -227,7 +227,7 @@ async function calcularIngredientesPT(
             item.fecha,
             item.cantidad,
             item.lugar,
-            item.comandaId
+            item.comandaId,
         );
     }
 
@@ -289,7 +289,7 @@ async function obtenerNombresRecetasPT(): Promise<Set<string>> {
 async function obtenerEventosSemana(
     inicio: Date,
     nombresPT: Set<string>,
-    salon: string
+    salon: string,
 ) {
     const lugares = ['El Central', 'La Rural'];
     const usarNotIn = salon === 'A';
@@ -301,7 +301,7 @@ async function obtenerEventosSemana(
                     // condición 1: fecha + plato
                     fecha: {
                         gte: inicio,
-                        lte: addDays(inicio, 9),
+                        lte: addDays(inicio, 6),
                     },
                     lugar: usarNotIn ? { notIn: lugares } : { in: lugares },
                     Plato: {
@@ -359,7 +359,7 @@ async function obtenerEventosSemana(
 
 function procesarEventosAPlatos(
     eventos: any[],
-    nombresPT: Set<string>
+    nombresPT: Set<string>,
 ): PlatoEvento[] {
     const resultado: PlatoEvento[] = [];
 
@@ -396,7 +396,7 @@ async function obtenerRecetas(): Promise<Receta[]> {
 
 async function calcularIngredientesConFormato(
     platos: PlatoEvento[],
-    recetas: Receta[]
+    recetas: Receta[],
 ) {
     const ingredientes = await calcularIngredientesPT(platos, recetas);
 
