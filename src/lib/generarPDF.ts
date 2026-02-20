@@ -47,7 +47,7 @@ export const generarPDFReceta = async (
             }
 
             const yPosition = renderEncabezado(doc);
-            renderReceta(doc, plato, yPosition, fecha);
+            renderReceta(doc, plato, yPosition, fecha, entregaMP);
         });
 
         doc.save(`Produccion_${fecha.toISOString().split('T')[0]}.pdf`);
