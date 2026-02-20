@@ -146,7 +146,7 @@ export default function ProduccionPage() {
             transition: Slide,
         });
 
-        generarPDFReceta([], fechaImprimir || new Date(), salon, modo, true);
+        generarPDFReceta([], fechaImprimir || new Date(), salon, modo, false);
 
         handleClose();
     };
