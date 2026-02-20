@@ -25,14 +25,14 @@ export async function POST(req: NextRequest) {
         if (!salon) {
             return NextResponse.json(
                 { error: 'Salon es requerido' },
-                { status: 400 }
+                { status: 400 },
             );
         }
 
         if (!fecha) {
             return NextResponse.json(
                 { error: 'Fecha es requerido' },
-                { status: 400 }
+                { status: 400 },
             );
         }
 
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
                 ? await buscarProduccionPorPlato(
                       fechaProduccion,
                       salon,
-                      listaPlatos
+                      listaPlatos,
                   )
                 : await buscarProduccionPorFecha(fechaProduccion, salon);
 
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
                 success: false,
                 message: 'Error al obtener la informacion para el PDF',
             },
-            { status: 500 }
+            { status: 500 },
         );
     }
 }
@@ -63,7 +63,7 @@ const buscarProduccionPorFecha = async (fecha: Date, salon: string) => {
     const gte = addDays(set(fecha, { hours: 0, minutes: 0, seconds: 0 }), -1);
     const lte = addDays(
         set(fecha, { hours: 23, minutes: 59, seconds: 59 }),
-        -1
+        -1,
     );
 
     const produccionList = await prisma.produccion.findMany({
@@ -82,12 +82,12 @@ const buscarProduccionPorFecha = async (fecha: Date, salon: string) => {
 const buscarProduccionPorPlato = async (
     fecha: Date,
     salon: string,
-    plato: string[]
+    plato: string[],
 ) => {
     const gte = addDays(set(fecha, { hours: 0, minutes: 0, seconds: 0 }), -1);
     const lte = addDays(
         set(fecha, { hours: 23, minutes: 59, seconds: 59 }),
-        -1
+        -1,
     );
     const produccionList = await prisma.produccion.findMany({
         where: {
@@ -139,8 +139,8 @@ const buscarReceta = async ({
                 subCodigo,
                 descripcion,
                 unidadMedida,
-                (porcionBruta * cantidad).toFixed(2),
-            ]
+                (porcionBruta * cantidad).toFixed(4),
+            ],
         ),
     };
 };

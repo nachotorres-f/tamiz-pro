@@ -70,7 +70,7 @@ export default function ProduccionPage() {
             '/api/produccion?fechaInicio=' +
                 semanaBase.toISOString() +
                 '&salon=' +
-                salon
+                salon,
         )
             .then((res) => res.json())
             .then((res) => res.data)
@@ -86,7 +86,7 @@ export default function ProduccionPage() {
     useEffect(() => {
         const inicioSemana = semanaBase;
         const dias = Array.from({ length: 7 }, (_, i) =>
-            addDays(inicioSemana, i)
+            addDays(inicioSemana, i),
         );
         setDiasSemana(dias);
         setDiaActivo('');
@@ -209,7 +209,7 @@ export default function ProduccionPage() {
                     '/api/produccion?fechaInicio=' +
                         semanaBase.toISOString() +
                         '&salon=' +
-                        salon
+                        salon,
                 )
                     .then((res) => res.json())
                     .then((res) => res.data)
@@ -257,7 +257,7 @@ export default function ProduccionPage() {
                     '/api/produccion?fechaInicio=' +
                         semanaBase.toISOString() +
                         '&salon=' +
-                        salon
+                        salon,
                 )
                     .then((res) => res.json())
                     .then((res) => res.data)
@@ -326,7 +326,7 @@ export default function ProduccionPage() {
         if (!paginado) return;
 
         const totalPags = Math.ceil(
-            datosApi.filter(filterPlatosPorDia).length / registrosPagina
+            datosApi.filter(filterPlatosPorDia).length / registrosPagina,
         );
         setTotalPaginas(totalPags);
         setPaginaActual(0);
@@ -412,8 +412,8 @@ export default function ProduccionPage() {
                                                                 setRegistrosPagina(
                                                                     Number(
                                                                         e.target
-                                                                            .value
-                                                                    )
+                                                                            .value,
+                                                                    ),
                                                                 )
                                                             }></Form.Control>
                                                     </Form.Group>
@@ -435,8 +435,8 @@ export default function ProduccionPage() {
                                                                 setIntervaloSegundos(
                                                                     Number(
                                                                         e.target
-                                                                            .value
-                                                                    )
+                                                                            .value,
+                                                                    ),
                                                                 )
                                                             }></Form.Control>
                                                     </Form.Group>
@@ -529,7 +529,7 @@ export default function ProduccionPage() {
                                     setObservacionModal(
                                         platoModalProduccion.comentario
                                             ? platoModalProduccion.comentario
-                                            : ''
+                                            : '',
                                     );
                                     handleCloseModalProduccion();
                                     setShowModalObservacion(true);
@@ -546,7 +546,7 @@ export default function ProduccionPage() {
                                     platoModalProduccion.fecha,
                                     salon,
                                     'separado',
-                                    true
+                                    false,
                                 );
 
                                 toast.info('Imprimiendo receta', {
@@ -583,7 +583,7 @@ export default function ProduccionPage() {
                                 onChange={(
                                     e: React.ChangeEvent<
                                         HTMLInputElement | HTMLTextAreaElement
-                                    >
+                                    >,
                                 ) => {
                                     setObservacionModal(e.target.value);
                                 }}
@@ -654,15 +654,15 @@ export default function ProduccionPage() {
                                             (diaActivo ===
                                                 format(
                                                     diasSemana[i],
-                                                    'yyyy-MM-dd'
+                                                    'yyyy-MM-dd',
                                                 ) ||
                                                 (i > 0 &&
                                                     diaActivo ===
                                                         format(
                                                             diasSemana[i - 1],
-                                                            'yyyy-MM-dd'
+                                                            'yyyy-MM-dd',
                                                         )))) ||
-                                        diaActivo === ''
+                                        diaActivo === '',
                                 )
                                 .map((i) => {
                                     return (
@@ -675,7 +675,7 @@ export default function ProduccionPage() {
                                                     <Dropdown.Item
                                                         onClick={() => {
                                                             setFechaImprimir(
-                                                                diasSemana[i]
+                                                                diasSemana[i],
                                                             );
                                                             setShowModal(true);
                                                         }}>
@@ -692,8 +692,8 @@ export default function ProduccionPage() {
                                                                           diasSemana[
                                                                               i
                                                                           ],
-                                                                          'yyyy-MM-dd'
-                                                                      )
+                                                                          'yyyy-MM-dd',
+                                                                      ),
                                                             );
                                                         }}>
                                                         <EyeFill />{' '}
@@ -738,20 +738,20 @@ export default function ProduccionPage() {
                                                             (prod: any) => {
                                                                 const fecha =
                                                                     new Date(
-                                                                        prod.fecha
+                                                                        prod.fecha,
                                                                     );
                                                                 fecha.setHours(
                                                                     0,
                                                                     0,
                                                                     0,
-                                                                    0
+                                                                    0,
                                                                 );
 
                                                                 return (
                                                                     fecha.getTime() ===
                                                                     dia.getTime()
                                                                 );
-                                                            }
+                                                            },
                                                         );
                                                     const cantidad = produccion
                                                         ? produccion.cantidad
@@ -776,10 +776,10 @@ export default function ProduccionPage() {
                                                                             produccion.comentario
                                                                                 ? dato.comentario
                                                                                 : '',
-                                                                    }
+                                                                    },
                                                                 );
                                                                 setShowModalProduccion(
-                                                                    true
+                                                                    true,
                                                                 );
                                                             }}>
                                                             {cantidad || ''}
@@ -790,7 +790,7 @@ export default function ProduccionPage() {
                                         {dato.comentario &&
                                             dato.comentario.replace(
                                                 '\n',
-                                                ''
+                                                '',
                                             ) !== '' && (
                                                 <tr className="fst-italic fs-6 text-secondary">
                                                     <td className="bg-warning-subtle"></td>

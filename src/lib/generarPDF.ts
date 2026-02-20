@@ -22,7 +22,7 @@ export const generarPDFReceta = async (
     fecha: Date,
     salon: string,
     modo: 'unico' | 'separado',
-    entregaMP = false
+    entregaMP = false,
 ) => {
     const response = await fetch('api/pdf', {
         method: 'POST',
@@ -36,6 +36,7 @@ export const generarPDFReceta = async (
 
     const data = await response.json();
     fecha = entregaMP ? addDays(fecha, -2) : fecha;
+    console.log(entregaMP);
 
     if (modo === 'unico') {
         const doc = new jsPDF();
@@ -59,21 +60,21 @@ export const generarPDFReceta = async (
             const doc = new jsPDF();
 
             const yPosition = renderEncabezado(doc);
-            renderReceta(doc, plato, yPosition, fecha);
+            renderReceta(doc, plato, yPosition, fecha, entregaMP);
 
             const pdfBlob = doc.output('blob');
             zip.file(
                 `Produccion_${plato.plato}_${
                     fecha.toISOString().split('T')[0]
                 }.pdf`,
-                pdfBlob
+                pdfBlob,
             );
         }
 
         const content = await zip.generateAsync({ type: 'blob' });
         saveAs(
             content,
-            `Producciones_${fecha.toISOString().split('T')[0]}.zip`
+            `Producciones_${fecha.toISOString().split('T')[0]}.zip`,
         );
     }
 };
@@ -126,7 +127,8 @@ const renderReceta = (
     doc: jsPDF,
     plato: Plato,
     yPosition: number,
-    fecha: Date
+    fecha: Date,
+    entregaMP: boolean = false,
 ) => {
     doc.setFontSize(16);
     doc.text(`${plato.codigo} - ${plato.plato}`, 14, yPosition);
@@ -135,9 +137,9 @@ const renderReceta = (
 
     doc.setFontSize(10);
     doc.text(
-        `Cantidad a producir: ${plato.cantidad} ${plato.unidadMedida}`,
+        `${entregaMP ? 'Cantidad' : 'Cantidad a producir:'} ${plato.cantidad} ${plato.unidadMedida}`,
         14,
-        yPosition
+        yPosition,
     );
 
     yPosition += 5;
@@ -150,7 +152,7 @@ const renderReceta = (
             yPosition - 4,
             doc.getTextWidth(observacionText) + 2,
             5, // PROBAR CON 6
-            'F'
+            'F',
         );
 
         doc.text(observacionText, 14, yPosition);
@@ -158,7 +160,11 @@ const renderReceta = (
         yPosition += 5;
     }
 
-    doc.text(`Fecha Produccion: ${format(fecha, 'dd/MM/yyyy')}`, 14, yPosition);
+    doc.text(
+        `${entregaMP ? 'Fecha:' : 'Fecha Produccion:'} ${format(fecha, 'dd/MM/yyyy')}`,
+        14,
+        yPosition,
+    );
 
     const tableData = {
         head,
