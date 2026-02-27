@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     if (!plato || !produccion) {
         return NextResponse.json(
             { error: 'Datos incompletos' },
-            { status: 400 }
+            { status: 400 },
         );
     }
 
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
                 await updateGestionadoPlato(plato);
                 return newProduccion;
             }
-        })
+        }),
     );
 
     await prisma.$executeRawUnsafe(`
@@ -95,13 +95,13 @@ export async function GET(req: NextRequest) {
     if (!fechaInicio) {
         return NextResponse.json(
             { error: 'fechaInicio es requerido' },
-            { status: 400 }
+            { status: 400 },
         );
     }
 
-    const desde = addDays(new Date(fechaInicio), previa ? 2 : 0);
+    const desde = addDays(new Date(fechaInicio), previa ? 1 : -1);
     desde.setHours(0, 0, 0, 0);
-    const hasta = addDays(desde, 6);
+    const hasta = addDays(desde, 7);
     hasta.setHours(0, 0, 0, 0);
 
     const producciones = await prisma.produccion.findMany({
@@ -126,7 +126,7 @@ export async function GET(req: NextRequest) {
         const existingPlato = groupedProducciones.find(
             (item: any) =>
                 item.plato === produccion.plato &&
-                item.platoPadre === produccion.platoPadre
+                item.platoPadre === produccion.platoPadre,
         );
 
         if (existingPlato) {
