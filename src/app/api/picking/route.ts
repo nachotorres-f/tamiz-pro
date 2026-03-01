@@ -2,41 +2,48 @@ import { prisma } from '@/lib/prisma';
 import { endOfWeek, startOfWeek } from 'date-fns';
 import { NextRequest, NextResponse } from 'next/server';
 
-interface Evento {
-    Plato: Plato[];
+interface RecetaNodo {
+    nombreProducto: string;
+    descripcion: string;
+    porcionBruta: number;
+}
+
+interface ComandaConPlatos {
+    Plato: {
+        nombre: string;
+        cantidad: number;
+    }[];
     id: number;
     lugar: string;
     salon: string;
     tipo: string;
     fecha: Date;
     nombre: string;
-    horarioInicio: Date;
-    horarioFin: Date;
-    cantidadMayores: number;
-    cantidadMenores: number;
-    observaciones: string | null;
 }
 
-interface Plato {
-    id: number;
-    fecha: Date | null;
-    nombre: string;
+interface PlatoDesglosado {
+    platoPrincipal: string;
     cantidad: number;
-    comandaId: number;
-    gestionado: boolean;
+    subPlatos: {
+        nombre: string;
+        cantidad: number;
+    }[];
 }
 
-interface Resultado {
-    semi: string;
-    comandas: { evento: Evento; cantidad: number }[];
-}
-
-interface Receta {
-    nombreProducto: string;
-    descripcion: string;
-    porcionBruta: number;
+interface ComandaDesglosada {
+    id: number;
+    fecha: Date;
+    lugar: string;
+    salon: string;
     tipo: string;
-    unidadMedida: string | null;
+    nombre: string;
+    platos: PlatoDesglosado[];
+}
+
+interface FilaPicking {
+    platoPrincipal: string;
+    subPlato: string;
+    cantidadesPorComanda: Record<string, number>;
 }
 
 export async function GET(req: NextRequest) {
@@ -48,8 +55,7 @@ export async function GET(req: NextRequest) {
     const lugares = ['El Central', 'La Rural'];
     const usarNotIn = salon === 'A';
 
-    // 1. Una sola consulta para obtener eventos
-    const eventos = await prisma.comanda.findMany({
+    const comandas = (await prisma.comanda.findMany({
         where: {
             fecha: {
                 gte: startOfWeek(new Date(), { weekStartsOn: 1 }),
@@ -57,198 +63,265 @@ export async function GET(req: NextRequest) {
             },
             lugar: usarNotIn ? { notIn: lugares } : { in: lugares },
         },
+        orderBy: [{ fecha: 'asc' }, { id: 'asc' }],
         include: { Plato: true },
-    });
+    })) as ComandaConPlatos[];
 
-    if (eventos.length === 0) {
-        return NextResponse.json({ resultado: [] });
+    if (comandas.length === 0) {
+        return NextResponse.json({
+            comandas: [],
+            filas: [],
+        });
     }
 
-    // 2. Recolectar todos los nombres de productos únicos
-    const nombresProductos = new Set<string>();
-    for (const evento of eventos) {
-        for (const plato of evento.Plato) {
-            nombresProductos.add(plato.nombre);
-        }
-    }
-
-    // 3. Una sola consulta para obtener todas las recetas necesarias
-    const todasLasRecetas = await prisma.receta.findMany({
-        where: {
-            nombreProducto: { in: Array.from(nombresProductos) },
-            tipo: 'PT',
-        },
-        select: {
-            nombreProducto: true,
-            descripcion: true,
-            porcionBruta: true,
-            tipo: true,
-            unidadMedida: true,
-        },
-    });
-
-    // 4. Crear un mapa de recetas por producto para acceso O(1)
-    const recetasPorProducto = new Map<string, Receta[]>();
-    for (const receta of todasLasRecetas) {
-        if (!recetasPorProducto.has(receta.nombreProducto)) {
-            recetasPorProducto.set(receta.nombreProducto, []);
-        }
-        recetasPorProducto.get(receta.nombreProducto)!.push(receta);
-    }
-
-    // 5. Construir el grafo de dependencias completo
-    const grafoRecetas = await construirGrafoCompleto(
-        recetasPorProducto,
-        nombresProductos
-    );
-
-    // 6. Procesar eventos sin consultas adicionales a la BD
-    const mapResultado = new Map<
-        string,
-        { evento: Evento; cantidad: number; unidadMedida: string }[]
-    >();
-
-    for (const evento of eventos) {
-        for (const plato of evento.Plato) {
-            procesarPlatoIterativo(
-                plato.nombre,
-                plato.cantidad,
-                evento,
-                grafoRecetas,
-                mapResultado
-            );
-        }
-    }
-    // Agrupar comandas por evento para evitar duplicados
-    const resultado: Resultado[] = Array.from(mapResultado.entries()).map(
-        ([semi, comandas]) => {
-            const eventoMap = new Map<
-                number,
-                { evento: Evento; cantidad: number }
-            >();
-            for (const { evento, cantidad } of comandas) {
-                if (eventoMap.has(evento.id)) {
-                } else {
-                    eventoMap.set(evento.id, { evento, cantidad });
-                }
+    const nombresPlatos = new Set<string>();
+    for (const comanda of comandas) {
+        for (const plato of comanda.Plato) {
+            const nombrePlato = normalizarTexto(plato.nombre);
+            if (nombrePlato) {
+                nombresPlatos.add(nombrePlato);
             }
-            return {
-                semi,
-                comandas: Array.from(eventoMap.values()),
-            };
         }
+    }
+
+    const grafoRecetas = await construirGrafoRecetas(nombresPlatos);
+    const cacheCoeficientes = new Map<string, Map<string, number>>();
+    const filasMap = new Map<string, FilaPicking>();
+
+    const comandasDesglosadas: ComandaDesglosada[] = comandas.map((comanda) => {
+        const platosAgrupados = agruparPlatosPorNombre(comanda.Plato);
+
+        const platos: PlatoDesglosado[] = Array.from(platosAgrupados.entries())
+            .map(([platoPrincipal, cantidadPlato]) => {
+                const coeficientesSubPlatos = obtenerCoeficientesSubPlatos(
+                    platoPrincipal,
+                    grafoRecetas,
+                    cacheCoeficientes,
+                );
+
+                const subPlatos = Array.from(coeficientesSubPlatos.entries())
+                    .map(([subPlato, coeficiente]) => {
+                        const cantidadSubPlato = redondearCantidad(
+                            cantidadPlato * coeficiente,
+                        );
+                        if (cantidadSubPlato === 0) {
+                            return null;
+                        }
+
+                        const keyFila = `${platoPrincipal}|||${subPlato}`;
+                        if (!filasMap.has(keyFila)) {
+                            filasMap.set(keyFila, {
+                                platoPrincipal,
+                                subPlato,
+                                cantidadesPorComanda: {},
+                            });
+                        }
+
+                        const fila = filasMap.get(keyFila)!;
+                        const keyComanda = String(comanda.id);
+                        fila.cantidadesPorComanda[keyComanda] =
+                            redondearCantidad(
+                                (fila.cantidadesPorComanda[keyComanda] ?? 0) +
+                                    cantidadSubPlato,
+                            );
+
+                        return {
+                            nombre: subPlato,
+                            cantidad: cantidadSubPlato,
+                        };
+                    })
+                    .filter(
+                        (
+                            item,
+                        ): item is {
+                            nombre: string;
+                            cantidad: number;
+                        } => item !== null,
+                    )
+                    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+
+                return {
+                    platoPrincipal,
+                    cantidad: redondearCantidad(cantidadPlato),
+                    subPlatos,
+                };
+            })
+            .sort((a, b) =>
+                a.platoPrincipal.localeCompare(b.platoPrincipal, 'es'),
+            );
+
+        return {
+            id: comanda.id,
+            fecha: comanda.fecha,
+            lugar: comanda.lugar,
+            salon: comanda.salon,
+            tipo: comanda.tipo,
+            nombre: comanda.nombre,
+            platos,
+        };
+    });
+
+    const filas = Array.from(filasMap.values()).sort(
+        (a, b) =>
+            a.platoPrincipal.localeCompare(b.platoPrincipal, 'es') ||
+            a.subPlato.localeCompare(b.subPlato, 'es'),
     );
 
-    // const resultado: Resultado[] = Array.from(mapResultado.entries()).map(
-    //     ([semi, comandas]) => ({ semi, comandas })
-    // );
-
-    return NextResponse.json(resultado);
+    return NextResponse.json({
+        comandas: comandasDesglosadas,
+        filas,
+    });
 }
 
-// Construir el grafo completo de recetas una sola vez
-async function construirGrafoCompleto(
-    recetasPorProducto: Map<string, Receta[]>,
-    nombresIniciales: Set<string>
-): Promise<Map<string, Receta[]>> {
-    const grafoCompleto = new Map<string, Receta[]>();
+async function construirGrafoRecetas(
+    nombresIniciales: Set<string>,
+): Promise<Map<string, RecetaNodo[]>> {
+    const grafoRecetas = new Map<string, RecetaNodo[]>();
     const visitados = new Set<string>();
     const pendientes = Array.from(nombresIniciales);
 
-    // Agregar recetas conocidas al grafo
-    for (const [nombre, recetas] of recetasPorProducto) {
-        grafoCompleto.set(nombre, recetas);
-    }
-
-    // Procesar pendientes para encontrar dependencias transitivas
     while (pendientes.length > 0) {
-        const nombresPendientesBatch = pendientes.splice(0, 50); // Procesar en lotes
-        const nombresNoVisitados = nombresPendientesBatch.filter(
-            (nombre) => !visitados.has(nombre)
-        );
+        const nombresNoVisitados = pendientes
+            .splice(0, 100)
+            .map((nombre) => normalizarTexto(nombre))
+            .filter((nombre): nombre is string => Boolean(nombre))
+            .filter((nombre) => !visitados.has(nombre));
 
-        if (nombresNoVisitados.length === 0) continue;
+        if (nombresNoVisitados.length === 0) {
+            continue;
+        }
 
-        // Marcar como visitados
         nombresNoVisitados.forEach((nombre) => visitados.add(nombre));
 
-        // Obtener recetas para este lote
-        const nuevasRecetas = await prisma.receta.findMany({
+        const recetas = await prisma.receta.findMany({
             where: {
-                nombreProducto: { in: nombresNoVisitados },
+                nombreProducto: {
+                    in: nombresNoVisitados,
+                },
                 tipo: 'PT',
             },
             select: {
                 nombreProducto: true,
                 descripcion: true,
                 porcionBruta: true,
-                tipo: true,
-                unidadMedida: true,
             },
         });
 
-        // Agregar al grafo y encontrar nuevas dependencias
-        for (const receta of nuevasRecetas) {
-            if (!grafoCompleto.has(receta.nombreProducto)) {
-                grafoCompleto.set(receta.nombreProducto, []);
-            }
-            grafoCompleto.get(receta.nombreProducto)!.push(receta);
+        for (const receta of recetas) {
+            const nombreProducto = normalizarTexto(receta.nombreProducto);
+            const descripcion = normalizarTexto(receta.descripcion);
+            const porcionBruta = Number(receta.porcionBruta);
 
-            // Agregar descripción a pendientes si no fue visitada
-            if (!visitados.has(receta.descripcion)) {
-                pendientes.push(receta.descripcion);
+            if (!nombreProducto || !descripcion) {
+                continue;
+            }
+
+            if (!Number.isFinite(porcionBruta) || porcionBruta === 0) {
+                continue;
+            }
+
+            if (!grafoRecetas.has(nombreProducto)) {
+                grafoRecetas.set(nombreProducto, []);
+            }
+
+            grafoRecetas.get(nombreProducto)!.push({
+                nombreProducto,
+                descripcion,
+                porcionBruta,
+            });
+
+            if (!visitados.has(descripcion)) {
+                pendientes.push(descripcion);
             }
         }
     }
 
-    return grafoCompleto;
+    return grafoRecetas;
 }
 
-// Versión iterativa para evitar stack overflow y mejorar rendimiento
-function procesarPlatoIterativo(
-    nombreInicial: string,
-    cantidadInicial: number,
-    evento: Evento,
-    grafoRecetas: Map<string, Receta[]>,
-    mapResultado: Map<
-        string,
-        { evento: Evento; cantidad: number; unidadMedida: string | null }[]
-    >
-): void {
-    // Usar una pila para simular la recursión
-    const pila: Array<{ nombre: string; cantidad: number }> = [
-        { nombre: nombreInicial, cantidad: cantidadInicial },
-    ];
+function obtenerCoeficientesSubPlatos(
+    platoPrincipal: string,
+    grafoRecetas: Map<string, RecetaNodo[]>,
+    cache: Map<string, Map<string, number>>,
+): Map<string, number> {
+    if (cache.has(platoPrincipal)) {
+        return cache.get(platoPrincipal)!;
+    }
+
+    const coeficientes = new Map<string, number>();
+    const pila: Array<{ nombre: string; factor: number; camino: Set<string> }> =
+        [
+            {
+                nombre: platoPrincipal,
+                factor: 1,
+                camino: new Set([platoPrincipal]),
+            },
+        ];
 
     while (pila.length > 0) {
-        const { nombre, cantidad } = pila.pop()!;
-        const recetas = grafoRecetas.get(nombre) || [];
+        const { nombre, factor, camino } = pila.pop()!;
+        const recetas = grafoRecetas.get(nombre) ?? [];
 
         for (const receta of recetas) {
-            const cantidadCalculo = cantidad * receta.porcionBruta;
-
-            // Actualizar resultado
-            if (mapResultado.has(receta.descripcion)) {
-                mapResultado.get(receta.descripcion)!.push({
-                    evento,
-                    cantidad: cantidadCalculo,
-                    unidadMedida: receta.unidadMedida,
-                });
-            } else {
-                mapResultado.set(receta.descripcion, [
-                    {
-                        evento,
-                        cantidad: cantidadCalculo,
-                        unidadMedida: receta.unidadMedida,
-                    },
-                ]);
+            if (camino.has(receta.descripcion)) {
+                continue;
             }
 
-            // Agregar a la pila para procesar recursivamente
+            const factorSubPlato = factor * receta.porcionBruta;
+
+            if (!Number.isFinite(factorSubPlato) || factorSubPlato === 0) {
+                continue;
+            }
+
+            coeficientes.set(
+                receta.descripcion,
+                (coeficientes.get(receta.descripcion) ?? 0) + factorSubPlato,
+            );
+
+            const nuevoCamino = new Set(camino);
+            nuevoCamino.add(receta.descripcion);
             pila.push({
                 nombre: receta.descripcion,
-                cantidad: cantidadCalculo,
+                factor: factorSubPlato,
+                camino: nuevoCamino,
             });
         }
     }
+
+    cache.set(platoPrincipal, coeficientes);
+    return coeficientes;
+}
+
+function agruparPlatosPorNombre(
+    platos: { nombre: string; cantidad: number }[],
+): Map<string, number> {
+    const platosAgrupados = new Map<string, number>();
+
+    for (const plato of platos) {
+        const nombre = normalizarTexto(plato.nombre);
+        const cantidad = Number(plato.cantidad);
+
+        if (!nombre || !Number.isFinite(cantidad) || cantidad === 0) {
+            continue;
+        }
+
+        platosAgrupados.set(
+            nombre,
+            (platosAgrupados.get(nombre) ?? 0) + cantidad,
+        );
+    }
+
+    return platosAgrupados;
+}
+
+function normalizarTexto(texto: string | null | undefined): string {
+    return (texto ?? '').trim();
+}
+
+function redondearCantidad(valor: number): number {
+    if (!Number.isFinite(valor)) {
+        return 0;
+    }
+
+    return Number(valor.toFixed(4));
 }

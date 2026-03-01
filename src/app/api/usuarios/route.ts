@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
         },
     });
 
-    return NextResponse.json({ user, userRequest: userRequest?.id });
+    return NextResponse.json({ user, userRequest: userRequest });
 }
 
 interface BodyPost {
@@ -36,12 +36,19 @@ interface BodyPost {
 export async function POST(req: NextRequest) {
     const { username, password, salon, rol }: BodyPost = await req.json();
 
+    if (!username || !password || !salon || !rol) {
+        return NextResponse.json(
+            { success: false, message: 'Datos incompletos' },
+            { status: 400 }
+        );
+    }
+
     const exist = await prisma.user.findUnique({ where: { username } });
 
     if (exist) {
         return NextResponse.json(
             { success: false, message: 'Usuario ya existe' },
-            { status: 401 }
+            { status: 409 }
         );
     }
 
@@ -82,6 +89,13 @@ export async function PUT(req: NextRequest) {
     const { id, username, currentPassword, newPassword, salon, rol }: BodyPut =
         await req.json();
 
+    if (!id) {
+        return NextResponse.json(
+            { success: false, message: 'Id de usuario inválido' },
+            { status: 400 }
+        );
+    }
+
     const user = await prisma.user.findUnique({
         where: { id },
     });
@@ -89,7 +103,7 @@ export async function PUT(req: NextRequest) {
     if (!user) {
         return NextResponse.json(
             { success: false, message: 'No se encontro el usuario' },
-            { status: 200 }
+            { status: 404 }
         );
     }
 
@@ -129,10 +143,17 @@ export async function DELETE(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const id = Number(searchParams.get('id'));
 
+    if (!id) {
+        return NextResponse.json(
+            { success: false, message: 'Id de usuario inválido' },
+            { status: 400 }
+        );
+    }
+
     await prisma.user.delete({ where: { id } });
 
     return NextResponse.json(
-        { success: false, message: 'Usuario eliminado' },
+        { success: true, message: 'Usuario eliminado' },
         { status: 200 }
     );
 }

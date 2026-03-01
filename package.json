@@ -48,7 +48,8 @@
     "react-select": "^5.10.2",
     "react-spinners": "^0.17.0",
     "react-toastify": "^11.0.5",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "xlsx-js-style": "^1.2.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

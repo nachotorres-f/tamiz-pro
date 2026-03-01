@@ -179,6 +179,20 @@ export default function ProduccionPage() {
         return produccion?.cantidad > 0;
     };
 
+    const obtenerCantidadPorDia = (dato: any, dia: Date) => {
+        const diaNormalizado = new Date(dia);
+        diaNormalizado.setHours(0, 0, 0, 0);
+
+        const produccion = dato.produccion.find((prod: any) => {
+            const fecha = new Date(prod.fecha);
+            fecha.setHours(0, 0, 0, 0);
+
+            return fecha.getTime() === diaNormalizado.getTime();
+        });
+
+        return produccion ? produccion.cantidad : '';
+    };
+
     function guardarComentario() {
         toast.warn('Agregando Comentario', {
             position: 'bottom-right',
@@ -355,6 +369,73 @@ export default function ProduccionPage() {
             </div>
         );
     }
+
+    const diasVisibles = diasSemana.filter(filterDias);
+    const datosVisibles = datos
+        ? datos.filter((dato) => filterPlatosPorDia(dato))
+        : [];
+
+    const calcularAnchoColumna = (
+        filas: Array<Array<string | number>>,
+        indiceColumna: number,
+    ) => {
+        const maximoCaracteres = filas.reduce((maximo, fila) => {
+            const valor = fila[indiceColumna] ?? '';
+            return Math.max(maximo, String(valor).length);
+        }, 0);
+
+        return maximoCaracteres + 2;
+    };
+
+    const exportarExcel = () => {
+        const encabezados = [
+            'Plato',
+            'Elaboracion',
+            ...diasVisibles.map((dia) =>
+                format(dia, 'EEE, dd-MM', { locale: es }),
+            ),
+        ];
+
+        const filasExcel: Array<Array<string | number>> = [encabezados];
+
+        datosVisibles.forEach((dato) => {
+            const filaPlato: Array<string | number> = [
+                dato.platoPadre || '',
+                dato.plato || '',
+            ];
+
+            diasVisibles.forEach((dia) => {
+                filaPlato.push(obtenerCantidadPorDia(dato, dia));
+            });
+
+            filasExcel.push(filaPlato);
+
+            if (dato.comentario && dato.comentario.replace('\n', '') !== '') {
+                filasExcel.push([
+                    '',
+                    dato.comentario,
+                    ...Array(diasVisibles.length).fill(''),
+                ]);
+            }
+        });
+
+        import('xlsx-js-style').then((xlsxModule) => {
+            const XLSX: typeof import('xlsx-js-style') =
+                'default' in xlsxModule
+                    ? (xlsxModule.default as typeof import('xlsx-js-style'))
+                    : xlsxModule;
+
+            const worksheet = XLSX.utils.aoa_to_sheet(filasExcel);
+            worksheet['!cols'] = [
+                { wch: calcularAnchoColumna(filasExcel, 0) },
+                { wch: calcularAnchoColumna(filasExcel, 1) },
+            ];
+            const workbook = XLSX.utils.book_new();
+
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'Produccion');
+            XLSX.writeFile(workbook, 'produccion.xlsx');
+        });
+    };
 
     return (
         <>
@@ -614,6 +695,18 @@ export default function ProduccionPage() {
                     semanaBase={semanaBase}
                     setSemanaBase={setSemanaBase}
                 />
+
+                <div className="d-flex justify-content-center mt-3">
+                    <Button
+                        className="btn-success"
+                        disabled={
+                            diasVisibles.length === 0 ||
+                            datosVisibles.length === 0
+                        }
+                        onClick={exportarExcel}>
+                        Exportar a Excel
+                    </Button>
+                </div>
             </Container>
 
             <div
@@ -710,7 +803,7 @@ export default function ProduccionPage() {
                         <tr style={{ textAlign: 'center' }}>
                             <th>Plato</th>
                             <th>Elaboracion</th>
-                            {diasSemana.filter(filterDias).map((dia, idx) => (
+                            {diasVisibles.map((dia, idx) => (
                                 <th key={idx}>
                                     {format(dia, 'EEE, dd-MM', { locale: es })}
                                 </th>
@@ -718,19 +811,14 @@ export default function ProduccionPage() {
                         </tr>
                     </thead>
                     <tbody>
-                        {datos &&
-                            datos
-                                .filter((dato) => filterPlatosPorDia(dato))
-                                .map((dato) => (
+                        {datosVisibles.map((dato) => (
                                     <React.Fragment
                                         key={dato.plato + dato.platoPadre}>
                                         <tr>
                                             <td>{dato.platoPadre}</td>
                                             <td>{dato.plato}</td>
 
-                                            {diasSemana
-                                                .filter(filterDias)
-                                                .map((dia, i) => {
+                                            {diasVisibles.map((dia, i) => {
                                                     dia.setHours(0, 0, 0, 0);
 
                                                     const produccion =
