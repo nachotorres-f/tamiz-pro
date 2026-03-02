@@ -5,8 +5,9 @@ import { prisma } from '@/lib/prisma'; // Asumiendo que tienes prisma configurad
 
 // Constantes
 const TIMEZONE = 'America/Argentina/Buenos_Aires';
-const DIAS_SEMANA = 9;
 const TIPO_RECETA_PT = 'PT';
+const DIAS_EVENTOS_CICLO = 6;
+const DIAS_INICIO_ADELANTOS = 7;
 const DIAS_PRODUCCION_EXTRA = { anterior: 5, posterior: 9 };
 const SUBPLATOS_EXCLUIDOS_POR_PLATO: Record<string, Set<string>> = {
     'mesa dulce': new Set([
@@ -315,7 +316,6 @@ function validarFechaInicio(fechaInicio: string | null): Date {
 function calcularRangoSemana(fechaInicio: string): Date {
     const fechaBase = validarFechaInicio(fechaInicio);
     return startOfWeek(fechaBase, { weekStartsOn: 1 }); // Lunes como inicio de semana
-    return startOfWeek(addDays(fechaBase, DIAS_SEMANA), { weekStartsOn: 1 }); // Lunes como inicio de semana
 }
 
 async function obtenerNombresRecetasPT(): Promise<Set<string>> {
@@ -334,16 +334,18 @@ async function obtenerEventosSemana(
 ) {
     const lugares = ['El Central', 'La Rural'];
     const usarNotIn = salon === 'A';
+    const fechaFinCiclo = addDays(inicio, DIAS_EVENTOS_CICLO);
+    const fechaInicioAdelantos = addDays(inicio, DIAS_INICIO_ADELANTOS);
 
     return prisma.comanda.findMany({
         where: {
             deshabilitadaPlanificacion: false,
             OR: [
                 {
-                    // condición 1: fecha + plato
+                    // Comandas del ciclo actual
                     fecha: {
                         gte: inicio,
-                        lte: addDays(inicio, 6),
+                        lte: fechaFinCiclo,
                     },
                     lugar: usarNotIn ? { notIn: lugares } : { in: lugares },
                     Plato: {
@@ -353,12 +355,16 @@ async function obtenerEventosSemana(
                     },
                 },
                 {
+                    // Comandas futuras con al menos un plato adelantado
+                    fecha: {
+                        gte: fechaInicioAdelantos,
+                    },
                     lugar: usarNotIn ? { notIn: lugares } : { in: lugares },
                     Plato: {
                         some: {
                             nombre: { in: Array.from(nombresPT) },
                             fecha: {
-                                gte: addDays(inicio, 9),
+                                not: null,
                             },
                         },
                     },
@@ -374,21 +380,20 @@ async function obtenerEventosSemana(
                 where: {
                     OR: [
                         {
-                            fecha: null,
                             comanda: {
                                 fecha: {
                                     gte: inicio,
-                                    lte: addDays(inicio, 9),
+                                    lte: fechaFinCiclo,
                                 },
                             },
                         },
                         {
                             fecha: {
-                                gte: addDays(inicio, 9),
+                                not: null,
                             },
                             comanda: {
                                 fecha: {
-                                    gte: addDays(inicio, 9),
+                                    gte: fechaInicioAdelantos,
                                 },
                             },
                         },

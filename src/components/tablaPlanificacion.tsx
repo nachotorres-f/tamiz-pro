@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
 import {
     Button,
     FloatingLabel,
@@ -70,6 +70,11 @@ export function TablaPlanificacion({
     const [observacionModal, setObservacionModal] = useState('');
     const [adelantarEvento, setAdelantarEvento] = useState(0);
     const [platosAdelantados, setPlatosAdelantados] = useState<any[]>([]);
+    const [platosGuardandoAdelanto, setPlatosGuardandoAdelanto] = useState<
+        Set<number>
+    >(new Set());
+    const [cerrandoModalAdelanto, setCerrandoModalAdelanto] = useState(false);
+    const solicitudesAdelantoPendientesRef = useRef<Promise<void>[]>([]);
     //const [primeraCargaModal, setPrimeraCargaModal] = useState(true);
 
     useEffect(() => {
@@ -182,10 +187,85 @@ export function TablaPlanificacion({
             });
     }, [adelantarEvento]);
 
-    const handleCloseAdelantar = () => {
-        setEventoAdelantado(Math.random());
-        setAdelantarEvento(0);
-        setPlatosAdelantados([]);
+    const registrarSolicitudAdelanto = (solicitud: Promise<void>) => {
+        solicitudesAdelantoPendientesRef.current.push(solicitud);
+        void solicitud.finally(() => {
+            solicitudesAdelantoPendientesRef.current =
+                solicitudesAdelantoPendientesRef.current.filter(
+                    (pendiente) => pendiente !== solicitud,
+                );
+        });
+    };
+
+    const actualizarAdelantoPlato = async (
+        platoId: number,
+        adelantar: boolean,
+        fechaAnterior: any,
+    ) => {
+        setPlatosAdelantados((prev) =>
+            prev.map((item) =>
+                item.id === platoId
+                    ? { ...item, fecha: adelantar ? new Date() : null }
+                    : item,
+            ),
+        );
+        setPlatosGuardandoAdelanto((prev) => {
+            const next = new Set(prev);
+            next.add(platoId);
+            return next;
+        });
+
+        try {
+            const response = await fetch(`/api/planificacion/adelantarEvento`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    id: platoId,
+                    adelantar,
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error(
+                    `No se pudo actualizar el plato ${platoId}. Status: ${response.status}`,
+                );
+            }
+        } catch (error) {
+            console.error('Error al actualizar adelanto de plato:', error);
+            setPlatosAdelantados((prev) =>
+                prev.map((item) =>
+                    item.id === platoId
+                        ? { ...item, fecha: fechaAnterior }
+                        : item,
+                ),
+            );
+        } finally {
+            setPlatosGuardandoAdelanto((prev) => {
+                const next = new Set(prev);
+                next.delete(platoId);
+                return next;
+            });
+        }
+    };
+
+    const handleCloseAdelantar = async () => {
+        if (cerrandoModalAdelanto) return;
+
+        setCerrandoModalAdelanto(true);
+        try {
+            const pendientes = [...solicitudesAdelantoPendientesRef.current];
+            if (pendientes.length > 0) {
+                await Promise.allSettled(pendientes);
+            }
+
+            setEventoAdelantado(Math.random());
+            setAdelantarEvento(0);
+            setPlatosAdelantados([]);
+        } finally {
+            setCerrandoModalAdelanto(false);
+        }
     };
 
     const heightTd = '3rem';
@@ -288,7 +368,9 @@ export function TablaPlanificacion({
             <Modal
                 size="lg"
                 show={adelantarEvento != 0}
-                onHide={() => handleCloseAdelantar()}>
+                onHide={() => {
+                    void handleCloseAdelantar();
+                }}>
                 <Modal.Header closeButton>
                     <Modal.Title>Adelantar Plato Evento</Modal.Title>
                 </Modal.Header>
@@ -311,45 +393,21 @@ export function TablaPlanificacion({
                                             <Form.Check
                                                 type="checkbox"
                                                 checked={!!plato.fecha}
+                                                disabled={
+                                                    cerrandoModalAdelanto ||
+                                                    platosGuardandoAdelanto.has(
+                                                        plato.id,
+                                                    )
+                                                }
                                                 onChange={(e) => {
-                                                    const platoExistente =
-                                                        platosAdelantados.find(
-                                                            (p) =>
-                                                                p.id ===
-                                                                plato.id,
+                                                    const solicitud =
+                                                        actualizarAdelantoPlato(
+                                                            plato.id,
+                                                            e.target.checked,
+                                                            plato.fecha,
                                                         );
-                                                    if (platoExistente) {
-                                                        platoExistente.fecha = e
-                                                            .target.checked
-                                                            ? new Date()
-                                                            : null;
-                                                        setPlatosAdelantados([
-                                                            ...platosAdelantados.filter(
-                                                                (p) =>
-                                                                    p.id !==
-                                                                    plato.id,
-                                                            ),
-                                                            platoExistente,
-                                                        ]);
-                                                    }
-
-                                                    fetch(
-                                                        `/api/planificacion/adelantarEvento`,
-                                                        {
-                                                            method: 'POST',
-                                                            headers: {
-                                                                'Content-Type':
-                                                                    'application/json',
-                                                            },
-                                                            body: JSON.stringify(
-                                                                {
-                                                                    id: plato.id,
-                                                                    adelantar:
-                                                                        e.target
-                                                                            .checked,
-                                                                },
-                                                            ),
-                                                        },
+                                                    registrarSolicitudAdelanto(
+                                                        solicitud,
                                                     );
                                                 }}
                                             />
@@ -365,8 +423,9 @@ export function TablaPlanificacion({
                 <Modal.Footer>
                     <Button
                         variant="secondary"
+                        disabled={cerrandoModalAdelanto}
                         onClick={() => {
-                            handleCloseAdelantar();
+                            void handleCloseAdelantar();
                         }}>
                         Cerrar
                     </Button>
