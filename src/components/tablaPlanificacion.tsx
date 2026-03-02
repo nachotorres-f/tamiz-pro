@@ -868,15 +868,31 @@ export function TablaPlanificacion({
                                                     let updateCant = false;
 
                                                     if (update.length > 0) {
-                                                        cantidad =
-                                                            update.reduce(
-                                                                (sum, d) =>
-                                                                    sum +
-                                                                    d.cantidad,
-                                                                0,
+                                                        updateCant = true;
+                                                        const tieneEliminacion =
+                                                            update.some(
+                                                                (d) =>
+                                                                    d?.eliminar ===
+                                                                        true ||
+                                                                    d?.cantidad ===
+                                                                        null ||
+                                                                    d?.cantidad ===
+                                                                        '',
                                                             );
 
-                                                        updateCant = true;
+                                                        if (tieneEliminacion) {
+                                                            cantidad = '';
+                                                        } else {
+                                                            cantidad =
+                                                                update.reduce(
+                                                                    (sum, d) =>
+                                                                        sum +
+                                                                        Number(
+                                                                            d.cantidad,
+                                                                        ),
+                                                                    0,
+                                                                );
+                                                        }
                                                     }
 
                                                     return (
@@ -915,15 +931,9 @@ export function TablaPlanificacion({
                                                                 onChange={(
                                                                     e,
                                                                 ) => {
-                                                                    const cantidad =
-                                                                        parseFloat(
-                                                                            e
-                                                                                .target
-                                                                                .value,
-                                                                        );
-                                                                    // if (isNaN(cantidad)) {
-                                                                    //     return;
-                                                                    // }
+                                                                    const valorInput =
+                                                                        e.target
+                                                                            .value;
                                                                     const fecha =
                                                                         format(
                                                                             diaLimpio,
@@ -947,13 +957,72 @@ export function TablaPlanificacion({
                                                                         );
 
                                                                     if (
+                                                                        valorInput ===
+                                                                        ''
+                                                                    ) {
+                                                                        if (
+                                                                            index >
+                                                                            -1
+                                                                        ) {
+                                                                            nuevaProduccion[
+                                                                                index
+                                                                            ] =
+                                                                                {
+                                                                                    plato,
+                                                                                    platoPadre,
+                                                                                    fecha,
+                                                                                    cantidad:
+                                                                                        null,
+                                                                                    eliminar:
+                                                                                        true,
+                                                                                };
+                                                                        } else {
+                                                                            nuevaProduccion.push(
+                                                                                {
+                                                                                    plato,
+                                                                                    platoPadre,
+                                                                                    fecha,
+                                                                                    cantidad:
+                                                                                        null,
+                                                                                    eliminar:
+                                                                                        true,
+                                                                                },
+                                                                            );
+                                                                        }
+
+                                                                        setProduccionUpdate(
+                                                                            nuevaProduccion,
+                                                                        );
+                                                                        return;
+                                                                    }
+
+                                                                    const cantidad =
+                                                                        Number.parseFloat(
+                                                                            valorInput,
+                                                                        );
+
+                                                                    if (
+                                                                        !Number.isFinite(
+                                                                            cantidad,
+                                                                        )
+                                                                    ) {
+                                                                        return;
+                                                                    }
+
+                                                                    if (
                                                                         index >
                                                                         -1
                                                                     ) {
                                                                         nuevaProduccion[
                                                                             index
-                                                                        ].cantidad =
-                                                                            cantidad;
+                                                                        ] = {
+                                                                            plato,
+                                                                            platoPadre,
+                                                                            fecha,
+                                                                            cantidad,
+                                                                            eliminar:
+                                                                                false,
+                                                                        };
                                                                     } else {
                                                                         nuevaProduccion.push(
                                                                             {
@@ -961,17 +1030,13 @@ export function TablaPlanificacion({
                                                                                 platoPadre,
                                                                                 fecha,
                                                                                 cantidad,
+                                                                                eliminar:
+                                                                                    false,
                                                                             },
                                                                         );
                                                                     }
                                                                     setProduccionUpdate(
                                                                         nuevaProduccion,
-                                                                    );
-                                                                    localStorage.setItem(
-                                                                        'produccionUpdate',
-                                                                        JSON.stringify(
-                                                                            nuevaProduccion,
-                                                                        ),
                                                                     );
                                                                 }}
                                                             />

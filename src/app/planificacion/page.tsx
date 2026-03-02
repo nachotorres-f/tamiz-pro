@@ -4,6 +4,7 @@
 import {
     useContext,
     useEffect,
+    useRef,
     //  useRef,
     useState,
 } from 'react';
@@ -39,6 +40,143 @@ export interface EventoPlanificacion {
     // agrega aquí otras propiedades si existen
 }
 
+interface ProduccionBase {
+    plato: string;
+    platoPadre: string;
+    fecha: string;
+}
+
+interface ProduccionEdit extends ProduccionBase {
+    cantidad: number;
+    eliminar?: false;
+}
+
+interface ProduccionDelete extends ProduccionBase {
+    cantidad: null;
+    eliminar: true;
+}
+
+type ProduccionChange = ProduccionEdit | ProduccionDelete;
+
+type EstadoAutoGuardado = 'idle' | 'pending' | 'saving' | 'saved' | 'error';
+
+function normalizarFechaProduccion(fecha: string | Date): string {
+    const normalizada = new Date(fecha);
+
+    if (!Number.isFinite(normalizada.getTime())) {
+        return String(fecha);
+    }
+
+    normalizada.setHours(0, 0, 0, 0);
+    normalizada.setDate(normalizada.getDate() + 1);
+
+    return format(normalizada, 'yyyy-MM-dd');
+}
+
+function construirClaveProduccion(item: {
+    plato: string;
+    platoPadre: string;
+    fecha: string | Date;
+}): string {
+    return `${item.plato}|||${item.platoPadre}|||${normalizarFechaProduccion(item.fecha)}`;
+}
+
+function esCambioEliminacion(item: any): item is ProduccionDelete {
+    return item?.eliminar === true || item?.cantidad === null || item?.cantidad === '';
+}
+
+function sanitizarProduccionUpdate(items: any[]): ProduccionChange[] {
+    const porClave = new Map<string, ProduccionChange>();
+
+    for (const item of items) {
+        const plato = String(item?.plato ?? '').trim();
+        const platoPadre = String(item?.platoPadre ?? '').trim();
+        const fecha = String(item?.fecha ?? '').trim();
+
+        if (!plato || !platoPadre || !fecha) {
+            continue;
+        }
+
+        if (esCambioEliminacion(item)) {
+            const normalizado: ProduccionDelete = {
+                plato,
+                platoPadre,
+                fecha,
+                cantidad: null,
+                eliminar: true,
+            };
+            porClave.set(construirClaveProduccion(normalizado), normalizado);
+            continue;
+        }
+
+        const cantidad = Number(item?.cantidad);
+
+        if (!Number.isFinite(cantidad)) {
+            continue;
+        }
+
+        const normalizado: ProduccionEdit = {
+            plato,
+            platoPadre,
+            fecha,
+            cantidad: Number(cantidad.toFixed(2)),
+            eliminar: false,
+        };
+
+        porClave.set(construirClaveProduccion(normalizado), normalizado);
+    }
+
+    return Array.from(porClave.values());
+}
+
+function construirFirmaProduccion(items: ProduccionChange[]): string {
+    return items
+        .map((item) =>
+            esCambioEliminacion(item)
+                ? `${construirClaveProduccion(item)}=DELETE`
+                : `${construirClaveProduccion(item)}=${item.cantidad.toFixed(2)}`,
+        )
+        .sort()
+        .join('|');
+}
+
+function mergeProduccionGuardada(
+    produccionActual: any[],
+    cambiosGuardados: ProduccionChange[],
+): any[] {
+    const porClave = new Map<string, any>();
+
+    for (const item of produccionActual) {
+        const clave = construirClaveProduccion({
+            plato: item.plato,
+            platoPadre: item.platoPadre,
+            fecha: item.fecha,
+        });
+        porClave.set(clave, item);
+    }
+
+    for (const item of cambiosGuardados) {
+        const clave = construirClaveProduccion(item);
+
+        if (esCambioEliminacion(item)) {
+            porClave.delete(clave);
+            continue;
+        }
+
+        const existente = porClave.get(clave) ?? {};
+
+        porClave.set(clave, {
+            ...existente,
+            plato: item.plato,
+            platoPadre: item.platoPadre,
+            fecha: item.fecha,
+            cantidad: item.cantidad,
+        });
+    }
+
+    return Array.from(porClave.values());
+}
+
 export default function PlanificacionPage() {
     const filtroSalon = useContext(SalonContext);
     const RolProvider = useContext(RolContext);
@@ -67,6 +205,19 @@ export default function PlanificacionPage() {
         { plato: string; observacion: string; platoPadre: string }[]
     >([]);
     const [eventoAdelantado, setEventoAdelantado] = useState(0);
+    const [estadoAutoGuardado, setEstadoAutoGuardado] =
+        useState<EstadoAutoGuardado>('idle');
+    const [ultimaSincronizacion, setUltimaSincronizacion] =
+        useState<Date | null>(null);
+    const [guardandoManual, setGuardandoManual] = useState(false);
+    const ultimaFirmaGuardadaRef = useRef('');
+    const cambiosInicialesCargadosRef = useRef(false);
+
+    const fechaInicioPlanificacion = startOfWeek(addDays(semanaBase, 4), {
+        weekStartsOn: 1,
+    })
+        .toISOString()
+        .split('T')[0];
 
     // Referencias para medir el ancho de las celdas
     // const buttonRef = useRef<HTMLTableCellElement>(null);
@@ -106,16 +257,22 @@ export default function PlanificacionPage() {
             .finally(() => {
                 setLoading(false);
             });
-
-        setProduccionUpdate(
-            JSON.parse(localStorage.getItem('produccionUpdate') || '[]')
-        );
     }, [
         semanaBase,
         salonActual,
         eventoAdelantado,
         recargaComandas,
     ]);
+
+    useEffect(() => {
+        const cambiosGuardados = JSON.parse(
+            localStorage.getItem('produccionUpdate') || '[]',
+        );
+        setProduccionUpdate(
+            Array.isArray(cambiosGuardados) ? cambiosGuardados : [],
+        );
+        cambiosInicialesCargadosRef.current = true;
+    }, []);
 
     useEffect(() => {
         if (diasSemana.length < 5) return;
@@ -185,6 +342,123 @@ export default function PlanificacionPage() {
         }
     }, [filtroSalon, datos]);
 
+    useEffect(() => {
+        if (!cambiosInicialesCargadosRef.current) {
+            return;
+        }
+
+        if (produccionUpdate.length === 0) {
+            localStorage.removeItem('produccionUpdate');
+            return;
+        }
+
+        localStorage.setItem('produccionUpdate', JSON.stringify(produccionUpdate));
+    }, [produccionUpdate]);
+
+    useEffect(() => {
+        if (guardandoManual) {
+            return;
+        }
+
+        const cambiosPendientes = sanitizarProduccionUpdate(produccionUpdate);
+
+        if (cambiosPendientes.length === 0) {
+            setEstadoAutoGuardado('idle');
+            return;
+        }
+
+        const firmaPendiente = construirFirmaProduccion(cambiosPendientes);
+
+        if (firmaPendiente === ultimaFirmaGuardadaRef.current) {
+            setEstadoAutoGuardado('saved');
+            return;
+        }
+
+        setEstadoAutoGuardado('pending');
+
+        const timerId = window.setTimeout(async () => {
+            setEstadoAutoGuardado('saving');
+
+            try {
+                const response = await fetch('/api/planificacion', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        salon: salonActual,
+                        produccion: cambiosPendientes,
+                        observaciones: [],
+                        fechaInicio: fechaInicioPlanificacion,
+                    }),
+                });
+
+                if (!response.ok) {
+                    throw new Error('No se pudieron guardar los cambios');
+                }
+
+                const cambiosPorClave = new Map(
+                    cambiosPendientes.map((item) => [
+                        construirClaveProduccion(item),
+                        item,
+                    ]),
+                );
+
+                setProduccion((prevProduccion) =>
+                    mergeProduccionGuardada(prevProduccion, cambiosPendientes),
+                );
+                setProduccionUpdate((prevCambios) =>
+                    prevCambios.filter((item) => {
+                        const plato = String(item?.plato ?? '').trim();
+                        const platoPadre = String(item?.platoPadre ?? '').trim();
+                        const fecha = String(item?.fecha ?? '').trim();
+
+                        if (!plato || !platoPadre || !fecha) {
+                            return true;
+                        }
+
+                        const clave = construirClaveProduccion({
+                            plato,
+                            platoPadre,
+                            fecha,
+                        });
+                        const cantidadGuardada = cambiosPorClave.get(clave);
+
+                        if (cantidadGuardada === undefined) {
+                            return true;
+                        }
+
+                        if (esCambioEliminacion(cantidadGuardada)) {
+                            return !esCambioEliminacion(item);
+                        }
+
+                        const cantidadActual = Number(item?.cantidad);
+
+                        if (!Number.isFinite(cantidadActual)) {
+                            return true;
+                        }
+
+                        return (
+                            Number(cantidadActual.toFixed(2)) !==
+                            cantidadGuardada.cantidad
+                        );
+                    }),
+                );
+
+                ultimaFirmaGuardadaRef.current = firmaPendiente;
+                setUltimaSincronizacion(new Date());
+                setEstadoAutoGuardado('saved');
+            } catch {
+                setEstadoAutoGuardado('error');
+            }
+        }, 900);
+
+        return () => window.clearTimeout(timerId);
+    }, [
+        produccionUpdate,
+        salonActual,
+        fechaInicioPlanificacion,
+        guardandoManual,
+    ]);
+
     const handleGuardarProduccion = async () => {
         toast.warn('Actualizando produccion', {
             position: 'bottom-right',
@@ -192,54 +466,57 @@ export default function PlanificacionPage() {
             transition: Slide,
         });
 
-        await fetch('/api/planificacion', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                salon: salonActual,
-                produccion: produccionUpdate,
-                observaciones,
-                fechaInicio: startOfWeek(addDays(semanaBase, 4), {
-                    weekStartsOn: 1,
-                })
-                    .toISOString()
-                    .split('T')[0],
-            }),
-        })
-            .then(() => {
-                toast.success('Produccion actualizada', {
-                    position: 'bottom-right',
-                    theme: 'colored',
-                    transition: Slide,
-                });
+        setGuardandoManual(true);
 
-                setProduccionUpdate([]);
-                localStorage.removeItem('produccionUpdate');
-            })
-            .catch(() => {
-                toast.error('Error al actualizar la producción', {
-                    position: 'bottom-right',
-                    theme: 'colored',
-                    transition: Slide,
-                });
+        try {
+            const cambiosManual = sanitizarProduccionUpdate(produccionUpdate);
+            const response = await fetch('/api/planificacion', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    salon: salonActual,
+                    produccion: cambiosManual,
+                    observaciones,
+                    fechaInicio: fechaInicioPlanificacion,
+                }),
             });
 
-        setProduccionUpdate([]);
+            if (!response.ok) {
+                throw new Error();
+            }
 
-        await fetch(
-            '/api/planificacion?fechaInicio=' +
-                startOfWeek(addDays(semanaBase, 4), {
-                    weekStartsOn: 1,
-                }).toISOString() +
-                '&salon=' +
-                salonActual,
-        ) // jueves
-            .then((res) => res.json())
-            .then((data) => {
-                setDatos(data.planifacion || []);
-                setProduccion(data.produccion || []);
-            })
-            .finally(() => {});
+            toast.success('Produccion actualizada', {
+                position: 'bottom-right',
+                theme: 'colored',
+                transition: Slide,
+            });
+
+            setProduccionUpdate([]);
+            ultimaFirmaGuardadaRef.current = '';
+            setUltimaSincronizacion(new Date());
+            setEstadoAutoGuardado('saved');
+
+            const res = await fetch(
+                '/api/planificacion?fechaInicio=' +
+                    startOfWeek(addDays(semanaBase, 4), {
+                        weekStartsOn: 1,
+                    }).toISOString() +
+                    '&salon=' +
+                    salonActual,
+            ); // jueves
+            const data = await res.json();
+            setDatos(data.planifacion || []);
+            setProduccion(data.produccion || []);
+        } catch {
+            toast.error('Error al actualizar la producción', {
+                position: 'bottom-right',
+                theme: 'colored',
+                transition: Slide,
+            });
+            setEstadoAutoGuardado('error');
+        } finally {
+            setGuardandoManual(false);
+        }
     };
 
     const platosUnicos = [
@@ -256,7 +533,8 @@ export default function PlanificacionPage() {
 
     const handleLimpiarProduccion = () => {
         setProduccionUpdate([]);
-        localStorage.removeItem('produccionUpdate');
+        ultimaFirmaGuardadaRef.current = '';
+        setEstadoAutoGuardado('idle');
         toast.info('Producción limpiada', {
             position: 'bottom-right',
             theme: 'colored',
@@ -451,6 +729,27 @@ export default function PlanificacionPage() {
                                     onClick={handleLimpiarProduccion}>
                                     Limpiar cambios
                                 </Button>
+                                <div
+                                    className={`small mb-3 ${
+                                        estadoAutoGuardado === 'error'
+                                            ? 'text-danger'
+                                            : 'text-muted'
+                                    }`}>
+                                    {estadoAutoGuardado === 'pending' &&
+                                        'Cambios pendientes de guardado automático...'}
+                                    {estadoAutoGuardado === 'saving' &&
+                                        'Guardando cambios automáticamente...'}
+                                    {estadoAutoGuardado === 'saved' &&
+                                        `Guardado automático activo${
+                                            ultimaSincronizacion
+                                                ? ` (último guardado ${format(ultimaSincronizacion, 'HH:mm:ss')})`
+                                                : ''
+                                        }`}
+                                    {estadoAutoGuardado === 'error' &&
+                                        'Error al guardar automáticamente. Podés usar "Guardar Cambios".'}
+                                    {estadoAutoGuardado === 'idle' &&
+                                        'Guardado automático activo.'}
+                                </div>
                             </Col>
                             <Col xs={4}></Col>
                             <Col xs={4}>

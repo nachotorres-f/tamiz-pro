@@ -133,7 +133,17 @@ export async function POST(req: NextRequest) {
     }
 
     for (const item of produccion) {
-        if (!item.plato || !item.fecha || typeof item.cantidad !== 'number') {
+        const eliminar =
+            item?.eliminar === true ||
+            item?.cantidad === null ||
+            item?.cantidad === '';
+        const cantidad = Number(item?.cantidad);
+
+        if (
+            !item.plato ||
+            !item.fecha ||
+            (!eliminar && !Number.isFinite(cantidad))
+        ) {
             return NextResponse.json(
                 { error: 'Cada item debe tener plato, fecha y cantidad' },
                 { status: 400 },
@@ -149,14 +159,23 @@ export async function POST(req: NextRequest) {
             },
         });
 
+        if (eliminar) {
+            if (existe) {
+                await prisma.produccion.delete({
+                    where: { id: existe.id },
+                });
+            }
+            continue;
+        }
+
         if (existe) {
-            if (existe.cantidad === item.cantidad) continue; // No hay cambios
+            if (existe.cantidad === cantidad) continue; // No hay cambios
 
             // Si hay cambios, actualizamos la cantidad
             await prisma.produccion.update({
                 where: { id: existe.id },
                 data: {
-                    cantidad: item.cantidad,
+                    cantidad: cantidad,
                     salon: salon,
                     observacion:
                         observaciones.find((o) => o.plato === existe.plato)
@@ -171,7 +190,7 @@ export async function POST(req: NextRequest) {
                     plato: item.plato,
                     platoPadre: item.platoPadre,
                     fecha: new Date(item.fecha),
-                    cantidad: item.cantidad,
+                    cantidad: cantidad,
                     salon,
                     observacion:
                         observaciones.find((o) => o.plato === item.plato)
