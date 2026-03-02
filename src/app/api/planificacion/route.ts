@@ -8,6 +8,18 @@ const TIMEZONE = 'America/Argentina/Buenos_Aires';
 const DIAS_SEMANA = 9;
 const TIPO_RECETA_PT = 'PT';
 const DIAS_PRODUCCION_EXTRA = { anterior: 5, posterior: 9 };
+const SUBPLATOS_EXCLUIDOS_POR_PLATO: Record<string, Set<string>> = {
+    'mesa dulce': new Set([
+        'helado para bochear + insumos (x pax)',
+        'patisserie rut',
+        'tortas rut',
+    ]),
+    'mesa dulce menores rut': new Set([
+        'carro de plaza',
+        'helado para bochear + insumos (x pax)',
+        'patisserie rut',
+    ]),
+};
 
 export async function GET(req: NextRequest) {
     process.env.TZ = TIMEZONE;
@@ -193,6 +205,7 @@ async function calcularIngredientesPT(
         cantidad: number,
         lugar: string,
         comandaId: number,
+        platoPrincipal: string,
     ) {
         const subRecetas = recetas.filter(
             (r) => r.nombreProducto === nombre && r.tipo === 'PT',
@@ -203,23 +216,27 @@ async function calcularIngredientesPT(
             const platoPadre = receta.nombreProducto;
             const porcion = receta.porcionBruta || 1;
             const cantidadTotal = cantidad * porcion;
+            const cantidadRedondeada = parseFloat(cantidadTotal.toFixed(2));
 
-            resultado.push({
-                plato: ingrediente,
-                platoPadre: platoPadre,
-                fecha,
-                cantidad: parseFloat(cantidadTotal.toFixed(2)), // Aseguramos que la cantidad sea un número con dos decimales
-                lugar,
-            });
+            if (!debeExcluirSubPlato(platoPrincipal, ingrediente)) {
+                resultado.push({
+                    plato: ingrediente,
+                    platoPadre: platoPadre,
+                    fecha,
+                    cantidad: cantidadRedondeada, // Aseguramos que la cantidad sea un número con dos decimales
+                    lugar,
+                });
+            }
 
             if (!visitados.has(ingrediente)) {
                 visitados.add(ingrediente + platoPadre + comandaId);
                 await recorrer(
                     ingrediente,
                     fecha,
-                    parseFloat(cantidadTotal.toFixed(2)),
+                    cantidadRedondeada,
                     lugar,
                     comandaId,
+                    platoPrincipal,
                 );
             }
         }
@@ -232,6 +249,7 @@ async function calcularIngredientesPT(
             item.cantidad,
             item.lugar,
             item.comandaId,
+            item.plato,
         );
     }
 
@@ -426,4 +444,20 @@ async function obtenerProduccion(inicio: Date, salon: string) {
         ...prod,
         cantidad: parseFloat(prod.cantidad.toFixed(2)),
     }));
+}
+
+function normalizarClaveFiltro(texto: string): string {
+    return (texto ?? '').trim().toLocaleLowerCase('es');
+}
+
+function debeExcluirSubPlato(platoPrincipal: string, subPlato: string): boolean {
+    const subPlatosExcluidos = SUBPLATOS_EXCLUIDOS_POR_PLATO[
+        normalizarClaveFiltro(platoPrincipal)
+    ];
+
+    if (!subPlatosExcluidos) {
+        return false;
+    }
+
+    return subPlatosExcluidos.has(normalizarClaveFiltro(subPlato));
 }

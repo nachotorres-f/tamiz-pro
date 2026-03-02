@@ -46,6 +46,19 @@ interface FilaPicking {
     cantidadesPorComanda: Record<string, number>;
 }
 
+const SUBPLATOS_EXCLUIDOS_POR_PLATO: Record<string, Set<string>> = {
+    'mesa dulce': new Set([
+        'helado para bochear + insumos (x pax)',
+        'patisserie rut',
+        'tortas rut',
+    ]),
+    'mesa dulce menores rut': new Set([
+        'carro de plaza',
+        'helado para bochear + insumos (x pax)',
+        'patisserie rut',
+    ]),
+};
+
 export async function GET(req: NextRequest) {
     process.env.TZ = 'America/Argentina/Buenos_Aires';
 
@@ -101,6 +114,15 @@ export async function GET(req: NextRequest) {
 
                 const subPlatos = Array.from(coeficientesSubPlatos.entries())
                     .map(([subPlato, coeficiente]) => {
+                        if (
+                            debeExcluirSubPlato(
+                                platoPrincipal,
+                                subPlato,
+                            )
+                        ) {
+                            return null;
+                        }
+
                         const cantidadSubPlato = redondearCantidad(
                             cantidadPlato * coeficiente,
                         );
@@ -324,4 +346,20 @@ function redondearCantidad(valor: number): number {
     }
 
     return Number(valor.toFixed(4));
+}
+
+function normalizarClaveFiltro(texto: string): string {
+    return normalizarTexto(texto).toLocaleLowerCase('es');
+}
+
+function debeExcluirSubPlato(platoPrincipal: string, subPlato: string): boolean {
+    const subPlatosExcluidos = SUBPLATOS_EXCLUIDOS_POR_PLATO[
+        normalizarClaveFiltro(platoPrincipal)
+    ];
+
+    if (!subPlatosExcluidos) {
+        return false;
+    }
+
+    return subPlatosExcluidos.has(normalizarClaveFiltro(subPlato));
 }
