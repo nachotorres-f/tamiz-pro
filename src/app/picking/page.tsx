@@ -69,9 +69,22 @@ const estiloNumeroCentradoNegrita: CellStyle = {
     },
 };
 
-const estiloHeaderNegrita: CellStyle = {
+const estiloHeaderOscuro: CellStyle = {
+    alignment: {
+        horizontal: 'center',
+        vertical: 'center',
+    },
+    fill: {
+        patternType: 'solid',
+        fgColor: {
+            rgb: '404040',
+        },
+    },
     font: {
         bold: true,
+        color: {
+            rgb: 'FFFFFF',
+        },
     },
 };
 
@@ -243,7 +256,7 @@ export default function PickingPage() {
 
                     if (!headerCelda) continue;
 
-                    headerCelda.s = estiloHeaderNegrita;
+                    headerCelda.s = estiloHeaderOscuro;
                 }
 
                 for (let r = 1; r <= rango.e.r; r += 1) {

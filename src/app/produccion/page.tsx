@@ -5,6 +5,7 @@ import { NavegacionSemanal } from '@/components/navegacionSemanal';
 import { addDays, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import React, { useContext, useEffect, useRef, useState } from 'react';
+import type { CellObject, CellStyle } from 'xlsx-js-style';
 import {
     Accordion,
     Button,
@@ -31,6 +32,25 @@ import { RolContext, SalonContext } from '@/components/filtroPlatos';
 import { Slide, toast, ToastContainer } from 'react-toastify';
 import { generarPDFReceta } from '@/lib/generarPDF';
 import AgregarPlato from '@/components/agregarPlato';
+
+const estiloHeaderOscuro: CellStyle = {
+    alignment: {
+        horizontal: 'center',
+        vertical: 'center',
+    },
+    fill: {
+        patternType: 'solid',
+        fgColor: {
+            rgb: '404040',
+        },
+    },
+    font: {
+        bold: true,
+        color: {
+            rgb: 'FFFFFF',
+        },
+    },
+};
 
 export default function ProduccionPage() {
     const salon = useContext(SalonContext);
@@ -430,6 +450,27 @@ export default function ProduccionPage() {
                 { wch: calcularAnchoColumna(filasExcel, 0) },
                 { wch: calcularAnchoColumna(filasExcel, 1) },
             ];
+
+            const rango = worksheet['!ref']
+                ? XLSX.utils.decode_range(worksheet['!ref'])
+                : null;
+
+            if (rango) {
+                for (let c = 0; c <= rango.e.c; c += 1) {
+                    const direccionHeader = XLSX.utils.encode_cell({
+                        r: 0,
+                        c,
+                    });
+                    const headerCelda = worksheet[direccionHeader] as
+                        | CellObject
+                        | undefined;
+
+                    if (!headerCelda) continue;
+
+                    headerCelda.s = estiloHeaderOscuro;
+                }
+            }
+
             const workbook = XLSX.utils.book_new();
 
             XLSX.utils.book_append_sheet(workbook, worksheet, 'Produccion');
