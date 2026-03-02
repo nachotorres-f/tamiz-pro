@@ -201,6 +201,8 @@ export default function PlanificacionPage() {
     const [platoExpandido, setPlatoExpandido] = useState<string | null>(null);
     const [produccionUpdate, setProduccionUpdate] = React.useState<any[]>([]);
     const [loading, setLoading] = useState(false);
+    const [actualizandoPlanificacion, setActualizandoPlanificacion] =
+        useState(false);
     const [observaciones, setObservaciones] = useState<
         { plato: string; observacion: string; platoPadre: string }[]
     >([]);
@@ -212,6 +214,10 @@ export default function PlanificacionPage() {
     const [guardandoManual, setGuardandoManual] = useState(false);
     const ultimaFirmaGuardadaRef = useRef('');
     const cambiosInicialesCargadosRef = useRef(false);
+    const primeraCargaPlanificacionRef = useRef(true);
+    const toastActualizandoPlanificacionRef = useRef<string | number | null>(
+        null,
+    );
 
     const fechaInicioPlanificacion = startOfWeek(addDays(semanaBase, 4), {
         weekStartsOn: 1,
@@ -240,7 +246,15 @@ export default function PlanificacionPage() {
     // }, [buttonRef, platoRef, totalRef]);
 
     useEffect(() => {
-        setLoading(true);
+        const primeraCarga = primeraCargaPlanificacionRef.current;
+        const abortController = new AbortController();
+
+        if (primeraCarga) {
+            setLoading(true);
+        } else {
+            setActualizandoPlanificacion(true);
+        }
+
         fetch(
             '/api/planificacion?fechaInicio=' +
                 startOfWeek(addDays(semanaBase, 4), {
@@ -248,15 +262,37 @@ export default function PlanificacionPage() {
                 }).toISOString() +
                 '&salon=' +
                 salonActual,
+            {
+                signal: abortController.signal,
+            },
         ) // jueves
             .then((res) => res.json())
             .then((data) => {
                 setDatos(data.planifacion || []);
                 setProduccion(data.produccion || []);
             })
+            .catch((error) => {
+                if (error?.name === 'AbortError') {
+                    return;
+                }
+            })
             .finally(() => {
-                setLoading(false);
+                if (abortController.signal.aborted) {
+                    return;
+                }
+
+                if (primeraCarga) {
+                    setLoading(false);
+                    primeraCargaPlanificacionRef.current = false;
+                    return;
+                }
+
+                setActualizandoPlanificacion(false);
             });
+
+        return () => {
+            abortController.abort();
+        };
     }, [
         semanaBase,
         salonActual,
@@ -458,6 +494,42 @@ export default function PlanificacionPage() {
         fechaInicioPlanificacion,
         guardandoManual,
     ]);
+
+    useEffect(() => {
+        if (actualizandoPlanificacion) {
+            if (
+                toastActualizandoPlanificacionRef.current === null ||
+                !toast.isActive(toastActualizandoPlanificacionRef.current)
+            ) {
+                toastActualizandoPlanificacionRef.current = toast.info(
+                    'Actualizando planificación...',
+                    {
+                        position: 'bottom-right',
+                        theme: 'colored',
+                        transition: Slide,
+                        autoClose: false,
+                        closeOnClick: false,
+                        draggable: false,
+                    },
+                );
+            }
+            return;
+        }
+
+        if (toastActualizandoPlanificacionRef.current !== null) {
+            toast.dismiss(toastActualizandoPlanificacionRef.current);
+            toastActualizandoPlanificacionRef.current = null;
+        }
+    }, [actualizandoPlanificacion]);
+
+    useEffect(
+        () => () => {
+            if (toastActualizandoPlanificacionRef.current !== null) {
+                toast.dismiss(toastActualizandoPlanificacionRef.current);
+            }
+        },
+        [],
+    );
 
     const handleGuardarProduccion = async () => {
         toast.warn('Actualizando produccion', {

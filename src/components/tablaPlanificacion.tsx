@@ -8,6 +8,7 @@ import {
     Form,
     Modal,
     OverlayTrigger,
+    Spinner,
     Table,
     Tooltip,
 } from 'react-bootstrap';
@@ -70,11 +71,18 @@ export function TablaPlanificacion({
     const [observacionModal, setObservacionModal] = useState('');
     const [adelantarEvento, setAdelantarEvento] = useState(0);
     const [platosAdelantados, setPlatosAdelantados] = useState<any[]>([]);
+    const [cargandoPlatosAdelantados, setCargandoPlatosAdelantados] =
+        useState(false);
+    const [adelantandoTodo, setAdelantandoTodo] = useState(false);
+    const [accionMasivaAdelanto, setAccionMasivaAdelanto] = useState<
+        'adelantar' | 'desadelantar' | null
+    >(null);
     const [platosGuardandoAdelanto, setPlatosGuardandoAdelanto] = useState<
         Set<number>
     >(new Set());
     const [cerrandoModalAdelanto, setCerrandoModalAdelanto] = useState(false);
-    const solicitudesAdelantoPendientesRef = useRef<Promise<void>[]>([]);
+    const solicitudesAdelantoPendientesRef = useRef<Promise<boolean>[]>([]);
+    const timerRefrescoPlanificacionRef = useRef<number | null>(null);
     //const [primeraCargaModal, setPrimeraCargaModal] = useState(true);
 
     useEffect(() => {
@@ -174,20 +182,66 @@ export function TablaPlanificacion({
         }
     };
 
+    const dispararActualizacionPlanificacion = (inmediato = false) => {
+        if (timerRefrescoPlanificacionRef.current !== null) {
+            window.clearTimeout(timerRefrescoPlanificacionRef.current);
+            timerRefrescoPlanificacionRef.current = null;
+        }
+
+        if (inmediato) {
+            setEventoAdelantado(Math.random());
+            return;
+        }
+
+        timerRefrescoPlanificacionRef.current = window.setTimeout(() => {
+            setEventoAdelantado(Math.random());
+            timerRefrescoPlanificacionRef.current = null;
+        }, 300);
+    };
+
+    useEffect(
+        () => () => {
+            if (timerRefrescoPlanificacionRef.current !== null) {
+                window.clearTimeout(timerRefrescoPlanificacionRef.current);
+            }
+        },
+        [],
+    );
+
     useEffect(() => {
         if (adelantarEvento == 0) return;
 
-        fetch(`/api/planificacion/adelantarEvento?id=${adelantarEvento}`)
+        const abortController = new AbortController();
+        setCargandoPlatosAdelantados(true);
+        setPlatosAdelantados([]);
+
+        fetch(`/api/planificacion/adelantarEvento?id=${adelantarEvento}`, {
+            signal: abortController.signal,
+        })
             .then((res) => res.json())
             .then((data) => {
-                setPlatosAdelantados(data.Plato);
+                setPlatosAdelantados(data.Plato || []);
             })
             .catch((error) => {
+                if (error?.name === 'AbortError') {
+                    return;
+                }
                 console.error('Error al adelantar el evento:', error);
+                setPlatosAdelantados([]);
+            })
+            .finally(() => {
+                if (abortController.signal.aborted) {
+                    return;
+                }
+                setCargandoPlatosAdelantados(false);
             });
+
+        return () => {
+            abortController.abort();
+        };
     }, [adelantarEvento]);
 
-    const registrarSolicitudAdelanto = (solicitud: Promise<void>) => {
+    const registrarSolicitudAdelanto = (solicitud: Promise<boolean>) => {
         solicitudesAdelantoPendientesRef.current.push(solicitud);
         void solicitud.finally(() => {
             solicitudesAdelantoPendientesRef.current =
@@ -201,7 +255,7 @@ export function TablaPlanificacion({
         platoId: number,
         adelantar: boolean,
         fechaAnterior: any,
-    ) => {
+    ): Promise<boolean> => {
         setPlatosAdelantados((prev) =>
             prev.map((item) =>
                 item.id === platoId
@@ -232,6 +286,7 @@ export function TablaPlanificacion({
                     `No se pudo actualizar el plato ${platoId}. Status: ${response.status}`,
                 );
             }
+            return true;
         } catch (error) {
             console.error('Error al actualizar adelanto de plato:', error);
             setPlatosAdelantados((prev) =>
@@ -241,12 +296,56 @@ export function TablaPlanificacion({
                         : item,
                 ),
             );
+            return false;
         } finally {
             setPlatosGuardandoAdelanto((prev) => {
                 const next = new Set(prev);
                 next.delete(platoId);
                 return next;
             });
+        }
+    };
+
+    const handleToggleAdelantoTodo = async () => {
+        if (adelantandoTodo || cargandoPlatosAdelantados) {
+            return;
+        }
+
+        const todosAdelantados =
+            platosAdelantados.length > 0 &&
+            platosAdelantados.every((plato) => !!plato.fecha);
+        const adelantar = !todosAdelantados;
+        const accion: 'adelantar' | 'desadelantar' = adelantar
+            ? 'adelantar'
+            : 'desadelantar';
+        const platosAActualizar = platosAdelantados.filter((plato) =>
+            adelantar ? !plato.fecha : !!plato.fecha,
+        );
+
+        if (platosAActualizar.length === 0) {
+            return;
+        }
+
+        setAdelantandoTodo(true);
+        setAccionMasivaAdelanto(accion);
+        try {
+            const solicitudes = platosAActualizar.map((plato) => {
+                const solicitud = actualizarAdelantoPlato(
+                    plato.id,
+                    adelantar,
+                    plato.fecha,
+                );
+                registrarSolicitudAdelanto(solicitud);
+                return solicitud;
+            });
+
+            const resultados = await Promise.all(solicitudes);
+            if (resultados.some(Boolean)) {
+                dispararActualizacionPlanificacion(true);
+            }
+        } finally {
+            setAdelantandoTodo(false);
+            setAccionMasivaAdelanto(null);
         }
     };
 
@@ -260,13 +359,197 @@ export function TablaPlanificacion({
                 await Promise.allSettled(pendientes);
             }
 
-            setEventoAdelantado(Math.random());
             setAdelantarEvento(0);
             setPlatosAdelantados([]);
+            setCargandoPlatosAdelantados(false);
+            setAdelantandoTodo(false);
+            setAccionMasivaAdelanto(null);
         } finally {
             setCerrandoModalAdelanto(false);
         }
     };
+
+    const actualizarProduccionCelda = (
+        plato: string,
+        platoPadre: string,
+        fecha: string,
+        valorInput: string,
+    ) => {
+        const nuevaProduccion = [...produccionUpdate];
+        const index = nuevaProduccion.findIndex(
+            (p) =>
+                p.plato === plato &&
+                p.platoPadre === platoPadre &&
+                p.fecha === fecha,
+        );
+
+        if (valorInput === '') {
+            const valorEliminado = {
+                plato,
+                platoPadre,
+                fecha,
+                cantidad: null,
+                eliminar: true,
+            };
+
+            if (index > -1) {
+                nuevaProduccion[index] = valorEliminado;
+            } else {
+                nuevaProduccion.push(valorEliminado);
+            }
+
+            setProduccionUpdate(nuevaProduccion);
+            return;
+        }
+
+        const cantidad = Number.parseFloat(valorInput.replace(',', '.'));
+
+        if (!Number.isFinite(cantidad)) {
+            return;
+        }
+
+        const valorActualizado = {
+            plato,
+            platoPadre,
+            fecha,
+            cantidad: Number(cantidad.toFixed(2)),
+            eliminar: false,
+        };
+
+        if (index > -1) {
+            nuevaProduccion[index] = valorActualizado;
+        } else {
+            nuevaProduccion.push(valorActualizado);
+        }
+
+        setProduccionUpdate(nuevaProduccion);
+    };
+
+    type DragCantidadPayload = {
+        mode: 'set' | 'add';
+        value: number;
+    };
+
+    const DRAG_CANTIDAD_MIME = 'application/x-tamiz-planificacion-cantidad';
+
+    const iniciarDragCantidad = (
+        event: React.DragEvent<HTMLElement>,
+        payload: DragCantidadPayload,
+    ) => {
+        if (!Number.isFinite(payload.value)) {
+            return;
+        }
+
+        const value = Number(payload.value.toFixed(2));
+        const payloadNormalizado: DragCantidadPayload = {
+            mode: payload.mode,
+            value,
+        };
+
+        event.dataTransfer.setData(
+            DRAG_CANTIDAD_MIME,
+            JSON.stringify(payloadNormalizado),
+        );
+        event.dataTransfer.setData('text/plain', String(value));
+        event.dataTransfer.effectAllowed = 'copy';
+    };
+
+    const obtenerDragCantidad = (
+        dataTransfer: DataTransfer,
+    ): DragCantidadPayload | null => {
+        const dataCustom = dataTransfer.getData(DRAG_CANTIDAD_MIME);
+
+        if (dataCustom) {
+            try {
+                const payload = JSON.parse(dataCustom) as Partial<DragCantidadPayload>;
+                const mode = payload.mode;
+                const value = Number(payload.value);
+
+                if (
+                    (mode === 'set' || mode === 'add') &&
+                    Number.isFinite(value)
+                ) {
+                    return { mode, value };
+                }
+            } catch {}
+        }
+
+        const dataTexto = dataTransfer.getData('text/plain');
+        const value = Number.parseFloat(dataTexto.replace(',', '.'));
+
+        if (!Number.isFinite(value)) {
+            return null;
+        }
+
+        return {
+            mode: 'set',
+            value,
+        };
+    };
+
+    const handleDragOverInputCantidad = (
+        event: React.DragEvent<HTMLElement>,
+    ) => {
+        if (RolProvider === 'consultor') {
+            return;
+        }
+
+        const tipos = Array.from(event.dataTransfer.types || []);
+        const esDragCompatible =
+            tipos.includes(DRAG_CANTIDAD_MIME) || tipos.includes('text/plain');
+
+        if (!esDragCompatible) {
+            return;
+        }
+
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'copy';
+    };
+
+    const handleDropInputCantidad = (
+        event: React.DragEvent<HTMLElement>,
+        {
+            plato,
+            platoPadre,
+            fecha,
+            cantidadActual,
+        }: {
+            plato: string;
+            platoPadre: string;
+            fecha: string;
+            cantidadActual: number | string;
+        },
+    ) => {
+        if (RolProvider === 'consultor') {
+            return;
+        }
+
+        const payload = obtenerDragCantidad(event.dataTransfer);
+
+        if (!payload) {
+            return;
+        }
+
+        event.preventDefault();
+
+        const actual = Number(cantidadActual);
+        const actualValido = Number.isFinite(actual) ? actual : null;
+        const nuevoValor =
+            payload.mode === 'add'
+                ? Number(((actualValido ?? 0) + payload.value).toFixed(2))
+                : Number(payload.value.toFixed(2));
+
+        actualizarProduccionCelda(
+            plato,
+            platoPadre,
+            fecha,
+            nuevoValor.toString(),
+        );
+    };
+
+    const todosAdelantados =
+        platosAdelantados.length > 0 &&
+        platosAdelantados.every((plato) => !!plato.fecha);
 
     const heightTd = '3rem';
     const styleTd = {
@@ -375,55 +658,108 @@ export function TablaPlanificacion({
                     <Modal.Title>Adelantar Plato Evento</Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
-                    {platosAdelantados.length > 0 ? (
-                        <Table>
-                            <thead>
-                                <tr>
-                                    <th>Nombre</th>
-                                    <th>Cantidad</th>
-                                    <th>Adelantar</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {platosAdelantados.map((plato) => (
-                                    <tr key={plato.id}>
-                                        <td>{plato.nombre}</td>
-                                        <td>{plato.cantidad}</td>
-                                        <td>
-                                            <Form.Check
-                                                type="checkbox"
-                                                checked={!!plato.fecha}
-                                                disabled={
-                                                    cerrandoModalAdelanto ||
-                                                    platosGuardandoAdelanto.has(
-                                                        plato.id,
-                                                    )
-                                                }
-                                                onChange={(e) => {
-                                                    const solicitud =
-                                                        actualizarAdelantoPlato(
-                                                            plato.id,
-                                                            e.target.checked,
-                                                            plato.fecha,
-                                                        );
-                                                    registrarSolicitudAdelanto(
-                                                        solicitud,
-                                                    );
-                                                }}
-                                            />
-                                        </td>
+                    {cargandoPlatosAdelantados ? (
+                        <div className="d-flex align-items-center gap-2 text-muted">
+                            <Spinner
+                                animation="border"
+                                size="sm"
+                            />
+                            <span>Cargando platos...</span>
+                        </div>
+                    ) : platosAdelantados.length > 0 ? (
+                        <>
+                            <div className="d-flex justify-content-between align-items-center mb-3">
+                                <small className="text-muted">
+                                    {adelantandoTodo ||
+                                    platosGuardandoAdelanto.size > 0
+                                        ? 'Actualizando adelantos y planificación...'
+                                        : 'Marcá los platos que querés adelantar para ver el impacto en la tabla.'}
+                                </small>
+                                <Button
+                                    size="sm"
+                                    variant="primary"
+                                    disabled={
+                                        cerrandoModalAdelanto ||
+                                        adelantandoTodo ||
+                                        platosGuardandoAdelanto.size > 0
+                                    }
+                                    onClick={() => {
+                                        void handleToggleAdelantoTodo();
+                                    }}>
+                                    {adelantandoTodo
+                                        ? accionMasivaAdelanto ===
+                                          'desadelantar'
+                                            ? 'Quitando adelantos...'
+                                            : 'Adelantando...'
+                                        : todosAdelantados
+                                          ? 'Quitar adelanto a todo'
+                                          : 'Adelantar todo'}
+                                </Button>
+                            </div>
+                            <Table>
+                                <thead>
+                                    <tr>
+                                        <th>Nombre</th>
+                                        <th>Cantidad</th>
+                                        <th>Adelantar</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </Table>
+                                </thead>
+                                <tbody>
+                                    {platosAdelantados.map((plato) => (
+                                        <tr key={plato.id}>
+                                            <td>{plato.nombre}</td>
+                                            <td>{plato.cantidad}</td>
+                                            <td>
+                                                <Form.Check
+                                                    type="checkbox"
+                                                    checked={!!plato.fecha}
+                                                    disabled={
+                                                        cerrandoModalAdelanto ||
+                                                        adelantandoTodo ||
+                                                        platosGuardandoAdelanto.has(
+                                                            plato.id,
+                                                        )
+                                                    }
+                                                    onChange={(e) => {
+                                                        const solicitud =
+                                                            actualizarAdelantoPlato(
+                                                                plato.id,
+                                                                e.target
+                                                                    .checked,
+                                                                plato.fecha,
+                                                            );
+                                                        registrarSolicitudAdelanto(
+                                                            solicitud,
+                                                        );
+                                                        void solicitud.then(
+                                                            (actualizado) => {
+                                                                if (
+                                                                    actualizado
+                                                                ) {
+                                                                    dispararActualizacionPlanificacion();
+                                                                }
+                                                            },
+                                                        );
+                                                    }}
+                                                />
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </Table>
+                        </>
                     ) : (
-                        <p>No hay platos</p>
+                        <p>No hay platos para adelantar.</p>
                     )}
                 </Modal.Body>
                 <Modal.Footer>
                     <Button
                         variant="secondary"
-                        disabled={cerrandoModalAdelanto}
+                        disabled={
+                            cerrandoModalAdelanto ||
+                            adelantandoTodo ||
+                            platosGuardandoAdelanto.size > 0
+                        }
                         onClick={() => {
                             void handleCloseAdelantar();
                         }}>
@@ -673,8 +1009,8 @@ export function TablaPlanificacion({
                                                         : ''
                                                 }
                                                 style={styleTd}>
-                                                {parseFloat(
-                                                    datos
+                                                {(() => {
+                                                    const totalFila = datos
                                                         .filter(
                                                             (dato) =>
                                                                 dato.plato ===
@@ -687,8 +1023,46 @@ export function TablaPlanificacion({
                                                                 sum +
                                                                 d.cantidad,
                                                             0,
-                                                        ),
-                                                ).toFixed(2)}
+                                                        );
+
+                                                    return (
+                                                        <span
+                                                            draggable={
+                                                                RolProvider !==
+                                                                'consultor'
+                                                            }
+                                                            onDragStart={(
+                                                                event,
+                                                            ) => {
+                                                                iniciarDragCantidad(
+                                                                    event,
+                                                                    {
+                                                                        mode: 'set',
+                                                                        value: totalFila,
+                                                                    },
+                                                                );
+                                                            }}
+                                                            style={{
+                                                                cursor:
+                                                                    RolProvider ===
+                                                                    'consultor'
+                                                                        ? 'default'
+                                                                        : 'grab',
+                                                                userSelect:
+                                                                    'none',
+                                                            }}
+                                                            title={
+                                                                RolProvider ===
+                                                                'consultor'
+                                                                    ? undefined
+                                                                    : 'Arrastrá para pegar este total en una celda'
+                                                            }>
+                                                            {totalFila.toFixed(
+                                                                2,
+                                                            )}
+                                                        </span>
+                                                    );
+                                                })()}
                                             </td>
                                         </tr>
                                     </React.Fragment>
@@ -950,9 +1324,19 @@ export function TablaPlanificacion({
                                                                             d.cantidad,
                                                                         ),
                                                                     0,
-                                                                );
+                                                            );
                                                         }
                                                     }
+
+                                                    const fechaCelda = format(
+                                                        diaLimpio,
+                                                        'yyyy-MM-dd',
+                                                    );
+                                                    const placeholderArrastrable =
+                                                        RolProvider !==
+                                                            'consultor' &&
+                                                        cantidad === '' &&
+                                                        totalConsumo > 0;
 
                                                     return (
                                                         <td
@@ -977,6 +1361,9 @@ export function TablaPlanificacion({
                                                                     color: updateCant
                                                                         ? '#ff0000'
                                                                         : '#000000',
+                                                                    cursor: placeholderArrastrable
+                                                                        ? 'grab'
+                                                                        : 'text',
                                                                 }}
                                                                 className="form-control form-control-sm input"
                                                                 value={cantidad}
@@ -987,115 +1374,56 @@ export function TablaPlanificacion({
                                                                 }
                                                                 step={0.1}
                                                                 min={0}
+                                                                draggable={
+                                                                    placeholderArrastrable
+                                                                }
+                                                                onDragStart={(
+                                                                    event,
+                                                                ) => {
+                                                                    if (
+                                                                        !placeholderArrastrable
+                                                                    ) {
+                                                                        return;
+                                                                    }
+                                                                    iniciarDragCantidad(
+                                                                        event,
+                                                                        {
+                                                                            mode: 'add',
+                                                                            value: totalConsumo,
+                                                                        },
+                                                                    );
+                                                                }}
+                                                                onDragOver={
+                                                                    handleDragOverInputCantidad
+                                                                }
+                                                                onDrop={(
+                                                                    event,
+                                                                ) => {
+                                                                    handleDropInputCantidad(
+                                                                        event,
+                                                                        {
+                                                                            plato,
+                                                                            platoPadre,
+                                                                            fecha: fechaCelda,
+                                                                            cantidadActual:
+                                                                                cantidad,
+                                                                        },
+                                                                    );
+                                                                }}
+                                                                title={
+                                                                    placeholderArrastrable
+                                                                        ? 'Arrastrá este valor para sumarlo en otra celda'
+                                                                        : undefined
+                                                                }
                                                                 onChange={(
                                                                     e,
                                                                 ) => {
-                                                                    const valorInput =
+                                                                    actualizarProduccionCelda(
+                                                                        plato,
+                                                                        platoPadre,
+                                                                        fechaCelda,
                                                                         e.target
-                                                                            .value;
-                                                                    const fecha =
-                                                                        format(
-                                                                            diaLimpio,
-                                                                            'yyyy-MM-dd',
-                                                                        );
-                                                                    const nuevaProduccion =
-                                                                        [
-                                                                            ...produccionUpdate,
-                                                                        ];
-                                                                    const index =
-                                                                        nuevaProduccion.findIndex(
-                                                                            (
-                                                                                p,
-                                                                            ) =>
-                                                                                p.plato ===
-                                                                                    plato &&
-                                                                                p.platoPadre ===
-                                                                                    platoPadre &&
-                                                                                p.fecha ===
-                                                                                    fecha,
-                                                                        );
-
-                                                                    if (
-                                                                        valorInput ===
-                                                                        ''
-                                                                    ) {
-                                                                        if (
-                                                                            index >
-                                                                            -1
-                                                                        ) {
-                                                                            nuevaProduccion[
-                                                                                index
-                                                                            ] =
-                                                                                {
-                                                                                    plato,
-                                                                                    platoPadre,
-                                                                                    fecha,
-                                                                                    cantidad:
-                                                                                        null,
-                                                                                    eliminar:
-                                                                                        true,
-                                                                                };
-                                                                        } else {
-                                                                            nuevaProduccion.push(
-                                                                                {
-                                                                                    plato,
-                                                                                    platoPadre,
-                                                                                    fecha,
-                                                                                    cantidad:
-                                                                                        null,
-                                                                                    eliminar:
-                                                                                        true,
-                                                                                },
-                                                                            );
-                                                                        }
-
-                                                                        setProduccionUpdate(
-                                                                            nuevaProduccion,
-                                                                        );
-                                                                        return;
-                                                                    }
-
-                                                                    const cantidad =
-                                                                        Number.parseFloat(
-                                                                            valorInput,
-                                                                        );
-
-                                                                    if (
-                                                                        !Number.isFinite(
-                                                                            cantidad,
-                                                                        )
-                                                                    ) {
-                                                                        return;
-                                                                    }
-
-                                                                    if (
-                                                                        index >
-                                                                        -1
-                                                                    ) {
-                                                                        nuevaProduccion[
-                                                                            index
-                                                                        ] = {
-                                                                            plato,
-                                                                            platoPadre,
-                                                                            fecha,
-                                                                            cantidad,
-                                                                            eliminar:
-                                                                                false,
-                                                                        };
-                                                                    } else {
-                                                                        nuevaProduccion.push(
-                                                                            {
-                                                                                plato,
-                                                                                platoPadre,
-                                                                                fecha,
-                                                                                cantidad,
-                                                                                eliminar:
-                                                                                    false,
-                                                                            },
-                                                                        );
-                                                                    }
-                                                                    setProduccionUpdate(
-                                                                        nuevaProduccion,
+                                                                            .value,
                                                                     );
                                                                 }}
                                                             />
