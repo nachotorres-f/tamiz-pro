@@ -55,6 +55,7 @@ model Comanda {
   horarioFin          DateTime
   cantidadMayores     Int @default(0)
   cantidadMenores     Int @default(0)
+  deshabilitadaPlanificacion Boolean @default(false)
   observaciones       String? @db.Text
 
   Plato Plato[]

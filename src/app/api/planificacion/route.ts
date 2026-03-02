@@ -40,7 +40,11 @@ export async function GET(req: NextRequest) {
         ]);
 
         // Obtener eventos de la semana
-        const eventos = await obtenerEventosSemana(inicio, nombresPT, salon);
+        const eventos = await obtenerEventosSemana(
+            inicio,
+            nombresPT,
+            salon,
+        );
 
         // Procesar eventos a platos
         const platos = procesarEventosAPlatos(eventos, nombresPT);
@@ -296,6 +300,7 @@ async function obtenerEventosSemana(
 
     return prisma.comanda.findMany({
         where: {
+            deshabilitadaPlanificacion: false,
             OR: [
                 {
                     // condición 1: fecha + plato

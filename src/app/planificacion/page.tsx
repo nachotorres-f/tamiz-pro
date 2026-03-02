@@ -12,6 +12,7 @@ import {
     Button,
     Col,
     Container,
+    Form,
     Row,
     // Form
 } from 'react-bootstrap';
@@ -34,17 +35,26 @@ export interface EventoPlanificacion {
     lugar: string;
     nombre: string;
     salon: string;
+    deshabilitadaPlanificacion?: boolean;
     // agrega aquí otras propiedades si existen
 }
 
 export default function PlanificacionPage() {
     const filtroSalon = useContext(SalonContext);
     const RolProvider = useContext(RolContext);
+    const salonActual = filtroSalon || 'A';
 
     const [semanaBase] = useState(new Date());
     const [diasSemana, setDiasSemana] = useState<Date[]>([]);
     const [datos, setDatos] = useState<any[]>([]);
     const [eventos, setEventos] = React.useState<EventoPlanificacion[]>([]);
+    const [comandasCiclo, setComandasCiclo] = React.useState<
+        EventoPlanificacion[]
+    >([]);
+    const [recargaComandas, setRecargaComandas] = useState(0);
+    const [actualizandoComandaId, setActualizandoComandaId] = useState<
+        number | null
+    >(null);
     const [maxCantidadEventosDia, setMaxCantidadEventosDia] = useState(0);
     const [produccion, setProduccion] = useState<any[]>([]);
     const [datosFiltrados, setDatosFiltrados] = useState<any[]>([]);
@@ -86,7 +96,7 @@ export default function PlanificacionPage() {
                     weekStartsOn: 1,
                 }).toISOString() +
                 '&salon=' +
-                (filtroSalon || 'A')
+                salonActual,
         ) // jueves
             .then((res) => res.json())
             .then((data) => {
@@ -100,25 +110,50 @@ export default function PlanificacionPage() {
         setProduccionUpdate(
             JSON.parse(localStorage.getItem('produccionUpdate') || '[]')
         );
-    }, [semanaBase, filtroSalon, eventoAdelantado]);
+    }, [
+        semanaBase,
+        salonActual,
+        eventoAdelantado,
+        recargaComandas,
+    ]);
 
     useEffect(() => {
-        if (diasSemana.length === 0) return;
+        if (diasSemana.length < 5) return;
 
-        fetch(
-            '/api/eventosPlanificacion?fechaInicio=' +
-                format(diasSemana[4], 'yyyy-MM-dd') +
-                '&fechaFinal=' +
-                format(diasSemana[diasSemana.length - 1], 'yyyy-MM-dd') +
-                '&salon=' +
-                filtroSalon
-        )
-            .then((res) => res.json())
-            .then((data) => {
-                setEventos(data.eventos);
-                setMaxCantidadEventosDia(data.maxRepeticion);
+        const paramsBase = new URLSearchParams({
+            fechaInicio: format(diasSemana[4], 'yyyy-MM-dd'),
+            fechaFinal: format(diasSemana[diasSemana.length - 1], 'yyyy-MM-dd'),
+            salon: salonActual,
+        });
+
+        const paramsTodos = new URLSearchParams(paramsBase.toString());
+        paramsTodos.set('incluirDeshabilitadas', 'true');
+
+        const paramsFiltrados = new URLSearchParams(paramsBase.toString());
+
+        Promise.all([
+            fetch('/api/eventosPlanificacion?' + paramsTodos.toString()),
+            fetch('/api/eventosPlanificacion?' + paramsFiltrados.toString()),
+        ])
+            .then(async ([resTodos, resFiltrados]) => {
+                const [dataTodos, dataFiltrados] = await Promise.all([
+                    resTodos.json(),
+                    resFiltrados.json(),
+                ]);
+                setComandasCiclo(dataTodos.eventos || []);
+                setEventos(dataFiltrados.eventos || []);
+                setMaxCantidadEventosDia(dataFiltrados.maxRepeticion || 0);
+            })
+            .catch(() => {
+                setComandasCiclo([]);
+                setEventos([]);
+                setMaxCantidadEventosDia(0);
             });
-    }, [diasSemana, filtroSalon]);
+    }, [
+        diasSemana,
+        salonActual,
+        recargaComandas,
+    ]);
 
     useEffect(() => {
         const inicioSemana = startOfWeek(semanaBase, { weekStartsOn: 4 }); // jueves
@@ -161,7 +196,7 @@ export default function PlanificacionPage() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                salon: filtroSalon,
+                salon: salonActual,
                 produccion: produccionUpdate,
                 observaciones,
                 fechaInicio: startOfWeek(addDays(semanaBase, 4), {
@@ -197,7 +232,7 @@ export default function PlanificacionPage() {
                     weekStartsOn: 1,
                 }).toISOString() +
                 '&salon=' +
-                (filtroSalon || 'A')
+                salonActual,
         ) // jueves
             .then((res) => res.json())
             .then((data) => {
@@ -229,13 +264,43 @@ export default function PlanificacionPage() {
         });
     };
 
-    const diasCiclo = diasSemana.slice(0, 11);
-    const inicioCiclo = diasCiclo[0];
-    const finCiclo = diasCiclo[diasCiclo.length - 1];
-    const textoCiclo =
-        inicioCiclo && finCiclo
-            ? `Ciclo (11 días): ${format(inicioCiclo, 'dd/MM/yyyy')} al ${format(finCiclo, 'dd/MM/yyyy')}`
-            : 'Ciclo (11 días): -';
+    const inicioSemana = startOfWeek(semanaBase, { weekStartsOn: 1 });
+    const finSemana = addDays(inicioSemana, 6);
+    const textoSemana = `Semana: ${format(inicioSemana, 'dd/MM/yyyy')} al ${format(finSemana, 'dd/MM/yyyy')}`;
+
+    const handleToggleComanda = async (comandaId: number, habilitada: boolean) => {
+        setActualizandoComandaId(comandaId);
+
+        await fetch('/api/planificacion/comanda', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                id: comandaId,
+                deshabilitada: !habilitada,
+            }),
+        })
+            .then(async (res) => {
+                if (!res.ok) {
+                    const data = await res.json().catch(() => null);
+                    throw new Error(
+                        data?.error || 'Error al actualizar la comanda',
+                    );
+                }
+            })
+            .then(() => {
+                setRecargaComandas((prev) => prev + 1);
+            })
+            .catch((error) => {
+                toast.error(error.message || 'Error al actualizar la comanda', {
+                    position: 'bottom-right',
+                    theme: 'colored',
+                    transition: Slide,
+                });
+            })
+            .finally(() => {
+                setActualizandoComandaId(null);
+            });
+    };
 
     if (loading) {
         return <Loading />;
@@ -246,7 +311,53 @@ export default function PlanificacionPage() {
             <ToastContainer />
             <Container className="mt-5 flex-grow-1">
                 <h2 className="text-center mb-4">Planificación</h2>
-                <p className="text-center text-muted mb-3">{textoCiclo}</p>
+                <p className="text-center text-muted mb-3">{textoSemana}</p>
+                <Container className="mb-3">
+                    <div className="border rounded p-3 bg-light">
+                        <div className="fw-semibold">Comandas del ciclo</div>
+                        <div className="text-muted small mb-2">
+                            Desactivá una comanda para excluir sus platos del
+                            cálculo. Volvé a activarla para revertir cambios.
+                        </div>
+                        {comandasCiclo.length === 0 ? (
+                            <div className="text-muted small">
+                                No hay comandas para el ciclo seleccionado.
+                            </div>
+                        ) : (
+                            <div
+                                style={{
+                                    maxHeight: '12rem',
+                                    overflowY: 'auto',
+                                }}>
+                                {comandasCiclo.map((comanda) => {
+                                    const deshabilitada =
+                                        comanda.deshabilitadaPlanificacion;
+                                    return (
+                                        <Form.Check
+                                            key={comanda.id}
+                                            type="switch"
+                                            id={`comanda-ciclo-${comanda.id}`}
+                                            className="mb-1"
+                                            checked={!deshabilitada}
+                                            disabled={
+                                                actualizandoComandaId ===
+                                                    comanda.id ||
+                                                RolProvider === 'consultor'
+                                            }
+                                            onChange={(e) =>
+                                                handleToggleComanda(
+                                                    comanda.id,
+                                                    e.target.checked,
+                                                )
+                                            }
+                                            label={`${format(new Date(comanda.fecha), 'dd/MM/yyyy')} - ${comanda.lugar} - ${comanda.salon} - ${comanda.nombre}`}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                </Container>
 
                 {/* <Form.Group>
                 <Row>

@@ -13,11 +13,13 @@ export async function GET(req: NextRequest) {
     const fechaInicio = searchParams.get('fechaInicio');
     const fechaFinal = searchParams.get('fechaFinal');
     const salon = searchParams.get('salon');
+    const incluirDeshabilitadas =
+        searchParams.get('incluirDeshabilitadas') === 'true';
 
     if (!fechaInicio || !fechaFinal || !salon) {
         return NextResponse.json(
             { error: 'Faltan parámetros de fecha' },
-            { status: 400 }
+            { status: 400 },
         );
     }
 
@@ -33,6 +35,9 @@ export async function GET(req: NextRequest) {
                 salon === 'A'
                     ? { notIn: ['El Central', 'La Rural'] }
                     : { in: ['El Central', 'La Rural'] },
+            ...(incluirDeshabilitadas
+                ? {}
+                : { deshabilitadaPlanificacion: false }),
         },
         orderBy: {
             fecha: 'asc',
@@ -54,7 +59,10 @@ function maxRepeticionesPorDia(array: Evento[]) {
         contador[dia] = (contador[dia] || 0) + 1;
     });
 
-    const max = Math.max(...Object.values(contador));
+    const valores = Object.values(contador);
+    if (valores.length === 0) return 0;
+
+    const max = Math.max(...valores);
 
     return max;
 }
