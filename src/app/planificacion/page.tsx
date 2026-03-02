@@ -229,6 +229,14 @@ export default function PlanificacionPage() {
         });
     };
 
+    const diasCiclo = diasSemana.slice(0, 11);
+    const inicioCiclo = diasCiclo[0];
+    const finCiclo = diasCiclo[diasCiclo.length - 1];
+    const textoCiclo =
+        inicioCiclo && finCiclo
+            ? `Ciclo (11 días): ${format(inicioCiclo, 'dd/MM/yyyy')} al ${format(finCiclo, 'dd/MM/yyyy')}`
+            : 'Ciclo (11 días): -';
+
     if (loading) {
         return <Loading />;
     }
@@ -238,6 +246,7 @@ export default function PlanificacionPage() {
             <ToastContainer />
             <Container className="mt-5 flex-grow-1">
                 <h2 className="text-center mb-4">Planificación</h2>
+                <p className="text-center text-muted mb-3">{textoCiclo}</p>
 
                 {/* <Form.Group>
                 <Row>
