@@ -193,10 +193,9 @@ export async function GET(req: NextRequest) {
         };
     });
 
-    const filas = Array.from(filasMap.values()).sort(
-        (a, b) =>
-            a.platoPrincipal.localeCompare(b.platoPrincipal, 'es') ||
-            a.subPlato.localeCompare(b.subPlato, 'es'),
+    const filas = ordenarFilasJerarquicamente(
+        Array.from(filasMap.values()),
+        nombresPlatos,
     );
 
     return NextResponse.json({
@@ -378,4 +377,78 @@ function debeExcluirSubPlato(platoPrincipal: string, subPlato: string): boolean 
     }
 
     return subPlatosExcluidos.has(normalizarClaveFiltro(subPlato));
+}
+
+function ordenarFilasJerarquicamente(
+    filas: FilaPicking[],
+    platosRaiz: Set<string>,
+): FilaPicking[] {
+    const filaPorClave = new Map<string, FilaPicking>();
+    const hijosPorPadre = new Map<string, Set<string>>();
+
+    for (const fila of filas) {
+        const keyFila = `${fila.platoPrincipal}|||${fila.subPlato}`;
+        filaPorClave.set(keyFila, fila);
+
+        if (!hijosPorPadre.has(fila.platoPrincipal)) {
+            hijosPorPadre.set(fila.platoPrincipal, new Set<string>());
+        }
+
+        hijosPorPadre.get(fila.platoPrincipal)!.add(fila.subPlato);
+    }
+
+    const filasOrdenadas: FilaPicking[] = [];
+    const filasVisitadas = new Set<string>();
+
+    const recorrerArbol = (padre: string, camino: Set<string>) => {
+        if (camino.has(padre)) {
+            return;
+        }
+
+        const hijos = Array.from(hijosPorPadre.get(padre) ?? []).sort((a, b) =>
+            a.localeCompare(b, 'es'),
+        );
+
+        if (hijos.length === 0) {
+            return;
+        }
+
+        const nuevoCamino = new Set(camino);
+        nuevoCamino.add(padre);
+
+        for (const hijo of hijos) {
+            const keyFila = `${padre}|||${hijo}`;
+
+            if (!filasVisitadas.has(keyFila)) {
+                const fila = filaPorClave.get(keyFila);
+                if (fila) {
+                    filasOrdenadas.push(fila);
+                    filasVisitadas.add(keyFila);
+                }
+            }
+
+            recorrerArbol(hijo, nuevoCamino);
+        }
+    };
+
+    const platosRaizOrdenados = Array.from(platosRaiz).sort((a, b) =>
+        a.localeCompare(b, 'es'),
+    );
+
+    for (const platoRaiz of platosRaizOrdenados) {
+        recorrerArbol(platoRaiz, new Set<string>());
+    }
+
+    const filasRestantes = filas
+        .filter((fila) => {
+            const keyFila = `${fila.platoPrincipal}|||${fila.subPlato}`;
+            return !filasVisitadas.has(keyFila);
+        })
+        .sort(
+            (a, b) =>
+                a.platoPrincipal.localeCompare(b.platoPrincipal, 'es') ||
+                a.subPlato.localeCompare(b.subPlato, 'es'),
+        );
+
+    return [...filasOrdenadas, ...filasRestantes];
 }
