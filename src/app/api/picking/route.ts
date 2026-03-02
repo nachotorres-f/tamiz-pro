@@ -8,6 +8,12 @@ interface RecetaNodo {
     porcionBruta: number;
 }
 
+interface AristaSubPlato {
+    platoPadre: string;
+    subPlato: string;
+    coeficiente: number;
+}
+
 interface ComandaConPlatos {
     Plato: {
         nombre: string;
@@ -98,7 +104,7 @@ export async function GET(req: NextRequest) {
     }
 
     const grafoRecetas = await construirGrafoRecetas(nombresPlatos);
-    const cacheCoeficientes = new Map<string, Map<string, number>>();
+    const cacheCoeficientes = new Map<string, Map<string, AristaSubPlato>>();
     const filasMap = new Map<string, FilaPicking>();
 
     const comandasDesglosadas: ComandaDesglosada[] = comandas.map((comanda) => {
@@ -106,14 +112,14 @@ export async function GET(req: NextRequest) {
 
         const platos: PlatoDesglosado[] = Array.from(platosAgrupados.entries())
             .map(([platoPrincipal, cantidadPlato]) => {
-                const coeficientesSubPlatos = obtenerCoeficientesSubPlatos(
+                const aristasSubPlatos = obtenerAristasSubPlatos(
                     platoPrincipal,
                     grafoRecetas,
                     cacheCoeficientes,
                 );
 
-                const subPlatos = Array.from(coeficientesSubPlatos.entries())
-                    .map(([subPlato, coeficiente]) => {
+                const subPlatos = Array.from(aristasSubPlatos.values())
+                    .map(({ platoPadre, subPlato, coeficiente }) => {
                         if (
                             debeExcluirSubPlato(
                                 platoPrincipal,
@@ -130,10 +136,10 @@ export async function GET(req: NextRequest) {
                             return null;
                         }
 
-                        const keyFila = `${platoPrincipal}|||${subPlato}`;
+                        const keyFila = `${platoPadre}|||${subPlato}`;
                         if (!filasMap.has(keyFila)) {
                             filasMap.set(keyFila, {
-                                platoPrincipal,
+                                platoPrincipal: platoPadre,
                                 subPlato,
                                 cantidadesPorComanda: {},
                             });
@@ -146,6 +152,10 @@ export async function GET(req: NextRequest) {
                                 (fila.cantidadesPorComanda[keyComanda] ?? 0) +
                                     cantidadSubPlato,
                             );
+
+                        if (platoPadre !== platoPrincipal) {
+                            return null;
+                        }
 
                         return {
                             nombre: subPlato,
@@ -261,16 +271,16 @@ async function construirGrafoRecetas(
     return grafoRecetas;
 }
 
-function obtenerCoeficientesSubPlatos(
+function obtenerAristasSubPlatos(
     platoPrincipal: string,
     grafoRecetas: Map<string, RecetaNodo[]>,
-    cache: Map<string, Map<string, number>>,
-): Map<string, number> {
+    cache: Map<string, Map<string, AristaSubPlato>>,
+): Map<string, AristaSubPlato> {
     if (cache.has(platoPrincipal)) {
         return cache.get(platoPrincipal)!;
     }
 
-    const coeficientes = new Map<string, number>();
+    const aristas = new Map<string, AristaSubPlato>();
     const pila: Array<{ nombre: string; factor: number; camino: Set<string> }> =
         [
             {
@@ -295,10 +305,16 @@ function obtenerCoeficientesSubPlatos(
                 continue;
             }
 
-            coeficientes.set(
-                receta.descripcion,
-                (coeficientes.get(receta.descripcion) ?? 0) + factorSubPlato,
-            );
+            const keyArista = `${nombre}|||${receta.descripcion}`;
+            if (!aristas.has(keyArista)) {
+                aristas.set(keyArista, {
+                    platoPadre: nombre,
+                    subPlato: receta.descripcion,
+                    coeficiente: 0,
+                });
+            }
+            const arista = aristas.get(keyArista)!;
+            arista.coeficiente += factorSubPlato;
 
             const nuevoCamino = new Set(camino);
             nuevoCamino.add(receta.descripcion);
@@ -310,8 +326,8 @@ function obtenerCoeficientesSubPlatos(
         }
     }
 
-    cache.set(platoPrincipal, coeficientes);
-    return coeficientes;
+    cache.set(platoPrincipal, aristas);
+    return aristas;
 }
 
 function agruparPlatosPorNombre(
