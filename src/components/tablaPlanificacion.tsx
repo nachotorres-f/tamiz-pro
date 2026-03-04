@@ -40,7 +40,12 @@ export function TablaPlanificacion({
 // anchoTotal,
 {
     pageOcultos: boolean;
-    platosUnicos: { plato: string; platoPadre: string }[];
+    platosUnicos: {
+        plato: string;
+        platoCodigo: string;
+        platoPadre: string;
+        platoPadreCodigo: string;
+    }[];
     diasSemana: Date[];
     datos: any[];
     filtro: string;
@@ -48,11 +53,23 @@ export function TablaPlanificacion({
     platoExpandido: string | null;
     produccion: any[];
     produccionUpdate: any[];
-    observaciones: { plato: string; observacion: string; platoPadre: string }[];
+    observaciones: {
+        plato: string;
+        platoCodigo: string;
+        observacion: string;
+        platoPadre: string;
+        platoPadreCodigo: string;
+    }[];
     eventos: EventoPlanificacion[];
     maxCantidadEventosDia: number;
     setObservaciones: (
-        value: { plato: string; observacion: string; platoPadre: string }[],
+        value: {
+            plato: string;
+            platoCodigo: string;
+            observacion: string;
+            platoPadre: string;
+            platoPadreCodigo: string;
+        }[],
     ) => void;
     setProduccion: (value: any[]) => void;
     setProduccionUpdate: (value: any[]) => void;
@@ -67,7 +84,9 @@ export function TablaPlanificacion({
     const [ocultos, setOcultos] = React.useState<Set<string>>(new Set());
     const [show, setShow] = useState(false);
     const [platoModal, setPlatoModal] = useState('');
+    const [platoCodigoModal, setPlatoCodigoModal] = useState('');
     const [platoPadreModal, setPlatoPadreModal] = useState('');
+    const [platoPadreCodigoModal, setPlatoPadreCodigoModal] = useState('');
     const [observacionModal, setObservacionModal] = useState('');
     const [adelantarEvento, setAdelantarEvento] = useState(0);
     const [platosAdelantados, setPlatosAdelantados] = useState<any[]>([]);
@@ -371,22 +390,26 @@ export function TablaPlanificacion({
 
     const actualizarProduccionCelda = (
         plato: string,
+        platoCodigo: string,
         platoPadre: string,
+        platoPadreCodigo: string,
         fecha: string,
         valorInput: string,
     ) => {
         const nuevaProduccion = [...produccionUpdate];
         const index = nuevaProduccion.findIndex(
             (p) =>
-                p.plato === plato &&
-                p.platoPadre === platoPadre &&
+                p.platoCodigo === platoCodigo &&
+                p.platoPadreCodigo === platoPadreCodigo &&
                 p.fecha === fecha,
         );
 
         if (valorInput === '') {
             const valorEliminado = {
                 plato,
+                platoCodigo,
                 platoPadre,
+                platoPadreCodigo,
                 fecha,
                 cantidad: null,
                 eliminar: true,
@@ -410,7 +433,9 @@ export function TablaPlanificacion({
 
         const valorActualizado = {
             plato,
+            platoCodigo,
             platoPadre,
+            platoPadreCodigo,
             fecha,
             cantidad: Number(cantidad.toFixed(2)),
             eliminar: false,
@@ -510,12 +535,16 @@ export function TablaPlanificacion({
         event: React.DragEvent<HTMLElement>,
         {
             plato,
+            platoCodigo,
             platoPadre,
+            platoPadreCodigo,
             fecha,
             cantidadActual,
         }: {
             plato: string;
+            platoCodigo: string;
             platoPadre: string;
+            platoPadreCodigo: string;
             fecha: string;
             cantidadActual: number | string;
         },
@@ -541,7 +570,9 @@ export function TablaPlanificacion({
 
         actualizarProduccionCelda(
             plato,
+            platoCodigo,
             platoPadre,
+            platoPadreCodigo,
             fecha,
             nuevoValor.toString(),
         );
@@ -615,17 +646,21 @@ export function TablaPlanificacion({
                             onClick={() => {
                                 const obsExistente = observaciones.find(
                                     (o) =>
-                                        o.plato === platoModal &&
-                                        o.platoPadre === platoPadreModal,
+                                        o.platoCodigo === platoCodigoModal &&
+                                        o.platoPadreCodigo ===
+                                            platoPadreCodigoModal,
                                 );
                                 if (obsExistente) {
                                     obsExistente.observacion = observacionModal;
                                     setObservaciones([
                                         ...observaciones.filter(
                                             (o) =>
-                                                o.plato !== platoModal &&
-                                                o.platoPadre !==
-                                                    platoPadreModal,
+                                                !(
+                                                    o.platoCodigo ===
+                                                        platoCodigoModal &&
+                                                    o.platoPadreCodigo ===
+                                                        platoPadreCodigoModal
+                                                ),
                                         ),
                                         obsExistente,
                                     ]);
@@ -634,7 +669,10 @@ export function TablaPlanificacion({
                                         ...observaciones,
                                         {
                                             plato: platoModal,
+                                            platoCodigo: platoCodigoModal,
                                             platoPadre: platoPadreModal,
+                                            platoPadreCodigo:
+                                                platoPadreCodigoModal,
                                             observacion: observacionModal,
                                         },
                                     ]);
@@ -883,8 +921,18 @@ export function TablaPlanificacion({
                         <tbody>
                             {platosUnicos
                                 .filter(filterPlatos)
-                                .map(({ plato, platoPadre }) => (
-                                    <React.Fragment key={plato + platoPadre}>
+                                .map(
+                                    ({
+                                        plato,
+                                        platoCodigo,
+                                        platoPadre,
+                                        platoPadreCodigo,
+                                    }) => (
+                                        <React.Fragment
+                                            key={
+                                                platoCodigo +
+                                                platoPadreCodigo
+                                            }>
                                         <tr style={{ textAlign: 'center' }}>
                                             <td style={styleTd}>
                                                 <Button
@@ -902,10 +950,10 @@ export function TablaPlanificacion({
                                                         const observacion =
                                                             observaciones.find(
                                                                 (o) =>
-                                                                    o.plato ===
-                                                                        plato &&
-                                                                    o.platoPadre ===
-                                                                        platoPadre,
+                                                                    o.platoCodigo ===
+                                                                        platoCodigo &&
+                                                                    o.platoPadreCodigo ===
+                                                                        platoPadreCodigo,
                                                             )?.observacion ||
                                                             observacionModal;
 
@@ -917,10 +965,10 @@ export function TablaPlanificacion({
                                                             const prod =
                                                                 produccion.filter(
                                                                     (p) =>
-                                                                        p.plato ===
-                                                                            plato &&
-                                                                        p.platoPadre ===
-                                                                            platoPadre &&
+                                                                        p.platoCodigo ===
+                                                                            platoCodigo &&
+                                                                        p.platoPadreCodigo ===
+                                                                            platoPadreCodigo &&
                                                                         p.observacion,
                                                                 );
 
@@ -939,8 +987,14 @@ export function TablaPlanificacion({
                                                         }
 
                                                         setPlatoModal(plato);
+                                                        setPlatoCodigoModal(
+                                                            platoCodigo,
+                                                        );
                                                         setPlatoPadreModal(
                                                             platoPadre,
+                                                        );
+                                                        setPlatoPadreCodigoModal(
+                                                            platoPadreCodigo,
                                                         );
                                                         setShow(true);
                                                     }}>
@@ -980,10 +1034,10 @@ export function TablaPlanificacion({
                                                     datos
                                                         .filter(
                                                             (dato) =>
-                                                                dato.plato ===
-                                                                    plato &&
-                                                                dato.platoPadre ===
-                                                                    platoPadre,
+                                                                dato.platoCodigo ===
+                                                                    platoCodigo &&
+                                                                dato.platoPadreCodigo ===
+                                                                    platoPadreCodigo,
                                                         )
                                                         .reduce(
                                                             (sum, d) =>
@@ -994,10 +1048,10 @@ export function TablaPlanificacion({
                                                     produccion
                                                         .filter(
                                                             (d) =>
-                                                                d.plato ===
-                                                                    plato &&
-                                                                d.platoPadre ===
-                                                                    platoPadre,
+                                                                d.platoCodigo ===
+                                                                    platoCodigo &&
+                                                                d.platoPadreCodigo ===
+                                                                    platoPadreCodigo,
                                                         )
                                                         .reduce(
                                                             (sum, d) =>
@@ -1013,10 +1067,10 @@ export function TablaPlanificacion({
                                                     const totalFila = datos
                                                         .filter(
                                                             (dato) =>
-                                                                dato.plato ===
-                                                                    plato &&
-                                                                dato.platoPadre ===
-                                                                    platoPadre,
+                                                                dato.platoCodigo ===
+                                                                    platoCodigo &&
+                                                                dato.platoPadreCodigo ===
+                                                                    platoPadreCodigo,
                                                         )
                                                         .reduce(
                                                             (sum, d) =>
@@ -1066,7 +1120,8 @@ export function TablaPlanificacion({
                                             </td>
                                         </tr>
                                     </React.Fragment>
-                                ))}
+                                    ),
+                                )}
                         </tbody>
                     </Table>
                 </div>
@@ -1184,8 +1239,18 @@ export function TablaPlanificacion({
                         <tbody>
                             {platosUnicos
                                 .filter(filterPlatos)
-                                .map(({ plato, platoPadre }) => (
-                                    <React.Fragment key={plato + platoPadre}>
+                                .map(
+                                    ({
+                                        plato,
+                                        platoCodigo,
+                                        platoPadre,
+                                        platoPadreCodigo,
+                                    }) => (
+                                        <React.Fragment
+                                            key={
+                                                platoCodigo +
+                                                platoPadreCodigo
+                                            }>
                                         <tr style={{ textAlign: 'center' }}>
                                             {diasSemana
                                                 .filter(filterDias)
@@ -1219,10 +1284,10 @@ export function TablaPlanificacion({
                                                                 ); // Ajuste para comparar con el día limpio
 
                                                                 return (
-                                                                    d.plato ===
-                                                                        plato &&
-                                                                    d.platoPadre ===
-                                                                        platoPadre &&
+                                                                    d.platoCodigo ===
+                                                                        platoCodigo &&
+                                                                    d.platoPadreCodigo ===
+                                                                        platoPadreCodigo &&
                                                                     fecha.getTime() ===
                                                                         diaLimpio.getTime()
                                                                 );
@@ -1248,10 +1313,10 @@ export function TablaPlanificacion({
                                                                 ); // Ajuste para comparar con el día limpio
 
                                                                 return (
-                                                                    d.plato ===
-                                                                        plato &&
-                                                                    d.platoPadre ===
-                                                                        platoPadre &&
+                                                                    d.platoCodigo ===
+                                                                        platoCodigo &&
+                                                                    d.platoPadreCodigo ===
+                                                                        platoPadreCodigo &&
                                                                     fecha.getTime() ===
                                                                         diaLimpio.getTime()
                                                                 );
@@ -1272,10 +1337,10 @@ export function TablaPlanificacion({
                                                             );
 
                                                             return (
-                                                                d.plato ===
-                                                                    plato &&
-                                                                d.platoPadre ===
-                                                                    platoPadre &&
+                                                                d.platoCodigo ===
+                                                                    platoCodigo &&
+                                                                d.platoPadreCodigo ===
+                                                                    platoPadreCodigo &&
                                                                 fecha.getTime() ===
                                                                     dia.getTime()
                                                             );
@@ -1346,8 +1411,8 @@ export function TablaPlanificacion({
                                                                     'middle',
                                                             }}
                                                             key={
-                                                                plato +
-                                                                platoPadre +
+                                                                platoCodigo +
+                                                                platoPadreCodigo +
                                                                 i
                                                             }>
                                                             <Form.Control
@@ -1403,7 +1468,9 @@ export function TablaPlanificacion({
                                                                         event,
                                                                         {
                                                                             plato,
+                                                                            platoCodigo,
                                                                             platoPadre,
+                                                                            platoPadreCodigo,
                                                                             fecha: fechaCelda,
                                                                             cantidadActual:
                                                                                 cantidad,
@@ -1420,7 +1487,9 @@ export function TablaPlanificacion({
                                                                 ) => {
                                                                     actualizarProduccionCelda(
                                                                         plato,
+                                                                        platoCodigo,
                                                                         platoPadre,
+                                                                        platoPadreCodigo,
                                                                         fechaCelda,
                                                                         e.target
                                                                             .value,
@@ -1434,11 +1503,13 @@ export function TablaPlanificacion({
                                         {platoExpandido === plato && (
                                             <PlatoDetalle
                                                 plato={plato}
+                                                platoCodigo={platoCodigo}
                                                 diasSemanaProp={diasSemana}
                                             />
                                         )}
                                     </React.Fragment>
-                                ))}
+                                    ),
+                                )}
                         </tbody>
                     </Table>
                 </div>

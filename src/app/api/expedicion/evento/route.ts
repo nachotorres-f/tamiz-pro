@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { prisma } from '@/lib/prisma';
 import { NextRequest, NextResponse } from 'next/server';
+import { logAudit } from '@/lib/audit';
 
 export async function GET(req: NextRequest) {
     process.env.TZ = 'America/Argentina/Buenos_Aires';
@@ -8,43 +9,75 @@ export async function GET(req: NextRequest) {
     const { searchParams } = req.nextUrl;
     const id = searchParams.get('id');
 
-    const eventos = await prisma.comanda.findMany({
-        where: {
-            id: id ? Number(id) : undefined,
-        },
-        include: {
-            Plato: true,
-        },
-    });
-
-    //Para cada evento, obtenemos los ingredientes recursivamente
-    const eventosConIngredientes = [];
-    for (const evento of eventos) {
-        const ingredientes: any[] = [];
-        for (const plato of evento.Plato) {
-            const ingredientesPlato = await buscarIngredientesRecursivo(
-                plato.nombre,
-                plato.cantidad
-            );
-            ingredientes.push(...ingredientesPlato);
-        }
-        eventosConIngredientes.push({
-            ...evento,
-            ingredientes,
+    try {
+        const eventos = await prisma.comanda.findMany({
+            where: {
+                id: id ? Number(id) : undefined,
+            },
+            include: {
+                Plato: true,
+            },
         });
-    }
 
-    return NextResponse.json(eventos);
+        //Para cada evento, obtenemos los ingredientes recursivamente
+        const eventosConIngredientes = [];
+        for (const evento of eventos) {
+            const ingredientes: any[] = [];
+            for (const plato of evento.Plato) {
+                const ingredientesPlato = await buscarIngredientesRecursivo(
+                    plato.codigo || plato.nombre,
+                    plato.cantidad,
+                );
+                ingredientes.push(...ingredientesPlato);
+            }
+            eventosConIngredientes.push({
+                ...evento,
+                ingredientes,
+            });
+        }
+
+        await logAudit({
+            modulo: 'expedicion',
+            accion: 'consultar_expedicion_evento_legacy',
+            ruta: '/api/expedicion/evento',
+            metodo: 'GET',
+            resumen: `Consulta de evento de expedición ${id || 'sin_id'}`,
+            detalle: {
+                id: id ? Number(id) : null,
+                eventos: eventos.length,
+            },
+        });
+
+        return NextResponse.json(eventos);
+    } catch (error) {
+        await logAudit({
+            modulo: 'expedicion',
+            accion: 'consultar_expedicion_evento_legacy',
+            ruta: '/api/expedicion/evento',
+            metodo: 'GET',
+            estado: 'error',
+            resumen: 'Error consultando evento de expedición legacy',
+            detalle: {
+                id: id ? Number(id) : null,
+                error: error instanceof Error ? error.message : String(error),
+            },
+        });
+
+        return NextResponse.json(
+            { error: 'Error al consultar evento de expedición' },
+            { status: 500 },
+        );
+    }
 }
 
 // Búsqueda recursiva de ingredientes
 const buscarIngredientesRecursivo = async (
-    nombre: string,
+    codigoONombre: string,
     cantidadPadre: number
 ): Promise<any[]> => {
     const ingredientes = await prisma.receta.findMany({
         where: {
-            nombreProducto: nombre,
+            OR: [{ codigo: codigoONombre }, { nombreProducto: codigoONombre }],
         },
     });
 
@@ -60,7 +93,7 @@ const buscarIngredientesRecursivo = async (
 
         // Buscamos ingredientes hijos recursivamente
         const hijos = await buscarIngredientesRecursivo(
-            ingrediente.descripcion,
+            ingrediente.subCodigo || ingrediente.descripcion,
             ingredienteMultiplicado.porcionBruta
         );
         resultado.push(...hijos);

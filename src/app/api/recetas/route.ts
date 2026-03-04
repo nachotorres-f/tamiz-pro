@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { logAudit } from '@/lib/audit';
 
 export async function GET() {
     process.env.TZ = 'America/Argentina/Buenos_Aires';
@@ -57,8 +58,31 @@ export async function GET() {
             { timeout: 60000 }
         );
 
+        await logAudit({
+            modulo: 'recetas',
+            accion: 'importar_recetas_externo',
+            ruta: '/api/recetas',
+            metodo: 'GET',
+            resumen: 'Recetas importadas desde servicio externo',
+            detalle: {
+                cantidadRecetas: data.length,
+            },
+        });
+
         return NextResponse.json({ success: true });
     } catch (error) {
+        await logAudit({
+            modulo: 'recetas',
+            accion: 'importar_recetas_externo',
+            ruta: '/api/recetas',
+            metodo: 'GET',
+            estado: 'error',
+            resumen: 'Error importando recetas desde servicio externo',
+            detalle: {
+                error: error instanceof Error ? error.message : String(error),
+            },
+        });
+
         if (error instanceof Error) {
             console.error('Error al consultar el servicio:', error.message);
         } else {

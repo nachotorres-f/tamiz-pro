@@ -41,6 +41,7 @@ export default function ExpedicionPage() {
         porcionBruta: number;
         check: boolean;
         cantidadPadre: number;
+        puedeExpedir?: boolean;
     };
 
     type InfoArray = InfoItem[];
@@ -117,6 +118,10 @@ export default function ExpedicionPage() {
         codigo: string,
         subCodigo: string
     ) => {
+        if (!codigo || !subCodigo) {
+            return;
+        }
+
         fetch('/api/exEvento', {
             method: checked ? 'POST' : 'DELETE',
             headers: { 'Content-Type': 'application/json' },
@@ -138,9 +143,20 @@ export default function ExpedicionPage() {
     };
 
     const checkAllExpedicion = async (checked: boolean, i: number) => {
+        const ingredientesExpedibles = info[i].filter(
+            (ingrediente) =>
+                ingrediente.puedeExpedir !== false &&
+                ingrediente.codigo &&
+                ingrediente.subCodigo
+        );
+
+        if (ingredientesExpedibles.length === 0) {
+            return;
+        }
+
         // actualizar en backend todas las filas
         await Promise.all(
-            info[i].map((ingrediente) =>
+            ingredientesExpedibles.map((ingrediente) =>
                 checkExpedicion(
                     checked,
                     ingrediente.codigo,
@@ -226,10 +242,37 @@ export default function ExpedicionPage() {
                                     type="checkbox"
                                     id={`${i}`}
                                     label={`Marcar todas`}
-                                    disabled={RolProvider === 'consultor'}
-                                    checked={data.every(
-                                        (ingrediente) => ingrediente.check
-                                    )}
+                                    disabled={
+                                        RolProvider === 'consultor' ||
+                                        data.filter(
+                                            (ingrediente) =>
+                                                ingrediente.puedeExpedir !==
+                                                    false &&
+                                                ingrediente.codigo &&
+                                                ingrediente.subCodigo
+                                        ).length === 0
+                                    }
+                                    checked={
+                                        data.filter(
+                                            (ingrediente) =>
+                                                ingrediente.puedeExpedir !==
+                                                    false &&
+                                                ingrediente.codigo &&
+                                                ingrediente.subCodigo
+                                        ).length > 0 &&
+                                        data
+                                            .filter(
+                                                (ingrediente) =>
+                                                    ingrediente.puedeExpedir !==
+                                                        false &&
+                                                    ingrediente.codigo &&
+                                                    ingrediente.subCodigo
+                                            )
+                                            .every(
+                                                (ingrediente) =>
+                                                    ingrediente.check
+                                            )
+                                    }
                                     onChange={(e) => {
                                         checkAllExpedicion(e.target.checked, i);
                                     }}
@@ -254,11 +297,15 @@ export default function ExpedicionPage() {
                                                     <td>
                                                         <Form.Check
                                                             type="checkbox"
-                                                            id={`${item.codigo}${item.subCodigo}`}
+                                                            id={`${item.codigo || 'sin-codigo'}-${item.subCodigo || 'sin-subcodigo'}-${i}-${j}`}
                                                             label={``}
                                                             disabled={
                                                                 RolProvider ===
-                                                                'consultor'
+                                                                    'consultor' ||
+                                                                item.puedeExpedir ===
+                                                                    false ||
+                                                                !item.codigo ||
+                                                                !item.subCodigo
                                                             }
                                                             checked={item.check}
                                                             onChange={(e) => {
@@ -277,11 +324,11 @@ export default function ExpedicionPage() {
                                                             }}
                                                         />
                                                     </td>
-                                                    <td>{item.codigo}</td>
+                                                    <td>{item.codigo || '-'}</td>
                                                     <td>
                                                         {item.nombreProducto}
                                                     </td>
-                                                    <td>{item.subCodigo}</td>
+                                                    <td>{item.subCodigo || '-'}</td>
                                                     <td>{item.descripcion}</td>
                                                     <td>{item.tipo}</td>
                                                     <td>{item.unidadMedida}</td>

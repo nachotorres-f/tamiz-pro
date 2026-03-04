@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
 import { prisma } from '@/lib/prisma';
+import { logAudit } from '@/lib/audit';
 
 export const dynamic = 'force-dynamic';
 
@@ -63,12 +64,33 @@ export async function POST(req: NextRequest) {
             })),
         });
 
+        await logAudit({
+            modulo: 'recetas',
+            accion: 'importar_recetas_archivo',
+            ruta: '/api/importar/recetas',
+            metodo: 'POST',
+            resumen: 'Recetas importadas desde archivo',
+            detalle: {
+                filasArchivo: data.length,
+                sheetName,
+            },
+        });
+
         return NextResponse.json({
             success: true,
             message: 'Recetas importadas correctamente',
             data,
         });
     } catch {
+        await logAudit({
+            modulo: 'recetas',
+            accion: 'importar_recetas_archivo',
+            ruta: '/api/importar/recetas',
+            metodo: 'POST',
+            estado: 'error',
+            resumen: 'Error importando recetas desde archivo',
+        });
+
         return NextResponse.json(
             { success: false, message: 'Error al leer el archivo' },
             { status: 500 }

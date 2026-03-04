@@ -4,18 +4,127 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { addDays } from 'date-fns';
 
+function normalizarTexto(valor: string | null | undefined): string {
+    return (valor ?? '').trim();
+}
+
+function normalizarClave(valor: string | null | undefined): string {
+    return normalizarTexto(valor).toLocaleLowerCase('es');
+}
+
+async function obtenerMapasRecetas() {
+    const recetas = await prisma.receta.findMany({
+        select: {
+            id: true,
+            codigo: true,
+            subCodigo: true,
+            nombreProducto: true,
+            descripcion: true,
+        },
+        orderBy: {
+            id: 'asc',
+        },
+    });
+
+    const codigoPorNombreProducto = new Map<string, string>();
+    const nombrePorCodigoPadre = new Map<string, string>();
+    const nombrePorSubCodigo = new Map<string, string>();
+
+    for (const receta of recetas) {
+        const codigoPadre = normalizarTexto(receta.codigo);
+        const subCodigo = normalizarTexto(receta.subCodigo);
+        const nombreProducto = normalizarTexto(receta.nombreProducto);
+        const descripcion = normalizarTexto(receta.descripcion);
+
+        if (codigoPadre && !nombrePorCodigoPadre.has(codigoPadre)) {
+            nombrePorCodigoPadre.set(codigoPadre, nombreProducto || codigoPadre);
+        }
+
+        if (subCodigo && !nombrePorSubCodigo.has(subCodigo)) {
+            nombrePorSubCodigo.set(subCodigo, descripcion || subCodigo);
+        }
+
+        const claveNombre = normalizarClave(nombreProducto);
+        if (claveNombre && codigoPadre && !codigoPorNombreProducto.has(claveNombre)) {
+            codigoPorNombreProducto.set(claveNombre, codigoPadre);
+        }
+    }
+
+    return {
+        codigoPorNombreProducto,
+        nombrePorCodigoPadre,
+        nombrePorSubCodigo,
+    };
+}
+
+function resolverNombrePlato(
+    platoCodigo: string,
+    nombreActual: string,
+    nombrePorSubCodigo: Map<string, string>,
+    nombrePorCodigoPadre: Map<string, string>,
+): string {
+    const codigo = normalizarTexto(platoCodigo);
+    if (!codigo) {
+        return normalizarTexto(nombreActual);
+    }
+
+    return (
+        nombrePorSubCodigo.get(codigo) ||
+        nombrePorCodigoPadre.get(codigo) ||
+        normalizarTexto(nombreActual) ||
+        codigo
+    );
+}
+
+function resolverNombrePadre(
+    platoPadreCodigo: string,
+    nombreActual: string,
+    nombrePorCodigoPadre: Map<string, string>,
+): string {
+    const codigo = normalizarTexto(platoPadreCodigo);
+    if (!codigo) {
+        return normalizarTexto(nombreActual);
+    }
+
+    return (
+        nombrePorCodigoPadre.get(codigo) || normalizarTexto(nombreActual) || codigo
+    );
+}
+
 export async function POST(req: NextRequest) {
     process.env.TZ = 'America/Argentina/Buenos_Aires';
 
     const body = await req.json();
-    const { plato, produccion } = body;
+    const { platoCodigo: platoCodigoBody, plato, produccion } = body;
 
-    if (!plato || !produccion) {
+    if ((!platoCodigoBody && !plato) || !produccion) {
         return NextResponse.json(
             { error: 'Datos incompletos' },
-            { status: 400 }
+            { status: 400 },
         );
     }
+
+    const { codigoPorNombreProducto, nombrePorCodigoPadre, nombrePorSubCodigo } =
+        await obtenerMapasRecetas();
+
+    const platoCodigo =
+        normalizarTexto(platoCodigoBody) ||
+        codigoPorNombreProducto.get(normalizarClave(plato)) ||
+        '';
+
+    if (!platoCodigo) {
+        return NextResponse.json(
+            { error: 'No se pudo resolver el código del plato' },
+            { status: 400 },
+        );
+    }
+
+    const platoNombre = resolverNombrePlato(
+        platoCodigo,
+        plato,
+        nombrePorSubCodigo,
+        nombrePorCodigoPadre,
+    );
 
     const fechas = Object.keys(produccion);
 
@@ -23,45 +132,52 @@ export async function POST(req: NextRequest) {
         fechas.map(async (fecha) => {
             const existingProduccion = await prisma.produccion.findFirst({
                 where: {
-                    plato,
+                    platoCodigo,
+                    platoPadreCodigo: '',
                     fecha: new Date(fecha),
                 },
             });
 
             if (existingProduccion) {
-                // Actualizamos la cantidad si ya existe
                 await prisma.produccion.update({
                     where: { id: existingProduccion.id },
-                    data: { cantidad: produccion[fecha] },
-                });
-                return { ...existingProduccion, cantidad: produccion[fecha] };
-            } else {
-                // Creamos una nueva producción si no existe
-                const newProduccion = await prisma.produccion.create({
                     data: {
-                        plato,
-                        fecha: new Date(fecha),
                         cantidad: produccion[fecha],
+                        plato: platoNombre,
+                        platoCodigo,
                     },
                 });
-                return newProduccion;
+                return { ...existingProduccion, cantidad: produccion[fecha] };
             }
-        })
+
+            const newProduccion = await prisma.produccion.create({
+                data: {
+                    plato: platoNombre,
+                    platoCodigo,
+                    platoPadre: '',
+                    platoPadreCodigo: '',
+                    fecha: new Date(fecha),
+                    cantidad: produccion[fecha],
+                },
+            });
+            return newProduccion;
+        }),
     );
 
     const startOfWeek = new Date();
-    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay()); // Ajusta al inicio de la semana (domingo)
-    startOfWeek.setHours(0, 0, 0, 0); // Establece la hora al inicio del día
+    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
 
     const produccionSelect = await prisma.produccion.findMany({
         where: {
-            plato,
+            platoCodigo,
+            platoPadreCodigo: '',
             fecha: {
-                gte: addDays(startOfWeek, -1), // Filtra producciones desde el inicio de la semana en adelante
+                gte: addDays(startOfWeek, -1),
             },
         },
         orderBy: {
-            fecha: 'asc', // Ordena por fecha ascendente
+            fecha: 'asc',
         },
     });
 
@@ -82,15 +198,16 @@ export async function GET(req: NextRequest) {
     if (!fechaInicio) {
         return NextResponse.json(
             { error: 'fechaInicio es requerido' },
-            { status: 400 }
+            { status: 400 },
         );
     }
 
-    // Calcular el rango de fechas: hoy (00:00:00) hasta 6 días después (23:59:59)
     const desde = addDays(new Date(fechaInicio), 2);
     desde.setHours(0, 0, 0, 0);
     const hasta = addDays(desde, 6);
     hasta.setHours(0, 0, 0, 0);
+
+    const { nombrePorCodigoPadre, nombrePorSubCodigo } = await obtenerMapasRecetas();
 
     const producciones = await prisma.produccion.findMany({
         where: {
@@ -103,17 +220,33 @@ export async function GET(req: NextRequest) {
             },
         },
         orderBy: {
-            plato: 'asc',
+            platoCodigo: 'asc',
         },
     });
 
     const groupedProducciones: any[] = [];
 
     for (const produccion of producciones) {
+        const platoCodigo = normalizarTexto(produccion.platoCodigo);
+        const platoPadreCodigo = normalizarTexto(produccion.platoPadreCodigo);
+        const platoNombre = resolverNombrePlato(
+            platoCodigo,
+            produccion.plato,
+            nombrePorSubCodigo,
+            nombrePorCodigoPadre,
+        );
+        const platoPadreNombre = resolverNombrePadre(
+            platoPadreCodigo,
+            produccion.platoPadre,
+            nombrePorCodigoPadre,
+        );
+
         const existingPlato = groupedProducciones.find(
             (item: any) =>
-                item.plato === produccion.plato &&
-                item.platoPadre === produccion.platoPadre
+                (item.platoCodigo || item.plato) ===
+                    (platoCodigo || platoNombre) &&
+                (item.platoPadreCodigo || item.platoPadre) ===
+                    (platoPadreCodigo || platoPadreNombre),
         );
 
         if (existingPlato) {
@@ -127,8 +260,10 @@ export async function GET(req: NextRequest) {
             });
         } else {
             groupedProducciones.push({
-                plato: produccion.plato,
-                platoPadre: produccion.platoPadre,
+                plato: platoNombre,
+                platoCodigo,
+                platoPadre: platoPadreNombre,
+                platoPadreCodigo,
                 comentario: (produccion.observacionProduccion || '') + '\n',
                 produccion: [
                     {

@@ -42,7 +42,9 @@ export interface EventoPlanificacion {
 
 interface ProduccionBase {
     plato: string;
+    platoCodigo: string;
     platoPadre: string;
+    platoPadreCodigo: string;
     fecha: string;
 }
 
@@ -74,11 +76,11 @@ function normalizarFechaProduccion(fecha: string | Date): string {
 }
 
 function construirClaveProduccion(item: {
-    plato: string;
-    platoPadre: string;
+    platoCodigo: string;
+    platoPadreCodigo: string;
     fecha: string | Date;
 }): string {
-    return `${item.plato}|||${item.platoPadre}|||${normalizarFechaProduccion(item.fecha)}`;
+    return `${item.platoCodigo}|||${item.platoPadreCodigo}|||${normalizarFechaProduccion(item.fecha)}`;
 }
 
 function esCambioEliminacion(item: any): item is ProduccionDelete {
@@ -90,17 +92,21 @@ function sanitizarProduccionUpdate(items: any[]): ProduccionChange[] {
 
     for (const item of items) {
         const plato = String(item?.plato ?? '').trim();
+        const platoCodigo = String(item?.platoCodigo ?? '').trim();
         const platoPadre = String(item?.platoPadre ?? '').trim();
+        const platoPadreCodigo = String(item?.platoPadreCodigo ?? '').trim();
         const fecha = String(item?.fecha ?? '').trim();
 
-        if (!plato || !platoPadre || !fecha) {
+        if (!platoCodigo || !fecha) {
             continue;
         }
 
         if (esCambioEliminacion(item)) {
             const normalizado: ProduccionDelete = {
                 plato,
+                platoCodigo,
                 platoPadre,
+                platoPadreCodigo,
                 fecha,
                 cantidad: null,
                 eliminar: true,
@@ -117,7 +123,9 @@ function sanitizarProduccionUpdate(items: any[]): ProduccionChange[] {
 
         const normalizado: ProduccionEdit = {
             plato,
+            platoCodigo,
             platoPadre,
+            platoPadreCodigo,
             fecha,
             cantidad: Number(cantidad.toFixed(2)),
             eliminar: false,
@@ -148,8 +156,8 @@ function mergeProduccionGuardada(
 
     for (const item of produccionActual) {
         const clave = construirClaveProduccion({
-            plato: item.plato,
-            platoPadre: item.platoPadre,
+            platoCodigo: item.platoCodigo,
+            platoPadreCodigo: item.platoPadreCodigo,
             fecha: item.fecha,
         });
         porClave.set(clave, item);
@@ -168,7 +176,9 @@ function mergeProduccionGuardada(
         porClave.set(clave, {
             ...existente,
             plato: item.plato,
+            platoCodigo: item.platoCodigo,
             platoPadre: item.platoPadre,
+            platoPadreCodigo: item.platoPadreCodigo,
             fecha: item.fecha,
             cantidad: item.cantidad,
         });
@@ -204,7 +214,13 @@ export default function PlanificacionPage() {
     const [actualizandoPlanificacion, setActualizandoPlanificacion] =
         useState(false);
     const [observaciones, setObservaciones] = useState<
-        { plato: string; observacion: string; platoPadre: string }[]
+        {
+            plato: string;
+            platoCodigo: string;
+            observacion: string;
+            platoPadre: string;
+            platoPadreCodigo: string;
+        }[]
     >([]);
     const [eventoAdelantado, setEventoAdelantado] = useState(0);
     const [estadoAutoGuardado, setEstadoAutoGuardado] =
@@ -443,17 +459,19 @@ export default function PlanificacionPage() {
                 );
                 setProduccionUpdate((prevCambios) =>
                     prevCambios.filter((item) => {
-                        const plato = String(item?.plato ?? '').trim();
-                        const platoPadre = String(item?.platoPadre ?? '').trim();
+                        const platoCodigo = String(item?.platoCodigo ?? '').trim();
+                        const platoPadreCodigo = String(
+                            item?.platoPadreCodigo ?? '',
+                        ).trim();
                         const fecha = String(item?.fecha ?? '').trim();
 
-                        if (!plato || !platoPadre || !fecha) {
+                        if (!platoCodigo || !fecha) {
                             return true;
                         }
 
                         const clave = construirClaveProduccion({
-                            plato,
-                            platoPadre,
+                            platoCodigo,
+                            platoPadreCodigo,
                             fecha,
                         });
                         const cantidadGuardada = cambiosPorClave.get(clave);
@@ -594,10 +612,12 @@ export default function PlanificacionPage() {
     const platosUnicos = [
         ...new Map(
             datosFiltrados.map((d) => [
-                `${d.plato}-${d.platoPadre}`,
+                `${d.platoCodigo}-${d.platoPadreCodigo}`,
                 {
                     plato: d.plato,
+                    platoCodigo: d.platoCodigo,
                     platoPadre: d.platoPadre,
+                    platoPadreCodigo: d.platoPadreCodigo,
                 },
             ])
         ).values(),

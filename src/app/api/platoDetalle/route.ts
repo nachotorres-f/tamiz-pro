@@ -2,135 +2,75 @@ import { prisma } from '@/lib/prisma';
 import { NextRequest, NextResponse } from 'next/server';
 import { addDays, startOfWeek } from 'date-fns';
 
+function normalizarTexto(valor: string | null | undefined): string {
+    return (valor ?? '').trim();
+}
+
+async function resolverCodigoPorNombre(nombrePlato: string): Promise<string> {
+    const receta = await prisma.receta.findFirst({
+        where: {
+            OR: [
+                { nombreProducto: nombrePlato },
+                { descripcion: nombrePlato },
+            ],
+        },
+        select: {
+            codigo: true,
+            subCodigo: true,
+            nombreProducto: true,
+            descripcion: true,
+        },
+        orderBy: {
+            id: 'asc',
+        },
+    });
+
+    if (!receta) {
+        return '';
+    }
+
+    if (normalizarTexto(receta.descripcion) === normalizarTexto(nombrePlato)) {
+        return normalizarTexto(receta.subCodigo);
+    }
+
+    return normalizarTexto(receta.codigo);
+}
+
 export async function GET(req: NextRequest) {
     process.env.TZ = 'America/Argentina/Buenos_Aires';
 
     const { searchParams } = req.nextUrl;
     const nombrePlato = searchParams.get('nombrePlato');
+    const platoCodigoParam = searchParams.get('platoCodigo');
     const fechaInicio = searchParams.get('fechaInicio');
 
-    if (nombrePlato === null || fechaInicio === null) {
+    if ((nombrePlato === null && platoCodigoParam === null) || fechaInicio === null) {
         return NextResponse.json(
             {
-                error: 'Faltan parámetros requeridos: nombrePlato o fechaInicio',
+                error:
+                    'Faltan parámetros requeridos: nombrePlato/platoCodigo o fechaInicio',
             },
-            { status: 400 }
+            { status: 400 },
         );
+    }
+
+    const codigoBuscado =
+        normalizarTexto(platoCodigoParam) ||
+        (nombrePlato ? await resolverCodigoPorNombre(nombrePlato) : '');
+
+    if (!codigoBuscado) {
+        return NextResponse.json({ plato: [] });
     }
 
     const inicio = startOfWeek(new Date(fechaInicio), { weekStartsOn: 0 });
     const fin = addDays(inicio, 6);
 
-    // const plato = await prisma.plato.findMany({
-    //     where: {
-    //         comanda: {
-    //             fecha: {
-    //                 gte: inicio,
-    //                 lt: fin,
-    //             },
-    //         },
-    //     },
-    //     orderBy: {
-    //         comanda: {
-    //             fecha: 'asc',
-    //         },
-    //     },
-    //     include: {
-    //         comanda: true,
-    //     },
-    // });
+    const plato = await buscarPlato(codigoBuscado, inicio, fin);
 
-    const plato = await buscarPlato(nombrePlato, inicio, fin);
-
-    // const produccionesSelect = await prisma.produccion.findMany({
-    //     where: {
-    //         plato: nombrePlato || '',
-    //         fecha: {
-    //             gte: addDays(inicio, -1),
-    //         },
-    //     },
-    // });
-
-    // const producciones = produccionesSelect.map((produccion) => ({
-    //     fecha: addDays(produccion.fecha, 1),
-    //     cantidad: produccion.cantidad,
-    // }));
-
-    // async function fetchIngredientesRecursivos(
-    //     nombreProducto: string
-    // ): Promise<any[]> {
-    //     const ingredientes = await prisma.receta.findMany({
-    //         where: {
-    //             nombreProducto,
-    //         },
-    //     });
-
-    //     const ingredientesExpandidos = await Promise.all(
-    //         ingredientes.map(async (ingrediente) => {
-    //             if (ingrediente.tipo === 'PT') {
-    //                 const subIngredientes = await fetchIngredientesRecursivos(
-    //                     ingrediente.descripcion
-    //                 );
-    //                 return {
-    //                     ...ingrediente,
-    //                     subIngredientes,
-    //                 };
-    //             }
-    //             return ingrediente;
-    //         })
-    //     );
-
-    //     return ingredientesExpandidos;
-    // }
-
-    // const ingredientes = await fetchIngredientesRecursivos(nombrePlato || '');
-
-    // function buildTableData(
-    //     ingredientes: any[],
-    //     depth = 0,
-    //     parentPT = ''
-    // ): any[] {
-    //     return ingredientes.flatMap((ingrediente) => {
-    //         const currentParentPT =
-    //             ingrediente.tipo === 'PT' ? ingrediente.descripcion : parentPT;
-
-    //         const row = {
-    //             nombre: ingrediente.descripcion,
-    //             porcionBruta: ingrediente.porcionBruta,
-    //             unidadMedida: ingrediente.unidadMedida,
-    //             tipo: ingrediente.tipo,
-    //             cantidad: ingrediente.cantidad,
-    //             depth,
-    //             parentPT: parentPT,
-    //         };
-
-    //         if (ingrediente.subIngredientes) {
-    //             return [
-    //                 row,
-    //                 ...buildTableData(
-    //                     ingrediente.subIngredientes,
-    //                     depth + 1,
-    //                     currentParentPT
-    //                 ),
-    //             ];
-    //         }
-
-    //         return [row];
-    //     });
-    // }
-
-    // const tableData = buildTableData(ingredientes);
-
-    // const tableDataFiltered = tableData.filter((item) => item.tipo === 'PT');
-
-    return NextResponse.json({
-        plato,
-        // producciones,
-        // ingredientes: tableDataFiltered,
-    });
+    return NextResponse.json({ plato });
 }
 
-const buscarPlato = async (nombrePlato: string, inicio: Date, fin: Date) => {
+const buscarPlato = async (codigoBuscado: string, inicio: Date, fin: Date) => {
     const productosComandas = await prisma.plato.findMany({
         where: {
             comanda: {
@@ -148,8 +88,14 @@ const buscarPlato = async (nombrePlato: string, inicio: Date, fin: Date) => {
     const listProducto = [];
 
     for (const producto of productosComandas) {
+        const codigoProducto = normalizarTexto(producto.codigo);
+
+        if (!codigoProducto) {
+            continue;
+        }
+
         let cantidad = 0;
-        cantidad += await buscarIngredientes(producto.nombre, nombrePlato);
+        cantidad += await buscarIngredientes(codigoProducto, codigoBuscado);
 
         if (cantidad === 0) {
             continue;
@@ -165,20 +111,20 @@ const buscarPlato = async (nombrePlato: string, inicio: Date, fin: Date) => {
 };
 
 const buscarIngredientes = async (
-    nombrePlato: string,
-    ingredienteBuscar: string
+    codigoPlato: string,
+    codigoIngredienteBuscar: string,
 ): Promise<number> => {
     let cantidad = 0;
 
     const ingredientes = await prisma.receta.findMany({
         where: {
-            nombreProducto: nombrePlato,
+            codigo: codigoPlato,
             tipo: 'PT',
         },
         select: {
             id: true,
-            nombreProducto: true,
-            descripcion: true,
+            codigo: true,
+            subCodigo: true,
             porcionBruta: true,
         },
     });
@@ -188,28 +134,27 @@ const buscarIngredientes = async (
     }
 
     const existe = ingredientes.some((ingrediente) => {
-        if (ingrediente.descripcion === ingredienteBuscar) {
-            return true; // Encontrado, salir del bucle
-        }
-        return false; // Continuar buscando
+        return normalizarTexto(ingrediente.subCodigo) === codigoIngredienteBuscar;
     });
 
     if (!existe) {
         for (const ingrediente of ingredientes) {
+            const subCodigo = normalizarTexto(ingrediente.subCodigo);
+            if (!subCodigo) {
+                continue;
+            }
+
             const subCantidad = await buscarIngredientes(
-                ingrediente.descripcion,
-                ingredienteBuscar
+                subCodigo,
+                codigoIngredienteBuscar,
             );
             cantidad += subCantidad;
         }
     }
 
     if (existe) {
-        const ingrediente = ingredientes.find((ingrediente) => {
-            if (ingrediente.descripcion === ingredienteBuscar) {
-                return true; // Encontrado, salir del bucle
-            }
-            return false; // Continuar buscando
+        const ingrediente = ingredientes.find((item) => {
+            return normalizarTexto(item.subCodigo) === codigoIngredienteBuscar;
         });
 
         cantidad += ingrediente ? ingrediente.porcionBruta : 0;

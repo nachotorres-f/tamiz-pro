@@ -21,9 +21,11 @@ interface Comanda {
 
 export function PlatoDetalle({
     plato,
+    platoCodigo,
     diasSemanaProp,
 }: {
     plato: string;
+    platoCodigo?: string;
     diasSemanaProp: Date[];
 }) {
     const [datos, setDatos] = useState<any>({});
@@ -39,6 +41,8 @@ export function PlatoDetalle({
         fetch(
             '/api/platoDetalle?nombrePlato=' +
                 plato +
+                '&platoCodigo=' +
+                encodeURIComponent(platoCodigo || '') +
                 '&fechaInicio=' +
                 diasSemanaProp[4].toISOString()
         )
@@ -47,7 +51,7 @@ export function PlatoDetalle({
                 return d;
             })
             .then(setDatos);
-    }, [plato, diasSemanaProp]);
+    }, [plato, platoCodigo, diasSemanaProp]);
 
     useEffect(() => {
         const inicioSemana = startOfWeek(semanaBase, { weekStartsOn: 0 }); // domingo

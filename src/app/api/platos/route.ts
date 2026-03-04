@@ -19,20 +19,40 @@ export async function POST(request: NextRequest) {
     process.env.TZ = 'America/Argentina/Buenos_Aires';
 
     const {
-        plato,
+        platoCodigo,
         cantidad,
         fecha,
-    }: { plato: string; cantidad: string; fecha: string } =
+    }: { platoCodigo: string; cantidad: string; fecha: string } =
         await request.json();
 
-    if (!plato || !cantidad) {
+    if (!platoCodigo || !cantidad) {
         return NextResponse.json({ error: 'Faltan datos' }, { status: 400 });
     }
 
     try {
+        const receta = await prisma.receta.findFirst({
+            where: {
+                codigo: platoCodigo,
+            },
+            select: {
+                nombreProducto: true,
+            },
+            orderBy: {
+                id: 'asc',
+            },
+        });
+
+        if (!receta) {
+            return NextResponse.json(
+                { error: 'No se encontró receta para el código enviado' },
+                { status: 400 },
+            );
+        }
+
         const nuevoPlato = await prisma.plato.create({
             data: {
-                nombre: plato,
+                nombre: receta.nombreProducto,
+                codigo: platoCodigo,
                 cantidad: parseFloat(cantidad),
                 comanda: {
                     connect: { id: 1 },

@@ -57,7 +57,9 @@ export default function ProduccionPreviaPage() {
         useState<ReturnType<typeof setInterval>>();
     const [platoModalProduccion, setPlatoModalProduccion] = useState({
         plato: '',
+        platoCodigo: '',
         platoPadre: '',
+        platoPadreCodigo: '',
         comentario: undefined,
         cantidad: 0,
         fecha: new Date(),
@@ -190,8 +192,8 @@ export default function ProduccionPreviaPage() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                plato: platoModalProduccion.plato,
-                platoPadre: platoModalProduccion.platoPadre,
+                platoCodigo: platoModalProduccion.platoCodigo,
+                platoPadreCodigo: platoModalProduccion.platoPadreCodigo,
                 cantidad: platoModalProduccion.cantidad,
                 fecha: addDays(platoModalProduccion.fecha, 2),
                 comentario: observacionModal,
@@ -240,8 +242,8 @@ export default function ProduccionPreviaPage() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                plato: platoModalProduccion.plato,
-                platoPadre: platoModalProduccion.platoPadre,
+                platoCodigo: platoModalProduccion.platoCodigo,
+                platoPadreCodigo: platoModalProduccion.platoPadreCodigo,
                 cantidad: platoModalProduccion.cantidad,
                 fecha: addDays(platoModalProduccion.fecha, 2),
                 salon,
@@ -524,7 +526,7 @@ export default function ProduccionPreviaPage() {
                             variant="danger"
                             onClick={() => {
                                 generarPDFReceta(
-                                    [platoModalProduccion.plato],
+                                    [platoModalProduccion.platoCodigo],
                                     addDays(platoModalProduccion.fecha, 2),
                                     salon,
                                     'separado',
@@ -708,9 +710,16 @@ export default function ProduccionPreviaPage() {
                         {datos &&
                             datos
                                 .filter((dato) => filterPlatosPorDia(dato))
-                                .map((dato) => (
+                                .map((dato, indexDato) => (
                                     <React.Fragment
-                                        key={dato.plato + dato.platoPadre}>
+                                        key={
+                                            (dato.platoCodigo || dato.plato) +
+                                            '|' +
+                                            (dato.platoPadreCodigo ||
+                                                dato.platoPadre) +
+                                            '|' +
+                                            indexDato
+                                        }>
                                         <tr>
                                             <td>{dato.platoPadre}</td>
                                             <td>{dato.plato}</td>
@@ -755,8 +764,12 @@ export default function ProduccionPreviaPage() {
                                                                 setPlatoModalProduccion(
                                                                     {
                                                                         plato: dato.plato,
+                                                                        platoCodigo:
+                                                                            dato.platoCodigo,
                                                                         platoPadre:
                                                                             dato.platoPadre,
+                                                                        platoPadreCodigo:
+                                                                            dato.platoPadreCodigo,
                                                                         cantidad,
                                                                         fecha: produccion.fecha,
                                                                         comentario:

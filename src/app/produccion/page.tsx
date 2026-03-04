@@ -78,7 +78,9 @@ export default function ProduccionPage() {
         useState<ReturnType<typeof setInterval>>();
     const [platoModalProduccion, setPlatoModalProduccion] = useState({
         plato: '',
+        platoCodigo: '',
         platoPadre: '',
+        platoPadreCodigo: '',
         comentario: undefined,
         cantidad: 0,
         fecha: new Date(),
@@ -224,8 +226,8 @@ export default function ProduccionPage() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                plato: platoModalProduccion.plato,
-                platoPadre: platoModalProduccion.platoPadre,
+                platoCodigo: platoModalProduccion.platoCodigo,
+                platoPadreCodigo: platoModalProduccion.platoPadreCodigo,
                 cantidad: platoModalProduccion.cantidad,
                 fecha: platoModalProduccion.fecha,
                 comentario: observacionModal,
@@ -273,8 +275,8 @@ export default function ProduccionPage() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                plato: platoModalProduccion.plato,
-                platoPadre: platoModalProduccion.platoPadre,
+                platoCodigo: platoModalProduccion.platoCodigo,
+                platoPadreCodigo: platoModalProduccion.platoPadreCodigo,
                 cantidad: platoModalProduccion.cantidad,
                 fecha: addDays(platoModalProduccion.fecha, -1),
                 salon,
@@ -664,7 +666,7 @@ export default function ProduccionPage() {
                             variant="danger"
                             onClick={() => {
                                 generarPDFReceta(
-                                    [platoModalProduccion.plato],
+                                    [platoModalProduccion.platoCodigo],
                                     platoModalProduccion.fecha,
                                     salon,
                                     'separado',
@@ -852,9 +854,16 @@ export default function ProduccionPage() {
                         </tr>
                     </thead>
                     <tbody>
-                        {datosVisibles.map((dato) => (
+                        {datosVisibles.map((dato, indexDato) => (
                                     <React.Fragment
-                                        key={dato.plato + dato.platoPadre}>
+                                        key={
+                                            (dato.platoCodigo || dato.plato) +
+                                            '|' +
+                                            (dato.platoPadreCodigo ||
+                                                dato.platoPadre) +
+                                            '|' +
+                                            indexDato
+                                        }>
                                         <tr>
                                             <td>{dato.platoPadre}</td>
                                             <td>{dato.plato}</td>
@@ -897,8 +906,12 @@ export default function ProduccionPage() {
                                                                 setPlatoModalProduccion(
                                                                     {
                                                                         plato: dato.plato,
+                                                                        platoCodigo:
+                                                                            dato.platoCodigo,
                                                                         platoPadre:
                                                                             dato.platoPadre,
+                                                                        platoPadreCodigo:
+                                                                            dato.platoPadreCodigo,
                                                                         cantidad,
                                                                         fecha: produccion.fecha,
                                                                         comentario:

@@ -10,10 +10,15 @@ interface BodyRequest {
 
 interface Produccion {
     plato: string;
+    platoCodigo: string;
     cantidad: number;
     observacion: string | null;
     fecha: Date;
     salon: string | null;
+}
+
+function normalizarTexto(valor: string | null | undefined): string {
+    return (valor ?? '').trim();
 }
 
 export async function POST(req: NextRequest) {
@@ -82,13 +87,14 @@ const buscarProduccionPorFecha = async (fecha: Date, salon: string) => {
 const buscarProduccionPorPlato = async (
     fecha: Date,
     salon: string,
-    plato: string[],
+    platosCodigos: string[],
 ) => {
     const gte = addDays(set(fecha, { hours: 0, minutes: 0, seconds: 0 }), -1);
     const lte = addDays(
         set(fecha, { hours: 23, minutes: 59, seconds: 59 }),
         -1,
     );
+
     const produccionList = await prisma.produccion.findMany({
         where: {
             fecha: {
@@ -96,7 +102,7 @@ const buscarProduccionPorPlato = async (
                 lte,
             },
             salon,
-            plato: { in: plato },
+            platoCodigo: { in: platosCodigos },
         },
     });
 
@@ -105,6 +111,7 @@ const buscarProduccionPorPlato = async (
 
 const buscarReceta = async ({
     plato,
+    platoCodigo,
     cantidad,
     observacion,
     fecha,
@@ -112,25 +119,19 @@ const buscarReceta = async ({
 }: Produccion) => {
     const recetas = await prisma.receta.findMany({
         where: {
-            nombreProducto: plato,
+            codigo: platoCodigo,
         },
     });
 
-    const platoData = await prisma.receta.findFirst({
-        select: {
-            unidadMedida: true,
-        },
-        where: {
-            descripcion: plato,
-            proceso: 'Plato Terminado',
-        },
-    });
+    const nombrePlato =
+        normalizarTexto(recetas[0]?.nombreProducto) || normalizarTexto(plato);
 
     return {
-        plato,
-        codigo: recetas[0]?.codigo || 'No hay codigo',
+        plato: nombrePlato,
+        platoCodigo,
+        codigo: platoCodigo || 'No hay codigo',
         cantidad,
-        unidadMedida: platoData?.unidadMedida || 'Porciones',
+        unidadMedida: recetas[0]?.unidadMedida || 'Porciones',
         observacion,
         fecha,
         salon,

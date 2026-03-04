@@ -22,7 +22,7 @@ export default function AgregarPlato({
     setSemanaBase: (date: Date) => void;
 }) {
     const [platos, setPlatos] = useState<Plato[]>([]);
-    const [selectedPlato, setSelectedPlato] = useState<string>('');
+    const [selectedPlatoCodigo, setSelectedPlatoCodigo] = useState<string>('');
     const [cantidad, setCantidad] = useState<string>('');
     const [startDate, setStartDate] = useState(new Date());
     const [loading, setLoading] = useState(false);
@@ -45,7 +45,7 @@ export default function AgregarPlato({
     const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
 
-        if (!selectedPlato || !cantidad) {
+        if (!selectedPlatoCodigo || !cantidad) {
             setLoading(false);
             setMounted(true);
             toast.warn('Completa todos los campos', {
@@ -74,7 +74,7 @@ export default function AgregarPlato({
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    plato: selectedPlato.split('-')[0],
+                    platoCodigo: selectedPlatoCodigo,
                     cantidad: parseFloat(cantidad).toFixed(2),
                     fecha: startDate.toISOString(),
                     salon,
@@ -99,7 +99,7 @@ export default function AgregarPlato({
                 })
                 .finally(() => {
                     setLoading(false);
-                    setSelectedPlato('');
+                    setSelectedPlatoCodigo('');
                     setCantidad('');
                     setStartDate(new Date());
                 });
@@ -110,7 +110,7 @@ export default function AgregarPlato({
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    plato: selectedPlato.split('-')[0],
+                    platoCodigo: selectedPlatoCodigo,
                     cantidad: parseFloat(cantidad).toFixed(2),
                     fecha: startDate.toISOString(),
                 }),
@@ -134,7 +134,7 @@ export default function AgregarPlato({
                 })
                 .finally(() => {
                     setLoading(false);
-                    setSelectedPlato('');
+                    setSelectedPlatoCodigo('');
                     setCantidad('');
                     setStartDate(new Date());
                 });
@@ -142,7 +142,7 @@ export default function AgregarPlato({
     };
 
     const opciones = platos.map((plato) => ({
-        value: plato.nombreProducto,
+        value: String(plato.codigo),
         label: `${plato.codigo} - ${plato.nombreProducto}`,
     }));
 
@@ -214,10 +214,13 @@ export default function AgregarPlato({
                                 <Select
                                     options={opciones}
                                     value={opciones.find(
-                                        (o) => o.value === selectedPlato
+                                        (o) =>
+                                            o.value === selectedPlatoCodigo
                                     )}
                                     onChange={(opcion) =>
-                                        setSelectedPlato(opcion?.value || '')
+                                        setSelectedPlatoCodigo(
+                                            opcion?.value || '',
+                                        )
                                     }
                                     placeholder="Selecciona o busca un plato..."
                                     isSearchable={true} // ya viene por defecto, pero lo aclaramos

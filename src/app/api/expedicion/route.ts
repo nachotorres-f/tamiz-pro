@@ -1,37 +1,68 @@
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 import { startOfWeek, addDays } from 'date-fns';
+import { logAudit } from '@/lib/audit';
 
 export async function GET() {
     process.env.TZ = 'America/Argentina/Buenos_Aires';
 
-    const eventos = await prisma.comanda.findMany({
-        where: {
-            fecha: {
-                gte: startOfWeek(new Date(), { weekStartsOn: 1 }),
-                lt: addDays(startOfWeek(new Date(), { weekStartsOn: 1 }), 7),
+    try {
+        const eventos = await prisma.comanda.findMany({
+            where: {
+                fecha: {
+                    gte: startOfWeek(new Date(), { weekStartsOn: 1 }),
+                    lt: addDays(startOfWeek(new Date(), { weekStartsOn: 1 }), 7),
+                },
             },
-        },
-    });
+        });
 
-    // Para cada evento, obtenemos los ingredientes recursivamente
-    // const eventosConIngredientes = [];
-    // for (const evento of eventos) {
-    //     const ingredientes: any[] = [];
-    //     for (const plato of evento.Plato) {
-    //         const ingredientesPlato = await buscarIngredientesRecursivo(
-    //             plato.nombre,
-    //             plato.cantidad
-    //         );
-    //         ingredientes.push(...ingredientesPlato);
-    //     }
-    //     eventosConIngredientes.push({
-    //         ...evento,
-    //         ingredientes,
-    //     });
-    // }
+        await logAudit({
+            modulo: 'expedicion',
+            accion: 'consultar_expedicion_semana',
+            ruta: '/api/expedicion',
+            metodo: 'GET',
+            resumen: 'Consulta semanal de expedición',
+            detalle: {
+                eventos: eventos.length,
+            },
+        });
 
-    return NextResponse.json(eventos);
+        // Para cada evento, obtenemos los ingredientes recursivamente
+        // const eventosConIngredientes = [];
+        // for (const evento of eventos) {
+        //     const ingredientes: any[] = [];
+        //     for (const plato of evento.Plato) {
+        //         const ingredientesPlato = await buscarIngredientesRecursivo(
+        //             plato.nombre,
+        //             plato.cantidad
+        //         );
+        //         ingredientes.push(...ingredientesPlato);
+        //     }
+        //     eventosConIngredientes.push({
+        //         ...evento,
+        //         ingredientes,
+        //     });
+        // }
+
+        return NextResponse.json(eventos);
+    } catch (error) {
+        await logAudit({
+            modulo: 'expedicion',
+            accion: 'consultar_expedicion_semana',
+            ruta: '/api/expedicion',
+            metodo: 'GET',
+            estado: 'error',
+            resumen: 'Error consultando expedición semanal',
+            detalle: {
+                error: error instanceof Error ? error.message : String(error),
+            },
+        });
+
+        return NextResponse.json(
+            { error: 'Error al consultar expedición' },
+            { status: 500 },
+        );
+    }
 }
 
 // Búsqueda recursiva de ingredientes

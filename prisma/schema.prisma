@@ -66,12 +66,15 @@ model Comanda {
 model Plato {
   id        Int     @id @default(autoincrement())
   nombre    String
+  codigo    String @default("")
   cantidad Float 
   comandaId Int
   comanda   Comanda @relation(fields: [comandaId], references: [id])
   fecha     DateTime? 
   gestionado Boolean @default(false)
 
+  @@index([codigo])
+  @@index([comandaId, codigo])
   @@map("platos")
 }
 
@@ -79,12 +82,17 @@ model Produccion {
   id        Int      @id @default(autoincrement())
   fecha     DateTime
   plato     String
+  platoCodigo String @default("")
   platoPadre String @default("")
+  platoPadreCodigo String @default("")
   observacion String? @db.Text
   observacionProduccion String? @db.Text
   cantidad Float 
   salon String?
   createdAt DateTime @default(now())
+
+  @@index([platoCodigo, platoPadreCodigo, fecha, salon])
+  @@index([fecha, salon])
 }
 
 model PlatoOculto {
@@ -98,4 +106,20 @@ model Expedicion {
   codigo String
   subCodigo String
   comandaId Int
+}
+
+model AuditLog {
+  id Int @id @default(autoincrement())
+  modulo String
+  accion String
+  ruta String
+  metodo String
+  estado String @default("success")
+  resumen String? @db.Text
+  detalle String? @db.LongText
+  createdAt DateTime @default(now())
+
+  @@index([modulo, createdAt])
+  @@index([createdAt])
+  @@map("audit_logs")
 }

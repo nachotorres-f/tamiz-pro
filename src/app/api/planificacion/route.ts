@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server';
 import { startOfWeek, addDays, format } from 'date-fns';
-import { prisma } from '@/lib/prisma'; // Asumiendo que tienes prisma configurado
+import { prisma } from '@/lib/prisma';
+import { logAudit } from '@/lib/audit';
 
-// Constantes
 const TIMEZONE = 'America/Argentina/Buenos_Aires';
 const TIPO_RECETA_PT = 'PT';
 const DIAS_EVENTOS_CICLO = 6;
@@ -21,6 +21,188 @@ const SUBPLATOS_EXCLUIDOS_POR_PLATO: Record<string, Set<string>> = {
         'patisserie rut',
     ]),
 };
+
+type Resultado = {
+    plato: string;
+    platoCodigo: string;
+    platoPadre: string;
+    platoPadreCodigo: string;
+    fecha: string;
+    cantidad: number;
+    lugar: string;
+};
+
+interface Receta {
+    codigo: string;
+    nombreProducto: string;
+    descripcion: string;
+    subCodigo: string;
+    tipo: 'PT' | 'MP';
+    porcionBruta: number;
+}
+
+interface PlatoEvento {
+    comandaId: number;
+    plato: string;
+    platoCodigo: string;
+    fecha: string;
+    cantidad: number;
+    gestionado: boolean;
+    lugar: string;
+}
+
+interface MapasRecetas {
+    codigosPT: Set<string>;
+    recetasPTPorCodigoPadre: Map<string, Receta[]>;
+    codigoPorNombreProducto: Map<string, string>;
+    codigoPorDescripcion: Map<string, string>;
+    nombrePorCodigoPadre: Map<string, string>;
+    nombrePorSubCodigo: Map<string, string>;
+}
+
+function normalizarTexto(valor: string | null | undefined): string {
+    return (valor ?? '').trim();
+}
+
+function normalizarClave(valor: string | null | undefined): string {
+    return normalizarTexto(valor).toLocaleLowerCase('es');
+}
+
+function crearMapasRecetas(recetas: Receta[]): MapasRecetas {
+    const codigosPT = new Set<string>();
+    const recetasPTPorCodigoPadre = new Map<string, Receta[]>();
+    const codigoPorNombreProducto = new Map<string, string>();
+    const codigoPorDescripcion = new Map<string, string>();
+    const nombrePorCodigoPadre = new Map<string, string>();
+    const nombrePorSubCodigo = new Map<string, string>();
+
+    for (const receta of recetas) {
+        const codigoPadre = normalizarTexto(receta.codigo);
+        const subCodigo = normalizarTexto(receta.subCodigo);
+        const nombreProducto = normalizarTexto(receta.nombreProducto);
+        const descripcion = normalizarTexto(receta.descripcion);
+
+        if (codigoPadre) {
+            nombrePorCodigoPadre.set(codigoPadre, nombreProducto || codigoPadre);
+        }
+
+        if (subCodigo) {
+            nombrePorSubCodigo.set(subCodigo, descripcion || subCodigo);
+        }
+
+        const claveNombreProducto = normalizarClave(nombreProducto);
+        if (claveNombreProducto && codigoPadre && !codigoPorNombreProducto.has(claveNombreProducto)) {
+            codigoPorNombreProducto.set(claveNombreProducto, codigoPadre);
+        }
+
+        const claveDescripcion = normalizarClave(descripcion);
+        if (claveDescripcion && subCodigo && !codigoPorDescripcion.has(claveDescripcion)) {
+            codigoPorDescripcion.set(claveDescripcion, subCodigo);
+        }
+
+        if (receta.tipo !== TIPO_RECETA_PT || !codigoPadre || !subCodigo) {
+            continue;
+        }
+
+        codigosPT.add(codigoPadre);
+
+        if (!recetasPTPorCodigoPadre.has(codigoPadre)) {
+            recetasPTPorCodigoPadre.set(codigoPadre, []);
+        }
+
+        recetasPTPorCodigoPadre.get(codigoPadre)!.push(receta);
+    }
+
+    return {
+        codigosPT,
+        recetasPTPorCodigoPadre,
+        codigoPorNombreProducto,
+        codigoPorDescripcion,
+        nombrePorCodigoPadre,
+        nombrePorSubCodigo,
+    };
+}
+
+function resolverNombrePlato(codigo: string, mapas: MapasRecetas, fallback: string): string {
+    const codigoNormalizado = normalizarTexto(codigo);
+    if (!codigoNormalizado) {
+        return normalizarTexto(fallback);
+    }
+
+    return (
+        mapas.nombrePorSubCodigo.get(codigoNormalizado) ||
+        mapas.nombrePorCodigoPadre.get(codigoNormalizado) ||
+        normalizarTexto(fallback) ||
+        codigoNormalizado
+    );
+}
+
+function resolverNombrePlatoPadre(
+    codigoPadre: string,
+    mapas: MapasRecetas,
+    fallback: string,
+): string {
+    const codigoNormalizado = normalizarTexto(codigoPadre);
+    if (!codigoNormalizado) {
+        return normalizarTexto(fallback);
+    }
+
+    return (
+        mapas.nombrePorCodigoPadre.get(codigoNormalizado) ||
+        normalizarTexto(fallback) ||
+        codigoNormalizado
+    );
+}
+
+function resolverCodigoPlato(item: any, mapas: MapasRecetas): string {
+    const codigoDirecto = normalizarTexto(item?.platoCodigo);
+    if (codigoDirecto) {
+        return codigoDirecto;
+    }
+
+    const porDescripcion = mapas.codigoPorDescripcion.get(normalizarClave(item?.plato));
+    if (porDescripcion) {
+        return porDescripcion;
+    }
+
+    return mapas.codigoPorNombreProducto.get(normalizarClave(item?.plato)) || '';
+}
+
+function resolverCodigoPlatoPadre(item: any, mapas: MapasRecetas): string {
+    const codigoDirecto = normalizarTexto(item?.platoPadreCodigo);
+    if (codigoDirecto) {
+        return codigoDirecto;
+    }
+
+    return mapas.codigoPorNombreProducto.get(normalizarClave(item?.platoPadre)) || '';
+}
+
+function construirClaveObservacion(platoCodigo: string, platoPadreCodigo: string): string {
+    return `${platoCodigo}|||${platoPadreCodigo}`;
+}
+
+function obtenerObservacionPorCodigos(
+    observaciones: any[],
+    mapas: MapasRecetas,
+): Map<string, string> {
+    const map = new Map<string, string>();
+
+    for (const observacion of observaciones) {
+        const platoCodigo = resolverCodigoPlato(observacion, mapas);
+        const platoPadreCodigo = resolverCodigoPlatoPadre(observacion, mapas);
+
+        if (!platoCodigo) {
+            continue;
+        }
+
+        map.set(
+            construirClaveObservacion(platoCodigo, platoPadreCodigo),
+            normalizarTexto(observacion?.observacion),
+        );
+    }
+
+    return map;
+}
 
 export async function GET(req: NextRequest) {
     process.env.TZ = TIMEZONE;
@@ -45,34 +227,54 @@ export async function GET(req: NextRequest) {
         }
 
         const inicio = calcularRangoSemana(fechaInicio);
+        const recetas = await obtenerRecetas();
+        const mapasRecetas = crearMapasRecetas(recetas);
 
-        // Obtener datos base
-        const [nombresPT, recetas] = await Promise.all([
-            obtenerNombresRecetasPT(),
-            obtenerRecetas(),
-        ]);
-
-        // Obtener eventos de la semana
         const eventos = await obtenerEventosSemana(
             inicio,
-            nombresPT,
+            Array.from(mapasRecetas.codigosPT),
             salon,
         );
 
-        // Procesar eventos a platos
-        const platos = procesarEventosAPlatos(eventos, nombresPT);
+        const platos = procesarEventosAPlatos(eventos, mapasRecetas);
 
-        // Calcular ingredientes y obtener producción en paralelo
         const [ingredientes, produccion] = await Promise.all([
-            calcularIngredientesConFormato(platos, recetas),
-            obtenerProduccion(inicio, salon),
+            calcularIngredientesConFormato(platos, mapasRecetas),
+            obtenerProduccion(inicio, salon, mapasRecetas),
         ]);
+
+        await logAudit({
+            modulo: 'planificacion',
+            accion: 'consultar_planificacion',
+            ruta: '/api/planificacion',
+            metodo: 'GET',
+            resumen: `Planificación consultada para salón ${salon}`,
+            detalle: {
+                fechaInicio,
+                salon,
+                ingredientes: ingredientes.length,
+                produccion: produccion.length,
+                eventos: eventos.length,
+            },
+        });
 
         return NextResponse.json({
             planifacion: ingredientes,
             produccion,
         });
     } catch (error) {
+        await logAudit({
+            modulo: 'planificacion',
+            accion: 'consultar_planificacion',
+            ruta: '/api/planificacion',
+            metodo: 'GET',
+            estado: 'error',
+            resumen: 'Error consultando planificación',
+            detalle: {
+                error: error instanceof Error ? error.message : String(error),
+            },
+        });
+
         const mensaje =
             error instanceof Error
                 ? error.message
@@ -84,7 +286,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-    process.env.TZ = 'America/Argentina/Buenos_Aires';
+    process.env.TZ = TIMEZONE;
 
     const { salon, produccion, observaciones, fechaInicio } = await req.json();
 
@@ -116,142 +318,227 @@ export async function POST(req: NextRequest) {
         );
     }
 
-    if ((produccion.length === 0, observaciones.length > 0)) {
-        for (const observacionProduccion of observaciones) {
-            await prisma.produccion.updateMany({
-                where: {
-                    plato: observacionProduccion.plato,
-                    platoPadre: observacionProduccion.platoPadre,
-                    salon: salon,
-                    fecha: {
-                        gte: new Date(fechaInicio),
-                        lte: addDays(new Date(fechaInicio), 11),
-                    },
-                },
-                data: { observacion: observacionProduccion.observacion },
-            });
-        }
-    }
+    try {
+        const recetas = await obtenerRecetas();
+        const mapasRecetas = crearMapasRecetas(recetas);
+        const observacionPorCodigos = obtenerObservacionPorCodigos(
+            observaciones,
+            mapasRecetas,
+        );
 
-    for (const item of produccion) {
-        const eliminar =
-            item?.eliminar === true ||
-            item?.cantidad === null ||
+        if (produccion.length === 0 && observaciones.length > 0) {
+            for (const observacionProduccion of observaciones) {
+                const platoCodigo = resolverCodigoPlato(observacionProduccion, mapasRecetas);
+                const platoPadreCodigo = resolverCodigoPlatoPadre(
+                    observacionProduccion,
+                    mapasRecetas,
+                );
+
+                if (!platoCodigo) {
+                    continue;
+                }
+
+                await prisma.produccion.updateMany({
+                    where: {
+                        platoCodigo,
+                        platoPadreCodigo,
+                        salon,
+                        fecha: {
+                            gte: new Date(fechaInicio),
+                            lte: addDays(new Date(fechaInicio), 11),
+                        },
+                    },
+                    data: {
+                        observacion: normalizarTexto(observacionProduccion.observacion),
+                        plato: resolverNombrePlato(
+                            platoCodigo,
+                            mapasRecetas,
+                            observacionProduccion?.plato,
+                        ),
+                        platoPadre: resolverNombrePlatoPadre(
+                            platoPadreCodigo,
+                            mapasRecetas,
+                            observacionProduccion?.platoPadre,
+                        ),
+                    },
+                });
+            }
+        }
+
+        for (const item of produccion) {
+            const eliminar =
+                item?.eliminar === true ||
+                item?.cantidad === null ||
             item?.cantidad === '';
         const cantidad = Number(item?.cantidad);
+        const platoCodigo = resolverCodigoPlato(item, mapasRecetas);
+        const platoPadreCodigo = resolverCodigoPlatoPadre(item, mapasRecetas);
 
-        if (
-            !item.plato ||
-            !item.fecha ||
-            (!eliminar && !Number.isFinite(cantidad))
-        ) {
-            return NextResponse.json(
-                { error: 'Cada item debe tener plato, fecha y cantidad' },
-                { status: 400 },
+            if (!platoCodigo || !item.fecha || (!eliminar && !Number.isFinite(cantidad))) {
+                return NextResponse.json(
+                    {
+                        error: 'Cada item debe tener platoCodigo, fecha y cantidad',
+                    },
+                    { status: 400 },
+                );
+            }
+
+            const platoNombre = resolverNombrePlato(platoCodigo, mapasRecetas, item?.plato);
+            const platoPadreNombre = resolverNombrePlatoPadre(
+                platoPadreCodigo,
+                mapasRecetas,
+                item?.platoPadre,
             );
-        }
+
+        const observacion =
+            observacionPorCodigos.get(
+                construirClaveObservacion(platoCodigo, platoPadreCodigo),
+            ) || '';
+
+            if (eliminar) {
+                await prisma.produccion.deleteMany({
+                    where: {
+                        platoCodigo,
+                        platoPadreCodigo,
+                        fecha: new Date(item.fecha),
+                        salon,
+                    },
+                });
+                continue;
+            }
 
         const existe = await prisma.produccion.findFirst({
             where: {
-                plato: item.plato,
-                platoPadre: item.platoPadre,
+                platoCodigo,
+                platoPadreCodigo,
                 fecha: new Date(item.fecha),
-                salon: salon,
+                salon,
             },
         });
 
-        if (eliminar) {
             if (existe) {
-                await prisma.produccion.delete({
+                if (
+                    existe.cantidad === cantidad &&
+                    existe.observacion === observacion &&
+                    existe.plato === platoNombre &&
+                    existe.platoPadre === platoPadreNombre
+                ) {
+                    continue;
+                }
+
+                await prisma.produccion.update({
                     where: { id: existe.id },
+                    data: {
+                        cantidad,
+                        salon,
+                        observacion,
+                        plato: platoNombre,
+                        platoPadre: platoPadreNombre,
+                        platoCodigo,
+                        platoPadreCodigo,
+                    },
                 });
+                continue;
             }
-            continue;
-        }
 
-        if (existe) {
-            if (existe.cantidad === cantidad) continue; // No hay cambios
-
-            // Si hay cambios, actualizamos la cantidad
-            await prisma.produccion.update({
-                where: { id: existe.id },
-                data: {
-                    cantidad: cantidad,
-                    salon: salon,
-                    observacion:
-                        observaciones.find((o) => o.plato === existe.plato)
-                            ?.observacion || '',
-                },
-            });
-            continue;
-        } else {
-            // Si no existe, creamos una nueva entrada
             await prisma.produccion.create({
                 data: {
-                    plato: item.plato,
-                    platoPadre: item.platoPadre,
+                    plato: platoNombre,
+                    platoCodigo,
+                    platoPadre: platoPadreNombre,
+                    platoPadreCodigo,
                     fecha: new Date(item.fecha),
-                    cantidad: cantidad,
+                    cantidad,
                     salon,
-                    observacion:
-                        observaciones.find((o) => o.plato === item.plato)
-                            ?.observacion || '',
+                    observacion,
                 },
             });
         }
+
+        await logAudit({
+            modulo: 'planificacion',
+            accion: 'guardar_planificacion',
+            ruta: '/api/planificacion',
+            metodo: 'POST',
+            resumen: `Planificación guardada para salón ${salon}`,
+            detalle: {
+                fechaInicio,
+                salon,
+                cambiosProduccion: produccion.length,
+                observaciones: observaciones.length,
+            },
+        });
+
+        return NextResponse.json({ message: 'Producción actualizada' });
+    } catch (error) {
+        await logAudit({
+            modulo: 'planificacion',
+            accion: 'guardar_planificacion',
+            ruta: '/api/planificacion',
+            metodo: 'POST',
+            estado: 'error',
+            resumen: 'Error guardando planificación',
+            detalle: {
+                fechaInicio,
+                salon,
+                error: error instanceof Error ? error.message : String(error),
+            },
+        });
+
+        return NextResponse.json(
+            { error: 'Error interno del servidor' },
+            { status: 500 },
+        );
     }
-
-    return NextResponse.json({ message: 'Producción actualizada' });
 }
-
-type Resultado = {
-    plato: string;
-    platoPadre: string;
-    fecha: string;
-    cantidad: number;
-    lugar: string;
-};
 
 async function calcularIngredientesPT(
     platos: PlatoEvento[],
-    recetas: Receta[],
+    mapasRecetas: MapasRecetas,
 ): Promise<Resultado[]> {
     const resultado: Resultado[] = [];
-    const visitados = new Set<string>(); // para evitar loops
+    const visitados = new Set<string>();
 
     async function recorrer(
-        nombre: string,
+        codigoPadre: string,
         fecha: string,
         cantidad: number,
         lugar: string,
         comandaId: number,
         platoPrincipal: string,
     ) {
-        const subRecetas = recetas.filter(
-            (r) => r.nombreProducto === nombre && r.tipo === 'PT',
-        );
+        const subRecetas = mapasRecetas.recetasPTPorCodigoPadre.get(codigoPadre) || [];
 
         for (const receta of subRecetas) {
-            const ingrediente = receta.descripcion;
-            const platoPadre = receta.nombreProducto;
+            const ingrediente = normalizarTexto(receta.descripcion);
+            const ingredienteCodigo = normalizarTexto(receta.subCodigo);
+            const platoPadre = normalizarTexto(receta.nombreProducto);
+            const platoPadreCodigo = normalizarTexto(receta.codigo);
             const porcion = receta.porcionBruta || 1;
             const cantidadTotal = cantidad * porcion;
             const cantidadRedondeada = parseFloat(cantidadTotal.toFixed(2));
 
+            if (!ingredienteCodigo || !platoPadreCodigo) {
+                continue;
+            }
+
             if (!debeExcluirSubPlato(platoPrincipal, ingrediente)) {
                 resultado.push({
                     plato: ingrediente,
-                    platoPadre: platoPadre,
+                    platoCodigo: ingredienteCodigo,
+                    platoPadre,
+                    platoPadreCodigo,
                     fecha,
-                    cantidad: cantidadRedondeada, // Aseguramos que la cantidad sea un número con dos decimales
+                    cantidad: cantidadRedondeada,
                     lugar,
                 });
             }
 
-            if (!visitados.has(ingrediente)) {
-                visitados.add(ingrediente + platoPadre + comandaId);
+            const claveVisitado = `${ingredienteCodigo}|||${platoPadreCodigo}|||${comandaId}`;
+            if (!visitados.has(claveVisitado)) {
+                visitados.add(claveVisitado);
                 await recorrer(
-                    ingrediente,
+                    ingredienteCodigo,
                     fecha,
                     cantidadRedondeada,
                     lugar,
@@ -264,7 +551,7 @@ async function calcularIngredientesPT(
 
     for (const item of platos) {
         await recorrer(
-            item.plato,
+            item.platoCodigo,
             item.fecha,
             item.cantidad,
             item.lugar,
@@ -273,11 +560,10 @@ async function calcularIngredientesPT(
         );
     }
 
-    // Agrupar por ingrediente + fecha y sumar
     const agrupado = new Map<string, Resultado>();
 
     for (const item of resultado) {
-        const key = `${item.plato}_${item.platoPadre}_${item.fecha}`;
+        const key = `${item.platoCodigo}_${item.platoPadreCodigo}_${item.fecha}`;
         if (!agrupado.has(key)) {
             agrupado.set(key, { ...item });
         } else {
@@ -288,24 +574,6 @@ async function calcularIngredientesPT(
     return Array.from(agrupado.values());
 }
 
-// Tipos
-interface Receta {
-    nombreProducto: string;
-    descripcion: string;
-    tipo: 'PT' | 'MP';
-    porcionBruta: number;
-}
-
-interface PlatoEvento {
-    comandaId: number;
-    plato: string;
-    fecha: string;
-    cantidad: number;
-    gestionado: boolean;
-    lugar: string;
-}
-
-// Funciones auxiliares
 function validarFechaInicio(fechaInicio: string | null): Date {
     if (!fechaInicio) {
         throw new Error('fechaInicio es requerido');
@@ -315,21 +583,12 @@ function validarFechaInicio(fechaInicio: string | null): Date {
 
 function calcularRangoSemana(fechaInicio: string): Date {
     const fechaBase = validarFechaInicio(fechaInicio);
-    return startOfWeek(fechaBase, { weekStartsOn: 1 }); // Lunes como inicio de semana
-}
-
-async function obtenerNombresRecetasPT(): Promise<Set<string>> {
-    const recetasPT = await prisma.receta.findMany({
-        where: { tipo: TIPO_RECETA_PT },
-        select: { nombreProducto: true },
-    });
-
-    return new Set(recetasPT.map((receta) => receta.nombreProducto));
+    return startOfWeek(fechaBase, { weekStartsOn: 1 });
 }
 
 async function obtenerEventosSemana(
     inicio: Date,
-    nombresPT: Set<string>,
+    codigosPT: string[],
     salon: string,
 ) {
     const lugares = ['El Central', 'La Rural'];
@@ -342,7 +601,6 @@ async function obtenerEventosSemana(
             deshabilitadaPlanificacion: false,
             OR: [
                 {
-                    // Comandas del ciclo actual
                     fecha: {
                         gte: inicio,
                         lte: fechaFinCiclo,
@@ -350,19 +608,18 @@ async function obtenerEventosSemana(
                     lugar: usarNotIn ? { notIn: lugares } : { in: lugares },
                     Plato: {
                         some: {
-                            nombre: { in: Array.from(nombresPT) },
+                            codigo: { in: codigosPT },
                         },
                     },
                 },
                 {
-                    // Comandas futuras con al menos un plato adelantado
                     fecha: {
                         gte: fechaInicioAdelantos,
                     },
                     lugar: usarNotIn ? { notIn: lugares } : { in: lugares },
                     Plato: {
                         some: {
-                            nombre: { in: Array.from(nombresPT) },
+                            codigo: { in: codigosPT },
                             fecha: {
                                 not: null,
                             },
@@ -370,7 +627,6 @@ async function obtenerEventosSemana(
                     },
                 },
                 {
-                    // condición 2: id = 1
                     id: 1,
                 },
             ],
@@ -378,6 +634,7 @@ async function obtenerEventosSemana(
         include: {
             Plato: {
                 where: {
+                    codigo: { in: codigosPT },
                     OR: [
                         {
                             comanda: {
@@ -406,24 +663,29 @@ async function obtenerEventosSemana(
 
 function procesarEventosAPlatos(
     eventos: any[],
-    nombresPT: Set<string>,
+    mapasRecetas: MapasRecetas,
 ): PlatoEvento[] {
     const resultado: PlatoEvento[] = [];
 
     for (const evento of eventos) {
         for (const plato of evento.Plato) {
-            if (nombresPT.has(plato.nombre)) {
-                resultado.push({
-                    comandaId: evento.id,
-                    plato: plato.nombre,
-                    fecha: plato.fecha
-                        ? format(addDays(plato.fecha, 1), 'yyyy-MM-dd')
-                        : format(addDays(evento.fecha, 1), 'yyyy-MM-dd'),
-                    cantidad: plato.cantidad,
-                    gestionado: plato.gestionado || false,
-                    lugar: evento.lugar,
-                });
+            const platoCodigo = normalizarTexto(plato.codigo);
+
+            if (!platoCodigo || !mapasRecetas.codigosPT.has(platoCodigo)) {
+                continue;
             }
+
+            resultado.push({
+                comandaId: evento.id,
+                plato: resolverNombrePlato(platoCodigo, mapasRecetas, plato.nombre),
+                platoCodigo,
+                fecha: plato.fecha
+                    ? format(addDays(plato.fecha, 1), 'yyyy-MM-dd')
+                    : format(addDays(evento.fecha, 1), 'yyyy-MM-dd'),
+                cantidad: plato.cantidad,
+                gestionado: plato.gestionado || false,
+                lugar: evento.lugar,
+            });
         }
     }
 
@@ -434,8 +696,10 @@ async function obtenerRecetas(): Promise<Receta[]> {
     const recetasRaw = await prisma.receta.findMany({});
 
     return recetasRaw.map((receta) => ({
-        nombreProducto: receta.nombreProducto,
-        descripcion: receta.descripcion,
+        codigo: normalizarTexto(receta.codigo),
+        nombreProducto: normalizarTexto(receta.nombreProducto),
+        descripcion: normalizarTexto(receta.descripcion),
+        subCodigo: normalizarTexto(receta.subCodigo),
         tipo: receta.tipo as 'PT' | 'MP',
         porcionBruta: receta.porcionBruta,
     }));
@@ -443,9 +707,9 @@ async function obtenerRecetas(): Promise<Receta[]> {
 
 async function calcularIngredientesConFormato(
     platos: PlatoEvento[],
-    recetas: Receta[],
+    mapasRecetas: MapasRecetas,
 ) {
-    const ingredientes = await calcularIngredientesPT(platos, recetas);
+    const ingredientes = await calcularIngredientesPT(platos, mapasRecetas);
 
     return ingredientes.map((ingrediente) => ({
         ...ingrediente,
@@ -453,19 +717,29 @@ async function calcularIngredientesConFormato(
     }));
 }
 
-async function obtenerProduccion(inicio: Date, salon: string) {
+async function obtenerProduccion(
+    inicio: Date,
+    salon: string,
+    mapasRecetas: MapasRecetas,
+) {
     const produccion = await prisma.produccion.findMany({
         where: {
             fecha: {
                 gte: addDays(inicio, -DIAS_PRODUCCION_EXTRA.anterior),
                 lte: addDays(inicio, DIAS_PRODUCCION_EXTRA.posterior),
             },
-            salon: salon,
+            salon,
         },
     });
 
     return produccion.map((prod) => ({
         ...prod,
+        plato: resolverNombrePlato(prod.platoCodigo, mapasRecetas, prod.plato),
+        platoPadre: resolverNombrePlatoPadre(
+            prod.platoPadreCodigo,
+            mapasRecetas,
+            prod.platoPadre,
+        ),
         cantidad: parseFloat(prod.cantidad.toFixed(2)),
     }));
 }
