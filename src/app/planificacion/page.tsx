@@ -10,10 +10,8 @@ import {
 } from 'react';
 import {
     // Accordion,
-    Button,
     Col,
     Container,
-    Form,
     Row,
     // Form
 } from 'react-bootstrap';
@@ -29,6 +27,15 @@ import { TablaPlanificacion } from '@/components/tablaPlanificacion';
 import { Slide, toast, ToastContainer } from 'react-toastify';
 import { RolContext, SalonContext } from '@/components/filtroPlatos';
 import { Loading } from '@/components/loading';
+import {
+    construirClaveProduccion,
+    construirFirmaProduccion,
+    esCambioEliminacion,
+    mergeProduccionGuardada,
+    sanitizarProduccionUpdate,
+} from './produccionUtils';
+import { ComandasCicloPanel } from '@/components/planificacion/ComandasCicloPanel';
+import { GuardadoProduccionPanel } from '@/components/planificacion/GuardadoProduccionPanel';
 
 export interface EventoPlanificacion {
     id: number;
@@ -40,152 +47,7 @@ export interface EventoPlanificacion {
     // agrega aquí otras propiedades si existen
 }
 
-interface ProduccionBase {
-    plato: string;
-    platoCodigo: string;
-    platoPadre: string;
-    platoPadreCodigo: string;
-    fecha: string;
-}
-
-interface ProduccionEdit extends ProduccionBase {
-    cantidad: number;
-    eliminar?: false;
-}
-
-interface ProduccionDelete extends ProduccionBase {
-    cantidad: null;
-    eliminar: true;
-}
-
-type ProduccionChange = ProduccionEdit | ProduccionDelete;
-
 type EstadoAutoGuardado = 'idle' | 'pending' | 'saving' | 'saved' | 'error';
-
-function normalizarFechaProduccion(fecha: string | Date): string {
-    const normalizada = new Date(fecha);
-
-    if (!Number.isFinite(normalizada.getTime())) {
-        return String(fecha);
-    }
-
-    normalizada.setHours(0, 0, 0, 0);
-    normalizada.setDate(normalizada.getDate() + 1);
-
-    return format(normalizada, 'yyyy-MM-dd');
-}
-
-function construirClaveProduccion(item: {
-    platoCodigo: string;
-    platoPadreCodigo: string;
-    fecha: string | Date;
-}): string {
-    return `${item.platoCodigo}|||${item.platoPadreCodigo}|||${normalizarFechaProduccion(item.fecha)}`;
-}
-
-function esCambioEliminacion(item: any): item is ProduccionDelete {
-    return item?.eliminar === true || item?.cantidad === null || item?.cantidad === '';
-}
-
-function sanitizarProduccionUpdate(items: any[]): ProduccionChange[] {
-    const porClave = new Map<string, ProduccionChange>();
-
-    for (const item of items) {
-        const plato = String(item?.plato ?? '').trim();
-        const platoCodigo = String(item?.platoCodigo ?? '').trim();
-        const platoPadre = String(item?.platoPadre ?? '').trim();
-        const platoPadreCodigo = String(item?.platoPadreCodigo ?? '').trim();
-        const fecha = String(item?.fecha ?? '').trim();
-
-        if (!platoCodigo || !fecha) {
-            continue;
-        }
-
-        if (esCambioEliminacion(item)) {
-            const normalizado: ProduccionDelete = {
-                plato,
-                platoCodigo,
-                platoPadre,
-                platoPadreCodigo,
-                fecha,
-                cantidad: null,
-                eliminar: true,
-            };
-            porClave.set(construirClaveProduccion(normalizado), normalizado);
-            continue;
-        }
-
-        const cantidad = Number(item?.cantidad);
-
-        if (!Number.isFinite(cantidad)) {
-            continue;
-        }
-
-        const normalizado: ProduccionEdit = {
-            plato,
-            platoCodigo,
-            platoPadre,
-            platoPadreCodigo,
-            fecha,
-            cantidad: Number(cantidad.toFixed(2)),
-            eliminar: false,
-        };
-
-        porClave.set(construirClaveProduccion(normalizado), normalizado);
-    }
-
-    return Array.from(porClave.values());
-}
-
-function construirFirmaProduccion(items: ProduccionChange[]): string {
-    return items
-        .map((item) =>
-            esCambioEliminacion(item)
-                ? `${construirClaveProduccion(item)}=DELETE`
-                : `${construirClaveProduccion(item)}=${item.cantidad.toFixed(2)}`,
-        )
-        .sort()
-        .join('|');
-}
-
-function mergeProduccionGuardada(
-    produccionActual: any[],
-    cambiosGuardados: ProduccionChange[],
-): any[] {
-    const porClave = new Map<string, any>();
-
-    for (const item of produccionActual) {
-        const clave = construirClaveProduccion({
-            platoCodigo: item.platoCodigo,
-            platoPadreCodigo: item.platoPadreCodigo,
-            fecha: item.fecha,
-        });
-        porClave.set(clave, item);
-    }
-
-    for (const item of cambiosGuardados) {
-        const clave = construirClaveProduccion(item);
-
-        if (esCambioEliminacion(item)) {
-            porClave.delete(clave);
-            continue;
-        }
-
-        const existente = porClave.get(clave) ?? {};
-
-        porClave.set(clave, {
-            ...existente,
-            plato: item.plato,
-            platoCodigo: item.platoCodigo,
-            platoPadre: item.platoPadre,
-            platoPadreCodigo: item.platoPadreCodigo,
-            fecha: item.fecha,
-            cantidad: item.cantidad,
-        });
-    }
-
-    return Array.from(porClave.values());
-}
 
 export default function PlanificacionPage() {
     const filtroSalon = useContext(SalonContext);
@@ -683,50 +545,12 @@ export default function PlanificacionPage() {
                 <h2 className="text-center mb-4">Planificación</h2>
                 <p className="text-center text-muted mb-3">{textoSemana}</p>
                 <Container className="mb-3">
-                    <div className="border rounded p-3 bg-light">
-                        <div className="fw-semibold">Comandas del ciclo</div>
-                        <div className="text-muted small mb-2">
-                            Desactivá una comanda para excluir sus platos del
-                            cálculo. Volvé a activarla para revertir cambios.
-                        </div>
-                        {comandasCiclo.length === 0 ? (
-                            <div className="text-muted small">
-                                No hay comandas para el ciclo seleccionado.
-                            </div>
-                        ) : (
-                            <div
-                                style={{
-                                    maxHeight: '12rem',
-                                    overflowY: 'auto',
-                                }}>
-                                {comandasCiclo.map((comanda) => {
-                                    const deshabilitada =
-                                        comanda.deshabilitadaPlanificacion;
-                                    return (
-                                        <Form.Check
-                                            key={comanda.id}
-                                            type="switch"
-                                            id={`comanda-ciclo-${comanda.id}`}
-                                            className="mb-1"
-                                            checked={!deshabilitada}
-                                            disabled={
-                                                actualizandoComandaId ===
-                                                    comanda.id ||
-                                                RolProvider === 'consultor'
-                                            }
-                                            onChange={(e) =>
-                                                handleToggleComanda(
-                                                    comanda.id,
-                                                    e.target.checked,
-                                                )
-                                            }
-                                            label={`${format(new Date(comanda.fecha), 'dd/MM/yyyy')} - ${comanda.lugar} - ${comanda.salon} - ${comanda.nombre}`}
-                                        />
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
+                    <ComandasCicloPanel
+                        comandasCiclo={comandasCiclo}
+                        actualizandoComandaId={actualizandoComandaId}
+                        esConsultor={RolProvider === 'consultor'}
+                        onToggleComanda={handleToggleComanda}
+                    />
                 </Container>
 
                 {/* <Form.Group>
@@ -809,39 +633,12 @@ export default function PlanificacionPage() {
 
                         <Row>
                             <Col xs={4}>
-                                <Button
-                                    type="button"
-                                    className="btn btn-success mb-3"
-                                    onClick={handleGuardarProduccion}>
-                                    Guardar Cambios
-                                </Button>
-                                <Button
-                                    type="button"
-                                    className="btn btn-primary mb-3 ms-2"
-                                    onClick={handleLimpiarProduccion}>
-                                    Limpiar cambios
-                                </Button>
-                                <div
-                                    className={`small mb-3 ${
-                                        estadoAutoGuardado === 'error'
-                                            ? 'text-danger'
-                                            : 'text-muted'
-                                    }`}>
-                                    {estadoAutoGuardado === 'pending' &&
-                                        'Cambios pendientes de guardado automático...'}
-                                    {estadoAutoGuardado === 'saving' &&
-                                        'Guardando cambios automáticamente...'}
-                                    {estadoAutoGuardado === 'saved' &&
-                                        `Guardado automático activo${
-                                            ultimaSincronizacion
-                                                ? ` (último guardado ${format(ultimaSincronizacion, 'HH:mm:ss')})`
-                                                : ''
-                                        }`}
-                                    {estadoAutoGuardado === 'error' &&
-                                        'Error al guardar automáticamente. Podés usar "Guardar Cambios".'}
-                                    {estadoAutoGuardado === 'idle' &&
-                                        'Guardado automático activo.'}
-                                </div>
+                                <GuardadoProduccionPanel
+                                    estadoAutoGuardado={estadoAutoGuardado}
+                                    ultimaSincronizacion={ultimaSincronizacion}
+                                    onGuardar={handleGuardarProduccion}
+                                    onLimpiar={handleLimpiarProduccion}
+                                />
                             </Col>
                             <Col xs={4}></Col>
                             <Col xs={4}>
