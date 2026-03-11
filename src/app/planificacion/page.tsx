@@ -10,7 +10,6 @@ import {
 } from 'react';
 import {
     // Accordion,
-    Button,
     Col,
     Container,
     Form,
@@ -84,7 +83,11 @@ function construirClaveProduccion(item: {
 }
 
 function esCambioEliminacion(item: any): item is ProduccionDelete {
-    return item?.eliminar === true || item?.cantidad === null || item?.cantidad === '';
+    return (
+        item?.eliminar === true ||
+        item?.cantidad === null ||
+        item?.cantidad === ''
+    );
 }
 
 function sanitizarProduccionUpdate(items: any[]): ProduccionChange[] {
@@ -227,7 +230,6 @@ export default function PlanificacionPage() {
         useState<EstadoAutoGuardado>('idle');
     const [ultimaSincronizacion, setUltimaSincronizacion] =
         useState<Date | null>(null);
-    const [guardandoManual, setGuardandoManual] = useState(false);
     const ultimaFirmaGuardadaRef = useRef('');
     const cambiosInicialesCargadosRef = useRef(false);
     const primeraCargaPlanificacionRef = useRef(true);
@@ -309,12 +311,7 @@ export default function PlanificacionPage() {
         return () => {
             abortController.abort();
         };
-    }, [
-        semanaBase,
-        salonActual,
-        eventoAdelantado,
-        recargaComandas,
-    ]);
+    }, [semanaBase, salonActual, eventoAdelantado, recargaComandas]);
 
     useEffect(() => {
         const cambiosGuardados = JSON.parse(
@@ -329,9 +326,37 @@ export default function PlanificacionPage() {
     useEffect(() => {
         if (diasSemana.length < 5) return;
 
+        const inicioCiclo = new Date(diasSemana[4]);
+        inicioCiclo.setHours(0, 0, 0, 0);
+        const finCiclo = addDays(inicioCiclo, 6);
+        finCiclo.setHours(0, 0, 0, 0);
+
+        const eventoDentroDeCiclo = (evento: EventoPlanificacion) => {
+            const fechaEvento = new Date(evento.fecha);
+            fechaEvento.setHours(0, 0, 0, 0);
+            return (
+                fechaEvento.getTime() >= inicioCiclo.getTime() &&
+                fechaEvento.getTime() <= finCiclo.getTime()
+            );
+        };
+
+        const maxEventosPorDia = (items: EventoPlanificacion[]) => {
+            const contador = new Map<number, number>();
+
+            items.forEach((item) => {
+                const fechaEvento = new Date(item.fecha);
+                fechaEvento.setHours(0, 0, 0, 0);
+                const key = fechaEvento.getTime();
+                contador.set(key, (contador.get(key) || 0) + 1);
+            });
+
+            if (contador.size === 0) return 0;
+            return Math.max(...Array.from(contador.values()));
+        };
+
         const paramsBase = new URLSearchParams({
             fechaInicio: format(diasSemana[4], 'yyyy-MM-dd'),
-            fechaFinal: format(diasSemana[diasSemana.length - 1], 'yyyy-MM-dd'),
+            fechaFinal: format(addDays(diasSemana[4], 6), 'yyyy-MM-dd'),
             salon: salonActual,
         });
 
@@ -349,25 +374,31 @@ export default function PlanificacionPage() {
                     resTodos.json(),
                     resFiltrados.json(),
                 ]);
-                setComandasCiclo(dataTodos.eventos || []);
-                setEventos(dataFiltrados.eventos || []);
-                setMaxCantidadEventosDia(dataFiltrados.maxRepeticion || 0);
+
+                const eventosCicloTodos = (dataTodos.eventos || []).filter(
+                    eventoDentroDeCiclo,
+                );
+                const eventosCicloHabilitados = (
+                    dataFiltrados.eventos || []
+                ).filter(eventoDentroDeCiclo);
+
+                setComandasCiclo(eventosCicloTodos);
+                setEventos(eventosCicloHabilitados);
+                setMaxCantidadEventosDia(
+                    maxEventosPorDia(eventosCicloHabilitados),
+                );
             })
             .catch(() => {
                 setComandasCiclo([]);
                 setEventos([]);
                 setMaxCantidadEventosDia(0);
             });
-    }, [
-        diasSemana,
-        salonActual,
-        recargaComandas,
-    ]);
+    }, [diasSemana, salonActual, recargaComandas]);
 
     useEffect(() => {
         const inicioSemana = startOfWeek(semanaBase, { weekStartsOn: 4 }); // jueves
         const dias = Array.from({ length: 60 }, (_, i) =>
-            addDays(inicioSemana, i)
+            addDays(inicioSemana, i),
         );
         setDiasSemana(dias);
         setDiaActivo('');
@@ -404,14 +435,13 @@ export default function PlanificacionPage() {
             return;
         }
 
-        localStorage.setItem('produccionUpdate', JSON.stringify(produccionUpdate));
+        localStorage.setItem(
+            'produccionUpdate',
+            JSON.stringify(produccionUpdate),
+        );
     }, [produccionUpdate]);
 
     useEffect(() => {
-        if (guardandoManual) {
-            return;
-        }
-
         const cambiosPendientes = sanitizarProduccionUpdate(produccionUpdate);
 
         if (cambiosPendientes.length === 0) {
@@ -459,7 +489,9 @@ export default function PlanificacionPage() {
                 );
                 setProduccionUpdate((prevCambios) =>
                     prevCambios.filter((item) => {
-                        const platoCodigo = String(item?.platoCodigo ?? '').trim();
+                        const platoCodigo = String(
+                            item?.platoCodigo ?? '',
+                        ).trim();
                         const platoPadreCodigo = String(
                             item?.platoPadreCodigo ?? '',
                         ).trim();
@@ -506,12 +538,7 @@ export default function PlanificacionPage() {
         }, 900);
 
         return () => window.clearTimeout(timerId);
-    }, [
-        produccionUpdate,
-        salonActual,
-        fechaInicioPlanificacion,
-        guardandoManual,
-    ]);
+    }, [produccionUpdate, salonActual, fechaInicioPlanificacion]);
 
     useEffect(() => {
         if (actualizandoPlanificacion) {
@@ -549,66 +576,6 @@ export default function PlanificacionPage() {
         [],
     );
 
-    const handleGuardarProduccion = async () => {
-        toast.warn('Actualizando produccion', {
-            position: 'bottom-right',
-            theme: 'colored',
-            transition: Slide,
-        });
-
-        setGuardandoManual(true);
-
-        try {
-            const cambiosManual = sanitizarProduccionUpdate(produccionUpdate);
-            const response = await fetch('/api/planificacion', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    salon: salonActual,
-                    produccion: cambiosManual,
-                    observaciones,
-                    fechaInicio: fechaInicioPlanificacion,
-                }),
-            });
-
-            if (!response.ok) {
-                throw new Error();
-            }
-
-            toast.success('Produccion actualizada', {
-                position: 'bottom-right',
-                theme: 'colored',
-                transition: Slide,
-            });
-
-            setProduccionUpdate([]);
-            ultimaFirmaGuardadaRef.current = '';
-            setUltimaSincronizacion(new Date());
-            setEstadoAutoGuardado('saved');
-
-            const res = await fetch(
-                '/api/planificacion?fechaInicio=' +
-                    startOfWeek(addDays(semanaBase, 4), {
-                        weekStartsOn: 1,
-                    }).toISOString() +
-                    '&salon=' +
-                    salonActual,
-            ); // jueves
-            const data = await res.json();
-            setDatos(data.planifacion || []);
-            setProduccion(data.produccion || []);
-        } catch {
-            toast.error('Error al actualizar la producción', {
-                position: 'bottom-right',
-                theme: 'colored',
-                transition: Slide,
-            });
-            setEstadoAutoGuardado('error');
-        } finally {
-            setGuardandoManual(false);
-        }
-    };
-
     const platosUnicos = [
         ...new Map(
             datosFiltrados.map((d) => [
@@ -619,26 +586,31 @@ export default function PlanificacionPage() {
                     platoPadre: d.platoPadre,
                     platoPadreCodigo: d.platoPadreCodigo,
                 },
-            ])
+            ]),
         ).values(),
     ];
-
-    const handleLimpiarProduccion = () => {
-        setProduccionUpdate([]);
-        ultimaFirmaGuardadaRef.current = '';
-        setEstadoAutoGuardado('idle');
-        toast.info('Producción limpiada', {
-            position: 'bottom-right',
-            theme: 'colored',
-            transition: Slide,
-        });
-    };
 
     const inicioSemana = startOfWeek(semanaBase, { weekStartsOn: 1 });
     const finSemana = addDays(inicioSemana, 6);
     const textoSemana = `Semana: ${format(inicioSemana, 'dd/MM/yyyy')} al ${format(finSemana, 'dd/MM/yyyy')}`;
 
-    const handleToggleComanda = async (comandaId: number, habilitada: boolean) => {
+    const handleToggleComanda = async (
+        comandaId: number,
+        habilitada: boolean,
+    ) => {
+        const esComandaDelCiclo = comandasCiclo.some(
+            (comanda) => comanda.id === comandaId,
+        );
+
+        if (!esComandaDelCiclo) {
+            toast.warn('Sólo se pueden editar comandas del ciclo actual.', {
+                position: 'bottom-right',
+                theme: 'colored',
+                transition: Slide,
+            });
+            return;
+        }
+
         setActualizandoComandaId(comandaId);
 
         await fetch('/api/planificacion/comanda', {
@@ -680,10 +652,14 @@ export default function PlanificacionPage() {
         <div>
             <ToastContainer />
             <Container className="mt-5 flex-grow-1">
-                <h2 className="text-center mb-4">Planificación</h2>
-                <p className="text-center text-muted mb-3">{textoSemana}</p>
+                <h1 className="text-center display-5 fw-bold mb-2">
+                    Planificación
+                </h1>
+                <p className="text-center text-secondary fs-4 fw-semibold mb-4">
+                    {textoSemana}
+                </p>
                 <Container className="mb-3">
-                    <div className="border rounded p-3 bg-light">
+                    <div className="border rounded p-2 bg-light">
                         <div className="fw-semibold">Comandas del ciclo</div>
                         <div className="text-muted small mb-2">
                             Desactivá una comanda para excluir sus platos del
@@ -696,7 +672,7 @@ export default function PlanificacionPage() {
                         ) : (
                             <div
                                 style={{
-                                    maxHeight: '12rem',
+                                    maxHeight: '7rem',
                                     overflowY: 'auto',
                                 }}>
                                 {comandasCiclo.map((comanda) => {
@@ -807,50 +783,27 @@ export default function PlanificacionPage() {
                             </Col>
                         </Row>
 
-                        <Row>
-                            <Col xs={4}>
-                                <Button
-                                    type="button"
-                                    className="btn btn-success mb-3"
-                                    onClick={handleGuardarProduccion}>
-                                    Guardar Cambios
-                                </Button>
-                                <Button
-                                    type="button"
-                                    className="btn btn-primary mb-3 ms-2"
-                                    onClick={handleLimpiarProduccion}>
-                                    Limpiar cambios
-                                </Button>
-                                <div
-                                    className={`small mb-3 ${
-                                        estadoAutoGuardado === 'error'
-                                            ? 'text-danger'
-                                            : 'text-muted'
-                                    }`}>
-                                    {estadoAutoGuardado === 'pending' &&
-                                        'Cambios pendientes de guardado automático...'}
-                                    {estadoAutoGuardado === 'saving' &&
-                                        'Guardando cambios automáticamente...'}
-                                    {estadoAutoGuardado === 'saved' &&
-                                        `Guardado automático activo${
-                                            ultimaSincronizacion
-                                                ? ` (último guardado ${format(ultimaSincronizacion, 'HH:mm:ss')})`
-                                                : ''
-                                        }`}
-                                    {estadoAutoGuardado === 'error' &&
-                                        'Error al guardar automáticamente. Podés usar "Guardar Cambios".'}
-                                    {estadoAutoGuardado === 'idle' &&
-                                        'Guardado automático activo.'}
-                                </div>
-                            </Col>
-                            <Col xs={4}></Col>
-                            <Col xs={4}>
-                                {/* <NavegacionSemanal
-                                semanaBase={semanaBase}
-                                setSemanaBase={setSemanaBase}
-                            /> */}
-                            </Col>
-                        </Row>
+                        <div
+                            className={`small mb-3 ${
+                                estadoAutoGuardado === 'error'
+                                    ? 'text-danger'
+                                    : 'text-muted'
+                            }`}>
+                            {estadoAutoGuardado === 'pending' &&
+                                'Cambios pendientes de guardado automático...'}
+                            {estadoAutoGuardado === 'saving' &&
+                                'Guardando cambios automáticamente...'}
+                            {estadoAutoGuardado === 'saved' &&
+                                `Guardado automático activo${
+                                    ultimaSincronizacion
+                                        ? ` (último guardado ${format(ultimaSincronizacion, 'HH:mm:ss')})`
+                                        : ''
+                                }`}
+                            {estadoAutoGuardado === 'error' &&
+                                'Error al guardar automáticamente. Reintentá en unos segundos.'}
+                            {estadoAutoGuardado === 'idle' &&
+                                'Guardado automático activo.'}
+                        </div>
                     </Container>
                 )}
             </Container>
