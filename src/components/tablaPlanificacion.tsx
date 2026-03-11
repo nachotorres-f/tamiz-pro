@@ -4,11 +4,8 @@
 import React, { useContext, useEffect, useRef, useState } from 'react';
 import {
     Button,
-    FloatingLabel,
     Form,
-    Modal,
     OverlayTrigger,
-    Spinner,
     Table,
     Tooltip,
 } from 'react-bootstrap';
@@ -18,6 +15,8 @@ import { PlatoDetalle } from './platoDetalle';
 import { ChatRightText } from 'react-bootstrap-icons';
 import { EventoPlanificacion } from '@/app/planificacion/page';
 import { RolContext } from './filtroPlatos';
+import { ObservacionModal } from './tablaPlanificacion/ObservacionModal';
+import { AdelantarEventoModal } from './tablaPlanificacion/AdelantarEventoModal';
 
 export function TablaPlanificacion({
     pageOcultos,
@@ -604,207 +603,49 @@ export function TablaPlanificacion({
 
     return (
         <>
-            <Modal
+            <ObservacionModal
                 show={show}
-                onHide={handleClose}>
-                <Modal.Header closeButton>
-                    <Modal.Title>
-                        Observacion - {platoModal} - {platoPadreModal}
-                    </Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    <FloatingLabel
-                        controlId="floatingTextarea"
-                        label="Observación"
-                        className="mb-3">
-                        <Form.Control
-                            as="textarea"
-                            value={observacionModal}
-                            onChange={(
-                                e: React.ChangeEvent<
-                                    HTMLInputElement | HTMLTextAreaElement
-                                >,
-                            ) => {
-                                setObservacionModal(e.target.value);
-                            }}
-                            style={{ height: '200px' }}
-                        />
-                    </FloatingLabel>
-                </Modal.Body>
-                <Modal.Footer>
-                    <Button
-                        variant="secondary"
-                        onClick={() => {
-                            setObservacionModal('');
-                            handleClose();
-                        }}>
-                        Cerrar
-                    </Button>
-                    {RolProvider !== 'consultor' && (
-                        <Button
-                            variant="primary"
-                            onClick={() => {
-                                const obsExistente = observaciones.find(
-                                    (o) =>
-                                        o.platoCodigo === platoCodigoModal &&
-                                        o.platoPadreCodigo ===
-                                            platoPadreCodigoModal,
-                                );
-                                if (obsExistente) {
-                                    obsExistente.observacion = observacionModal;
-                                    setObservaciones([
-                                        ...observaciones.filter(
-                                            (o) =>
-                                                !(
-                                                    o.platoCodigo ===
-                                                        platoCodigoModal &&
-                                                    o.platoPadreCodigo ===
-                                                        platoPadreCodigoModal
-                                                ),
-                                        ),
-                                        obsExistente,
-                                    ]);
-                                } else {
-                                    setObservaciones([
-                                        ...observaciones,
-                                        {
-                                            plato: platoModal,
-                                            platoCodigo: platoCodigoModal,
-                                            platoPadre: platoPadreModal,
-                                            platoPadreCodigo:
-                                                platoPadreCodigoModal,
-                                            observacion: observacionModal,
-                                        },
-                                    ]);
-                                }
-                                setObservacionModal('');
-                                handleClose();
-                            }}>
-                            Guardar Cambios
-                        </Button>
-                    )}
-                </Modal.Footer>
-            </Modal>
+                plato={platoModal}
+                platoCodigo={platoCodigoModal}
+                platoPadre={platoPadreModal}
+                platoPadreCodigo={platoPadreCodigoModal}
+                observacionModal={observacionModal}
+                observaciones={observaciones}
+                esConsultor={RolProvider === 'consultor'}
+                onClose={handleClose}
+                setObservacionModal={setObservacionModal}
+                setObservaciones={setObservaciones}
+            />
 
-            <Modal
-                size="lg"
+            <AdelantarEventoModal
                 show={adelantarEvento != 0}
-                onHide={() => {
+                cargando={cargandoPlatosAdelantados}
+                platos={platosAdelantados}
+                adelantandoTodo={adelantandoTodo}
+                accionMasivaAdelanto={accionMasivaAdelanto}
+                platosGuardandoAdelantoSize={platosGuardandoAdelanto.size}
+                cerrando={cerrandoModalAdelanto}
+                todosAdelantados={todosAdelantados}
+                onClose={() => {
                     void handleCloseAdelantar();
-                }}>
-                <Modal.Header closeButton>
-                    <Modal.Title>Adelantar Plato Evento</Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    {cargandoPlatosAdelantados ? (
-                        <div className="d-flex align-items-center gap-2 text-muted">
-                            <Spinner
-                                animation="border"
-                                size="sm"
-                            />
-                            <span>Cargando platos...</span>
-                        </div>
-                    ) : platosAdelantados.length > 0 ? (
-                        <>
-                            <div className="d-flex justify-content-between align-items-center mb-3">
-                                <small className="text-muted">
-                                    {adelantandoTodo ||
-                                    platosGuardandoAdelanto.size > 0
-                                        ? 'Actualizando adelantos y planificación...'
-                                        : 'Marcá los platos que querés adelantar para ver el impacto en la tabla.'}
-                                </small>
-                                <Button
-                                    size="sm"
-                                    variant="primary"
-                                    disabled={
-                                        cerrandoModalAdelanto ||
-                                        adelantandoTodo ||
-                                        platosGuardandoAdelanto.size > 0
-                                    }
-                                    onClick={() => {
-                                        void handleToggleAdelantoTodo();
-                                    }}>
-                                    {adelantandoTodo
-                                        ? accionMasivaAdelanto ===
-                                          'desadelantar'
-                                            ? 'Quitando adelantos...'
-                                            : 'Adelantando...'
-                                        : todosAdelantados
-                                          ? 'Quitar adelanto a todo'
-                                          : 'Adelantar todo'}
-                                </Button>
-                            </div>
-                            <Table>
-                                <thead>
-                                    <tr>
-                                        <th>Nombre</th>
-                                        <th>Cantidad</th>
-                                        <th>Adelantar</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {platosAdelantados.map((plato) => (
-                                        <tr key={plato.id}>
-                                            <td>{plato.nombre}</td>
-                                            <td>{plato.cantidad}</td>
-                                            <td>
-                                                <Form.Check
-                                                    type="checkbox"
-                                                    checked={!!plato.fecha}
-                                                    disabled={
-                                                        cerrandoModalAdelanto ||
-                                                        adelantandoTodo ||
-                                                        platosGuardandoAdelanto.has(
-                                                            plato.id,
-                                                        )
-                                                    }
-                                                    onChange={(e) => {
-                                                        const solicitud =
-                                                            actualizarAdelantoPlato(
-                                                                plato.id,
-                                                                e.target
-                                                                    .checked,
-                                                                plato.fecha,
-                                                            );
-                                                        registrarSolicitudAdelanto(
-                                                            solicitud,
-                                                        );
-                                                        void solicitud.then(
-                                                            (actualizado) => {
-                                                                if (
-                                                                    actualizado
-                                                                ) {
-                                                                    dispararActualizacionPlanificacion();
-                                                                }
-                                                            },
-                                                        );
-                                                    }}
-                                                />
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </Table>
-                        </>
-                    ) : (
-                        <p>No hay platos para adelantar.</p>
-                    )}
-                </Modal.Body>
-                <Modal.Footer>
-                    <Button
-                        variant="secondary"
-                        disabled={
-                            cerrandoModalAdelanto ||
-                            adelantandoTodo ||
-                            platosGuardandoAdelanto.size > 0
+                }}
+                onToggleTodo={() => {
+                    void handleToggleAdelantoTodo();
+                }}
+                onTogglePlato={(plato, checked) => {
+                    const solicitud = actualizarAdelantoPlato(
+                        plato.id,
+                        checked,
+                        plato.fecha,
+                    );
+                    registrarSolicitudAdelanto(solicitud);
+                    void solicitud.then((actualizado) => {
+                        if (actualizado) {
+                            dispararActualizacionPlanificacion();
                         }
-                        onClick={() => {
-                            void handleCloseAdelantar();
-                        }}>
-                        Cerrar
-                    </Button>
-                </Modal.Footer>
-            </Modal>
+                    });
+                }}
+            />
 
             <div
                 style={{
