@@ -15,7 +15,11 @@ import {
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { PlatoDetalle } from './platoDetalle';
-import { ChatRightText } from 'react-bootstrap-icons';
+import {
+    ArrowsFullscreen,
+    ChatRightText,
+    FullscreenExit,
+} from 'react-bootstrap-icons';
 import { EventoPlanificacion } from '@/app/planificacion/page';
 import { RolContext } from './filtroPlatos';
 
@@ -100,8 +104,10 @@ export function TablaPlanificacion({
         Set<number>
     >(new Set());
     const [cerrandoModalAdelanto, setCerrandoModalAdelanto] = useState(false);
+    const [isFullscreenTablas, setIsFullscreenTablas] = useState(false);
     const solicitudesAdelantoPendientesRef = useRef<Promise<boolean>[]>([]);
     const timerRefrescoPlanificacionRef = useRef<number | null>(null);
+    const contenedorTablasRef = useRef<HTMLDivElement | null>(null);
     //const [primeraCargaModal, setPrimeraCargaModal] = useState(true);
 
     useEffect(() => {
@@ -226,6 +232,41 @@ export function TablaPlanificacion({
         },
         [],
     );
+
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            setIsFullscreenTablas(
+                document.fullscreenElement === contenedorTablasRef.current,
+            );
+        };
+
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        handleFullscreenChange();
+
+        return () => {
+            document.removeEventListener(
+                'fullscreenchange',
+                handleFullscreenChange,
+            );
+        };
+    }, []);
+
+    const handleToggleFullscreenTablas = async () => {
+        const contenedor = contenedorTablasRef.current;
+
+        if (!contenedor) return;
+
+        try {
+            if (document.fullscreenElement === contenedor) {
+                await document.exitFullscreen();
+                return;
+            }
+
+            await contenedor.requestFullscreen();
+        } catch (error) {
+            console.error('No se pudo cambiar a pantalla completa:', error);
+        }
+    };
 
     useEffect(() => {
         if (adelantarEvento == 0) return;
@@ -848,9 +889,12 @@ export function TablaPlanificacion({
             </Modal>
 
             <div
+                ref={contenedorTablasRef}
                 style={{
                     display: 'flex',
-                    maxHeight: '90vh',
+                    maxHeight: isFullscreenTablas ? '100vh' : '90vh',
+                    height: isFullscreenTablas ? '100vh' : undefined,
+                    backgroundColor: '#fff',
                 }}>
                 <div
                     id="left-table"
@@ -914,7 +958,39 @@ export function TablaPlanificacion({
                                         top: 0,
                                         zIndex: 4,
                                         backgroundColor: '#BDBDBD',
-                                    }}></th>
+                                    }}>
+                                    <Button
+                                        size="sm"
+                                        variant="outline-dark"
+                                        onClick={() => {
+                                            void handleToggleFullscreenTablas();
+                                        }}
+                                        title={
+                                            isFullscreenTablas
+                                                ? 'Salir de pantalla completa'
+                                                : 'Ver en pantalla completa'
+                                        }
+                                        aria-label={
+                                            isFullscreenTablas
+                                                ? 'Salir de pantalla completa'
+                                                : 'Ver en pantalla completa'
+                                        }
+                                        style={{
+                                            width: '1.5rem',
+                                            height: '1.5rem',
+                                            display: 'inline-flex',
+                                            justifyContent: 'center',
+                                            alignItems: 'center',
+                                            fontSize: '0.75rem',
+                                            padding: 0,
+                                        }}>
+                                        {isFullscreenTablas ? (
+                                            <FullscreenExit />
+                                        ) : (
+                                            <ArrowsFullscreen />
+                                        )}
+                                    </Button>
+                                </th>
                                 <th
                                     style={{
                                         position: 'sticky',
