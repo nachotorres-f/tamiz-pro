@@ -453,6 +453,8 @@ export function TablaPlanificacion({
     type DragCantidadPayload = {
         mode: 'set' | 'add';
         value: number;
+        platoCodigo: string;
+        platoPadreCodigo: string;
     };
 
     const DRAG_CANTIDAD_MIME = 'application/x-tamiz-planificacion-cantidad';
@@ -469,6 +471,8 @@ export function TablaPlanificacion({
         const payloadNormalizado: DragCantidadPayload = {
             mode: payload.mode,
             value,
+            platoCodigo: payload.platoCodigo,
+            platoPadreCodigo: payload.platoPadreCodigo,
         };
 
         event.dataTransfer.setData(
@@ -489,41 +493,70 @@ export function TablaPlanificacion({
                 const payload = JSON.parse(dataCustom) as Partial<DragCantidadPayload>;
                 const mode = payload.mode;
                 const value = Number(payload.value);
+                const platoCodigo = String(payload.platoCodigo || '');
+                const platoPadreCodigo = String(payload.platoPadreCodigo || '');
 
                 if (
                     (mode === 'set' || mode === 'add') &&
-                    Number.isFinite(value)
+                    Number.isFinite(value) &&
+                    platoCodigo &&
+                    platoPadreCodigo
                 ) {
-                    return { mode, value };
+                    return {
+                        mode,
+                        value,
+                        platoCodigo,
+                        platoPadreCodigo,
+                    };
                 }
             } catch {}
         }
 
-        const dataTexto = dataTransfer.getData('text/plain');
-        const value = Number.parseFloat(dataTexto.replace(',', '.'));
-
-        if (!Number.isFinite(value)) {
-            return null;
-        }
-
-        return {
-            mode: 'set',
-            value,
-        };
+        return null;
     };
+
+    const esMismaFilaDrag = (
+        payload: DragCantidadPayload,
+        {
+            platoCodigo,
+            platoPadreCodigo,
+        }: {
+            platoCodigo: string;
+            platoPadreCodigo: string;
+        },
+    ) =>
+        payload.platoCodigo === platoCodigo &&
+        payload.platoPadreCodigo === platoPadreCodigo;
 
     const handleDragOverInputCantidad = (
         event: React.DragEvent<HTMLElement>,
+        {
+            platoCodigo,
+            platoPadreCodigo,
+        }: {
+            platoCodigo: string;
+            platoPadreCodigo: string;
+        },
     ) => {
         if (RolProvider === 'consultor') {
             return;
         }
 
         const tipos = Array.from(event.dataTransfer.types || []);
-        const esDragCompatible =
-            tipos.includes(DRAG_CANTIDAD_MIME) || tipos.includes('text/plain');
+        const esDragCompatible = tipos.includes(DRAG_CANTIDAD_MIME);
 
         if (!esDragCompatible) {
+            return;
+        }
+
+        const payload = obtenerDragCantidad(event.dataTransfer);
+        if (
+            payload &&
+            !esMismaFilaDrag(payload, {
+                platoCodigo,
+                platoPadreCodigo,
+            })
+        ) {
             return;
         }
 
@@ -560,6 +593,14 @@ export function TablaPlanificacion({
         }
 
         event.preventDefault();
+        if (
+            !esMismaFilaDrag(payload, {
+                platoCodigo,
+                platoPadreCodigo,
+            })
+        ) {
+            return;
+        }
 
         const actual = Number(cantidadActual);
         const actualValido = Number.isFinite(actual) ? actual : null;
@@ -1097,6 +1138,8 @@ export function TablaPlanificacion({
                                                                     {
                                                                         mode: 'set',
                                                                         value: totalNecesario,
+                                                                        platoCodigo,
+                                                                        platoPadreCodigo,
                                                                     },
                                                                 );
                                                             }}
@@ -1113,7 +1156,7 @@ export function TablaPlanificacion({
                                                                 RolProvider ===
                                                                 'consultor'
                                                                     ? undefined
-                                                                    : 'Arrastrá para pegar este total en una celda'
+                                                                    : 'Arrastrá para pegar este total en una celda de la misma fila'
                                                             }>
                                                             {totalNecesario.toFixed(
                                                                 2,
@@ -1458,12 +1501,22 @@ export function TablaPlanificacion({
                                                                         {
                                                                             mode: 'add',
                                                                             value: totalConsumo,
+                                                                            platoCodigo,
+                                                                            platoPadreCodigo,
                                                                         },
                                                                     );
                                                                 }}
-                                                                onDragOver={
-                                                                    handleDragOverInputCantidad
-                                                                }
+                                                                onDragOver={(
+                                                                    event,
+                                                                ) => {
+                                                                    handleDragOverInputCantidad(
+                                                                        event,
+                                                                        {
+                                                                            platoCodigo,
+                                                                            platoPadreCodigo,
+                                                                        },
+                                                                    );
+                                                                }}
                                                                 onDrop={(
                                                                     event,
                                                                 ) => {
@@ -1482,7 +1535,7 @@ export function TablaPlanificacion({
                                                                 }}
                                                                 title={
                                                                     placeholderArrastrable
-                                                                        ? 'Arrastrá este valor para sumarlo en otra celda'
+                                                                        ? 'Arrastrá este valor para sumarlo en otra celda de la misma fila'
                                                                         : undefined
                                                                 }
                                                                 onChange={(
