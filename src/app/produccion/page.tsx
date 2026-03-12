@@ -242,6 +242,19 @@ export default function ProduccionPage() {
     };
 
     function guardarComentario() {
+        if (
+            !platoModalProduccion.platoCodigo ||
+            !platoModalProduccion.fecha ||
+            !salon
+        ) {
+            toast.error('Selecciona un plato con producción para comentar', {
+                position: 'bottom-right',
+                theme: 'colored',
+                transition: Slide,
+            });
+            return;
+        }
+
         toast.warn('Agregando Comentario', {
             position: 'bottom-right',
             theme: 'colored',
@@ -260,6 +273,12 @@ export default function ProduccionPage() {
                 salon,
             }),
         })
+            .then((res) => {
+                if (!res.ok) {
+                    throw new Error('Error al guardar comentario');
+                }
+                return res.json();
+            })
             .then(() => {
                 toast.success('Comentario guardado', {
                     position: 'bottom-right',
@@ -777,6 +796,9 @@ export default function ProduccionPage() {
                                                         : ''
                                                 }
                                                 onClick={() => {
+                                                    if (!produccion || cantidad <= 0) {
+                                                        return;
+                                                    }
                                                     setPlatoModalProduccion({
                                                         plato: dato.plato,
                                                         platoCodigo:
