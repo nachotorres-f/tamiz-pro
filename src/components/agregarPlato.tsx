@@ -17,6 +17,14 @@ type FilaPlato = {
     cantidad: string;
     fecha: Date;
 };
+type FilaAEnviar = {
+    platoCodigo: string;
+    cantidad: string;
+    fecha: string;
+};
+type ResultadoValidacionFilas =
+    | { ok: false; error: string }
+    | { ok: true; filas: FilaAEnviar[] };
 
 const crearFilaPlato = (id: number, fecha?: Date): FilaPlato => ({
     id,
@@ -116,7 +124,7 @@ export default function AgregarPlato({
         );
     };
 
-    const obtenerFilasAEnviar = () => {
+    const obtenerFilasAEnviar = (): ResultadoValidacionFilas => {
         const filasConDatos = filasPlatos.filter((fila) => {
             const tienePlato = fila.platoCodigo.trim() !== '';
             const tieneCantidad = fila.cantidad.trim() !== '';
@@ -124,7 +132,7 @@ export default function AgregarPlato({
         });
 
         if (filasConDatos.length === 0) {
-            return { error: 'Completa todos los campos' };
+            return { ok: false, error: 'Completa todos los campos' };
         }
 
         const tieneIncompletos = filasConDatos.some((fila) => {
@@ -138,10 +146,11 @@ export default function AgregarPlato({
         });
 
         if (tieneIncompletos) {
-            return { error: 'Completa todos los campos' };
+            return { ok: false, error: 'Completa todos los campos' };
         }
 
         return {
+            ok: true,
             filas: filasConDatos.map((fila) => ({
                 platoCodigo: fila.platoCodigo,
                 cantidad: Number(fila.cantidad).toFixed(2),
@@ -154,7 +163,7 @@ export default function AgregarPlato({
         e.preventDefault();
 
         const validacion = obtenerFilasAEnviar();
-        if ('error' in validacion) {
+        if (!validacion.ok) {
             mostrarToast('warn', validacion.error);
             return;
         }
