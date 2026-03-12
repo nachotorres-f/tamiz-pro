@@ -5,7 +5,7 @@ import { NavegacionSemanal } from '@/components/navegacionSemanal';
 import { addDays, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import React, { useContext, useEffect, useRef, useState } from 'react';
-import type { CellObject, CellStyle } from 'xlsx-js-style';
+import type { CellObject, CellStyle, WorkSheet } from 'xlsx-js-style';
 import {
     Accordion,
     Button,
@@ -398,6 +398,41 @@ export default function ProduccionPage() {
         return maximoCaracteres + 2;
     };
 
+    const aplicarEstiloHeader = (
+        worksheet: WorkSheet,
+        XLSX: typeof import('xlsx-js-style'),
+    ) => {
+        const rango = worksheet['!ref']
+            ? XLSX.utils.decode_range(worksheet['!ref'])
+            : null;
+
+        if (!rango) {
+            return;
+        }
+
+        for (let c = 0; c <= rango.e.c; c += 1) {
+            const direccionHeader = XLSX.utils.encode_cell({
+                r: 0,
+                c,
+            });
+            const headerCelda = worksheet[direccionHeader] as
+                | CellObject
+                | undefined;
+
+            if (!headerCelda) continue;
+
+            headerCelda.s = estiloHeaderOscuro;
+        }
+    };
+
+    const obtenerNombreHojaDia = (dia: Date) => {
+        const nombreDia = format(dia, 'EEEE', { locale: es });
+        const nombreDiaCapitalizado =
+            nombreDia.charAt(0).toUpperCase() + nombreDia.slice(1);
+
+        return `${nombreDiaCapitalizado} ${format(dia, 'd-M')}`;
+    };
+
     const exportarExcel = () => {
         const encabezados = [
             'Plato',
@@ -441,30 +476,52 @@ export default function ProduccionPage() {
                 { wch: calcularAnchoColumna(filasExcel, 0) },
                 { wch: calcularAnchoColumna(filasExcel, 1) },
             ];
-
-            const rango = worksheet['!ref']
-                ? XLSX.utils.decode_range(worksheet['!ref'])
-                : null;
-
-            if (rango) {
-                for (let c = 0; c <= rango.e.c; c += 1) {
-                    const direccionHeader = XLSX.utils.encode_cell({
-                        r: 0,
-                        c,
-                    });
-                    const headerCelda = worksheet[direccionHeader] as
-                        | CellObject
-                        | undefined;
-
-                    if (!headerCelda) continue;
-
-                    headerCelda.s = estiloHeaderOscuro;
-                }
-            }
+            aplicarEstiloHeader(worksheet, XLSX);
 
             const workbook = XLSX.utils.book_new();
 
             XLSX.utils.book_append_sheet(workbook, worksheet, 'Produccion');
+
+            diasVisibles.forEach((dia) => {
+                const encabezadoDia = format(dia, 'EEE, dd-MM', {
+                    locale: es,
+                });
+                const filasDia: Array<Array<string | number>> = [
+                    ['Plato', 'Elaboracion', encabezadoDia, 'Tips'],
+                ];
+
+                datosVisibles.forEach((dato) => {
+                    const cantidad = obtenerCantidadPorDia(dato, dia);
+
+                    if (typeof cantidad !== 'number' || cantidad <= 0) {
+                        return;
+                    }
+
+                    filasDia.push([
+                        dato.platoPadre || '',
+                        dato.plato || '',
+                        cantidad,
+                        dato.comentario || '',
+                    ]);
+                });
+
+                const hojaDia = XLSX.utils.aoa_to_sheet(filasDia);
+                hojaDia['!cols'] = [
+                    { wch: calcularAnchoColumna(filasDia, 0) },
+                    { wch: calcularAnchoColumna(filasDia, 1) },
+                    { wch: calcularAnchoColumna(filasDia, 2) },
+                    { wch: calcularAnchoColumna(filasDia, 3) },
+                ];
+
+                aplicarEstiloHeader(hojaDia, XLSX);
+
+                XLSX.utils.book_append_sheet(
+                    workbook,
+                    hojaDia,
+                    obtenerNombreHojaDia(dia),
+                );
+            });
+
             XLSX.writeFile(workbook, 'produccion.xlsx');
         });
     };
