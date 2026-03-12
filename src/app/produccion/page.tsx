@@ -152,16 +152,51 @@ export default function ProduccionPage() {
         return true;
     };
 
-    const generarPDF = (modo: 'unico' | 'separado') => {
-        toast.info('Imprimiendo recetas', {
+    const imprimirRecetas = async (
+        listaPlatos: string[],
+        fecha: Date,
+        modo: 'unico' | 'separado',
+        mensajeCarga: string,
+        mensajeExito: string,
+    ) => {
+        const toastId = toast.loading(mensajeCarga, {
             position: 'bottom-right',
+            type: 'info',
             theme: 'colored',
             transition: Slide,
         });
 
-        generarPDFReceta([], fechaImprimir || new Date(), salon, modo, false);
+        try {
+            await generarPDFReceta(listaPlatos, fecha, salon, modo, false);
+            toast.update(toastId, {
+                render: mensajeExito,
+                type: 'success',
+                isLoading: false,
+                autoClose: 3000,
+                closeOnClick: true,
+                draggable: true,
+            });
+        } catch {
+            toast.update(toastId, {
+                render: 'Error al imprimir recetas',
+                type: 'error',
+                isLoading: false,
+                autoClose: 5000,
+                closeOnClick: true,
+                draggable: true,
+            });
+        }
+    };
 
+    const generarPDF = async (modo: 'unico' | 'separado') => {
         handleClose();
+        await imprimirRecetas(
+            [],
+            fechaImprimir || new Date(),
+            modo,
+            'Imprimiendo recetas',
+            'Recetas impresas',
+        );
     };
 
     const handleClose = () => setShowModal(false);
@@ -458,14 +493,14 @@ export default function ProduccionPage() {
                         <Button
                             variant="primary"
                             onClick={() => {
-                                generarPDF('unico');
+                                void generarPDF('unico');
                             }}>
                             Imprimir juntas
                         </Button>
                         <Button
                             variant="primary"
                             onClick={() => {
-                                generarPDF('separado');
+                                void generarPDF('separado');
                             }}>
                             Imprimir separadas
                         </Button>
@@ -522,20 +557,14 @@ export default function ProduccionPage() {
                         <Button
                             variant="danger"
                             onClick={() => {
-                                generarPDFReceta(
+                                handleCloseModalProduccion();
+                                void imprimirRecetas(
                                     [platoModalProduccion.platoCodigo],
                                     platoModalProduccion.fecha,
-                                    salon,
                                     'separado',
-                                    false,
+                                    'Imprimiendo receta',
+                                    'Receta impresa',
                                 );
-
-                                toast.info('Imprimiendo receta', {
-                                    position: 'bottom-right',
-                                    theme: 'colored',
-                                    transition: Slide,
-                                });
-                                handleCloseModalProduccion();
                             }}>
                             <FiletypePdf /> Imprimir receta
                         </Button>
