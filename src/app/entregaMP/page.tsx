@@ -4,7 +4,8 @@
 import { NavegacionSemanal } from '@/components/navegacionSemanal';
 import { addDays, format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import React, { useContext, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import type { CellObject, CellStyle, WorkSheet } from 'xlsx-js-style';
 import {
     Accordion,
     Button,
@@ -30,6 +31,34 @@ import { MoonLoader } from 'react-spinners';
 import { RolContext, SalonContext } from '@/components/filtroPlatos';
 import { Slide, toast, ToastContainer } from 'react-toastify';
 import { generarPDFReceta } from '@/lib/generarPDF';
+
+const estiloHeaderOscuro: CellStyle = {
+    alignment: {
+        horizontal: 'center',
+        vertical: 'center',
+    },
+    fill: {
+        patternType: 'solid',
+        fgColor: {
+            rgb: '404040',
+        },
+    },
+    font: {
+        bold: true,
+        color: {
+            rgb: 'FFFFFF',
+        },
+    },
+};
+
+const estiloFilaComentario: CellStyle = {
+    fill: {
+        patternType: 'solid',
+        fgColor: {
+            rgb: 'FFF3CD',
+        },
+    },
+};
 
 export default function ProduccionPreviaPage() {
     const salon = useContext(SalonContext);
@@ -157,31 +186,64 @@ export default function ProduccionPreviaPage() {
     const handleCloseModalProduccion = () => setShowModalProduccion(false);
     const handleCloseModalObservacion = () => setShowModalObservacion(false);
 
-    const filterPlatosPorDia = (dato: any) => {
-        if (!diaActivo) {
-            return true;
-        }
+    const filterPlatosPorDia = useCallback(
+        (dato: any) => {
+            if (!diaActivo) {
+                return true;
+            }
 
-        const dia = addDays(new Date(diaActivo), 1);
-        const diaSiguiente = addDays(dia, 1);
+            const dia = addDays(new Date(diaActivo), 1);
+            const diaSiguiente = addDays(dia, 1);
 
-        dia.setHours(0, 0, 0, 0);
-        diaSiguiente.setHours(0, 0, 0, 0);
+            dia.setHours(0, 0, 0, 0);
+            diaSiguiente.setHours(0, 0, 0, 0);
 
-        const produccion = dato.produccion.find((prod: any) => {
+            const produccion = dato.produccion.find((prod: any) => {
+                const fecha = new Date(prod.fecha);
+                fecha.setHours(0, 0, 0, 0);
+
+                return (
+                    fecha.getTime() === dia.getTime() ||
+                    fecha.getTime() === diaSiguiente.getTime()
+                );
+            });
+
+            return produccion?.cantidad > 0;
+        },
+        [diaActivo]
+    );
+
+    const obtenerProduccionPorDia = (dato: any, dia: Date) => {
+        const diaNormalizado = new Date(dia);
+        diaNormalizado.setHours(0, 0, 0, 0);
+
+        return dato.produccion.find((prod: any) => {
             const fecha = new Date(prod.fecha);
             fecha.setHours(0, 0, 0, 0);
 
-            return (
-                fecha.getTime() === dia.getTime() ||
-                fecha.getTime() === diaSiguiente.getTime()
-            );
+            return fecha.getTime() === diaNormalizado.getTime();
         });
+    };
 
-        return produccion?.cantidad > 0;
+    const obtenerCantidadPorDia = (dato: any, dia: Date) => {
+        const produccion = obtenerProduccionPorDia(dato, dia);
+        return produccion ? produccion.cantidad : '';
     };
 
     function guardarComentario() {
+        if (
+            !platoModalProduccion.platoCodigo ||
+            !platoModalProduccion.fecha ||
+            !salon
+        ) {
+            toast.error('Selecciona un plato con producción para comentar', {
+                position: 'bottom-right',
+                theme: 'colored',
+                transition: Slide,
+            });
+            return;
+        }
+
         toast.warn('Agregando Comentario', {
             position: 'bottom-right',
             theme: 'colored',
@@ -200,6 +262,12 @@ export default function ProduccionPreviaPage() {
                 salon,
             }),
         })
+            .then((res) => {
+                if (!res.ok) {
+                    throw new Error('Error al guardar comentario');
+                }
+                return res.json();
+            })
             .then(() => {
                 toast.success('Comentario guardado', {
                     position: 'bottom-right',
@@ -216,7 +284,10 @@ export default function ProduccionPreviaPage() {
                 )
                     .then((res) => res.json())
                     .then((res) => res.data)
-                    .then(setDatosApi)
+                    .then((data) => {
+                        setDatosApi(data);
+                        setDatos(data);
+                    })
                     .finally(() => {
                         setLoading(false);
                     });
@@ -265,7 +336,10 @@ export default function ProduccionPreviaPage() {
                 )
                     .then((res) => res.json())
                     .then((res) => res.data)
-                    .then(setDatosApi)
+                    .then((data) => {
+                        setDatosApi(data);
+                        setDatos(data);
+                    })
                     .finally(() => {
                         setLoading(false);
                     });
@@ -311,7 +385,7 @@ export default function ProduccionPreviaPage() {
 
         setIntervaloPaginado(intervalo);
 
-        return () => clearInterval(intervaloPaginado);
+        return () => clearInterval(intervalo);
     }, [paginado, totalPaginas, intervaloSegundos]);
 
     useEffect(() => {
@@ -324,7 +398,7 @@ export default function ProduccionPreviaPage() {
             .slice(inicio, fin);
 
         setDatos(datosPaginados);
-    }, [paginado, paginaActual, registrosPagina]);
+    }, [paginado, paginaActual, registrosPagina, datosApi, filterPlatosPorDia]);
 
     useEffect(() => {
         if (!paginado) return;
@@ -334,7 +408,7 @@ export default function ProduccionPreviaPage() {
         );
         setTotalPaginas(totalPags);
         setPaginaActual(0);
-    }, [diaActivo, paginado, registrosPagina]);
+    }, [diaActivo, paginado, registrosPagina, datosApi, filterPlatosPorDia]);
 
     if (loading) {
         return (
@@ -359,6 +433,181 @@ export default function ProduccionPreviaPage() {
             </div>
         );
     }
+
+    const diasVisibles = diasSemana.filter(filterDias);
+    const datosVisibles = datosApi
+        ? datosApi.filter((dato) => filterPlatosPorDia(dato))
+        : [];
+
+    const calcularAnchoColumna = (
+        filas: Array<Array<string | number>>,
+        indiceColumna: number
+    ) => {
+        const maximoCaracteres = filas.reduce((maximo, fila) => {
+            const valor = fila[indiceColumna] ?? '';
+            return Math.max(maximo, String(valor).length);
+        }, 0);
+
+        return maximoCaracteres + 2;
+    };
+
+    const aplicarEstiloHeader = (
+        worksheet: WorkSheet,
+        XLSX: typeof import('xlsx-js-style')
+    ) => {
+        const rango = worksheet['!ref']
+            ? XLSX.utils.decode_range(worksheet['!ref'])
+            : null;
+
+        if (!rango) {
+            return;
+        }
+
+        for (let c = 0; c <= rango.e.c; c += 1) {
+            const direccionHeader = XLSX.utils.encode_cell({
+                r: 0,
+                c,
+            });
+            const headerCelda = worksheet[direccionHeader] as
+                | CellObject
+                | undefined;
+
+            if (!headerCelda) continue;
+
+            headerCelda.s = estiloHeaderOscuro;
+        }
+    };
+
+    const aplicarEstiloFilasComentario = (
+        worksheet: WorkSheet,
+        filasComentario: number[],
+        totalColumnas: number,
+        XLSX: typeof import('xlsx-js-style')
+    ) => {
+        filasComentario.forEach((fila) => {
+            for (let c = 0; c < totalColumnas; c += 1) {
+                const direccionCelda = XLSX.utils.encode_cell({ r: fila, c });
+                const celdaExistente = worksheet[direccionCelda] as
+                    | CellObject
+                    | undefined;
+                const celda = celdaExistente || { t: 's', v: '' };
+                celda.s = {
+                    ...(celda.s || {}),
+                    ...estiloFilaComentario,
+                };
+                worksheet[direccionCelda] = celda;
+            }
+        });
+    };
+
+    const obtenerNombreHojaDia = (dia: Date) => {
+        const nombreDia = format(dia, 'EEEE', { locale: es });
+        const nombreDiaCapitalizado =
+            nombreDia.charAt(0).toUpperCase() + nombreDia.slice(1);
+
+        return `${nombreDiaCapitalizado} ${format(dia, 'd-M')}`;
+    };
+
+    const exportarExcel = () => {
+        const encabezados = [
+            'Plato',
+            'Elaboracion',
+            ...diasVisibles.map((dia) =>
+                format(dia, 'EEE, dd-MM', { locale: es })
+            ),
+        ];
+
+        const filasExcel: Array<Array<string | number>> = [encabezados];
+        const filasComentario: number[] = [];
+
+        datosVisibles.forEach((dato) => {
+            const filaPlato: Array<string | number> = [
+                dato.platoPadre || '',
+                dato.plato || '',
+            ];
+
+            diasVisibles.forEach((dia) => {
+                filaPlato.push(obtenerCantidadPorDia(dato, dia));
+            });
+
+            filasExcel.push(filaPlato);
+
+            if (dato.comentario && dato.comentario.replace('\n', '') !== '') {
+                filasComentario.push(filasExcel.length);
+                filasExcel.push([
+                    '',
+                    dato.comentario,
+                    ...Array(diasVisibles.length).fill(''),
+                ]);
+            }
+        });
+
+        import('xlsx-js-style').then((xlsxModule) => {
+            const XLSX: typeof import('xlsx-js-style') =
+                'default' in xlsxModule
+                    ? (xlsxModule.default as typeof import('xlsx-js-style'))
+                    : xlsxModule;
+
+            const worksheet = XLSX.utils.aoa_to_sheet(filasExcel);
+            worksheet['!cols'] = [
+                { wch: calcularAnchoColumna(filasExcel, 0) },
+                { wch: calcularAnchoColumna(filasExcel, 1) },
+            ];
+            aplicarEstiloHeader(worksheet, XLSX);
+            aplicarEstiloFilasComentario(
+                worksheet,
+                filasComentario,
+                encabezados.length,
+                XLSX
+            );
+
+            const workbook = XLSX.utils.book_new();
+
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'Entrega MP');
+
+            diasVisibles.forEach((dia) => {
+                const encabezadoDia = format(dia, 'EEE, dd-MM', {
+                    locale: es,
+                });
+                const filasDia: Array<Array<string | number>> = [
+                    ['Plato', 'Elaboracion', encabezadoDia, 'Tips'],
+                ];
+
+                datosVisibles.forEach((dato) => {
+                    const cantidad = obtenerCantidadPorDia(dato, dia);
+
+                    if (typeof cantidad !== 'number' || cantidad <= 0) {
+                        return;
+                    }
+
+                    filasDia.push([
+                        dato.platoPadre || '',
+                        dato.plato || '',
+                        cantidad,
+                        dato.comentario || '',
+                    ]);
+                });
+
+                const hojaDia = XLSX.utils.aoa_to_sheet(filasDia);
+                hojaDia['!cols'] = [
+                    { wch: calcularAnchoColumna(filasDia, 0) },
+                    { wch: calcularAnchoColumna(filasDia, 1) },
+                    { wch: calcularAnchoColumna(filasDia, 2) },
+                    { wch: calcularAnchoColumna(filasDia, 3) },
+                ];
+
+                aplicarEstiloHeader(hojaDia, XLSX);
+
+                XLSX.utils.book_append_sheet(
+                    workbook,
+                    hojaDia,
+                    obtenerNombreHojaDia(dia)
+                );
+            });
+
+            XLSX.writeFile(workbook, 'entregaMP.xlsx');
+        });
+    };
 
     return (
         <>
@@ -598,6 +847,18 @@ export default function ProduccionPreviaPage() {
                     semanaBase={semanaBase}
                     setSemanaBase={setSemanaBase}
                 />
+
+                <div className="d-flex justify-content-center mt-3">
+                    <Button
+                        className="btn-success"
+                        disabled={
+                            diasVisibles.length === 0 ||
+                            datosVisibles.length === 0
+                        }
+                        onClick={exportarExcel}>
+                        Exportar a Excel
+                    </Button>
+                </div>
             </Container>
 
             <div
@@ -699,7 +960,7 @@ export default function ProduccionPreviaPage() {
                         <tr style={{ textAlign: 'center' }}>
                             <th>Plato</th>
                             <th>Elaboracion</th>
-                            {diasSemana.filter(filterDias).map((dia, idx) => (
+                            {diasVisibles.map((dia, idx) => (
                                 <th key={idx}>
                                     {format(dia, 'EEE, dd-MM', { locale: es })}
                                 </th>
@@ -724,30 +985,11 @@ export default function ProduccionPreviaPage() {
                                             <td>{dato.platoPadre}</td>
                                             <td>{dato.plato}</td>
 
-                                            {diasSemana
-                                                .filter(filterDias)
-                                                .map((dia, i) => {
-                                                    dia.setHours(0, 0, 0, 0);
-
+                                            {diasVisibles.map((dia, i) => {
                                                     const produccion =
-                                                        dato.produccion.find(
-                                                            (prod: any) => {
-                                                                const fecha =
-                                                                    new Date(
-                                                                        prod.fecha
-                                                                    );
-                                                                fecha.setHours(
-                                                                    0,
-                                                                    0,
-                                                                    0,
-                                                                    0
-                                                                );
-
-                                                                return (
-                                                                    fecha.getTime() ===
-                                                                    dia.getTime()
-                                                                );
-                                                            }
+                                                        obtenerProduccionPorDia(
+                                                            dato,
+                                                            dia
                                                         );
                                                     const cantidad = produccion
                                                         ? produccion.cantidad
@@ -761,6 +1003,13 @@ export default function ProduccionPreviaPage() {
                                                                     : ''
                                                             }
                                                             onClick={() => {
+                                                                if (
+                                                                    !produccion ||
+                                                                    cantidad <= 0
+                                                                ) {
+                                                                    return;
+                                                                }
+
                                                                 setPlatoModalProduccion(
                                                                     {
                                                                         plato: dato.plato,

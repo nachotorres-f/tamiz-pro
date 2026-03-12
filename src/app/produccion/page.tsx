@@ -52,6 +52,15 @@ const estiloHeaderOscuro: CellStyle = {
     },
 };
 
+const estiloFilaComentario: CellStyle = {
+    fill: {
+        patternType: 'solid',
+        fgColor: {
+            rgb: 'FFF3CD',
+        },
+    },
+};
+
 export default function ProduccionPage() {
     const salon = useContext(SalonContext);
     const RolProvider = useContext(RolContext);
@@ -425,6 +434,28 @@ export default function ProduccionPage() {
         }
     };
 
+    const aplicarEstiloFilasComentario = (
+        worksheet: WorkSheet,
+        filasComentario: number[],
+        totalColumnas: number,
+        XLSX: typeof import('xlsx-js-style'),
+    ) => {
+        filasComentario.forEach((fila) => {
+            for (let c = 0; c < totalColumnas; c += 1) {
+                const direccionCelda = XLSX.utils.encode_cell({ r: fila, c });
+                const celdaExistente = worksheet[direccionCelda] as
+                    | CellObject
+                    | undefined;
+                const celda = celdaExistente || { t: 's', v: '' };
+                celda.s = {
+                    ...(celda.s || {}),
+                    ...estiloFilaComentario,
+                };
+                worksheet[direccionCelda] = celda;
+            }
+        });
+    };
+
     const obtenerNombreHojaDia = (dia: Date) => {
         const nombreDia = format(dia, 'EEEE', { locale: es });
         const nombreDiaCapitalizado =
@@ -443,6 +474,7 @@ export default function ProduccionPage() {
         ];
 
         const filasExcel: Array<Array<string | number>> = [encabezados];
+        const filasComentario: number[] = [];
 
         datosVisibles.forEach((dato) => {
             const filaPlato: Array<string | number> = [
@@ -457,6 +489,7 @@ export default function ProduccionPage() {
             filasExcel.push(filaPlato);
 
             if (dato.comentario && dato.comentario.replace('\n', '') !== '') {
+                filasComentario.push(filasExcel.length);
                 filasExcel.push([
                     '',
                     dato.comentario,
@@ -477,6 +510,12 @@ export default function ProduccionPage() {
                 { wch: calcularAnchoColumna(filasExcel, 1) },
             ];
             aplicarEstiloHeader(worksheet, XLSX);
+            aplicarEstiloFilasComentario(
+                worksheet,
+                filasComentario,
+                encabezados.length,
+                XLSX,
+            );
 
             const workbook = XLSX.utils.book_new();
 
