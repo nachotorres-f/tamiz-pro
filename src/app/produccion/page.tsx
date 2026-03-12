@@ -1064,6 +1064,11 @@ export default function ProduccionPage() {
                                         const cantidad = produccion
                                             ? produccion.cantidad
                                             : 0;
+                                        const esCantidadFueraDeCiclo =
+                                            cantidad > 0 &&
+                                            Boolean(
+                                                produccion?.esAnteriorACiclo,
+                                            );
                                         return (
                                             <td
                                                 key={i}
@@ -1071,6 +1076,11 @@ export default function ProduccionPage() {
                                                     cantidad > 0
                                                         ? 'link-pdf'
                                                         : ''
+                                                }
+                                                style={
+                                                    esCantidadFueraDeCiclo
+                                                        ? { color: '#d97706' }
+                                                        : undefined
                                                 }
                                                 onClick={() => {
                                                     if (!produccion || cantidad <= 0) {

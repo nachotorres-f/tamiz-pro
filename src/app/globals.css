@@ -105,6 +105,15 @@ input[type='number'] {
     text-decoration: underline;
 }
 
+.table > :not(caption) > * > td.cantidad-fuera-ciclo {
+    color: #d97706 !important;
+}
+
+.table > :not(caption) > * > td.link-pdf.cantidad-fuera-ciclo:hover {
+    color: #b45309;
+    text-decoration: underline;
+}
+
 .no-scrollbar {
     overflow-x: auto; /* muestra horizontal */
     overflow-y: auto; /* permite scroll vertical */

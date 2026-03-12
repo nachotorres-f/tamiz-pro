@@ -19,6 +19,26 @@ function normalizarFechaInicioDia(valor: Date): Date {
     return fechaNormalizada;
 }
 
+function obtenerInicioCicloActual(): Date {
+    const ahora = normalizarFechaInicioDia(new Date());
+    const diaSemana = ahora.getDay();
+    const diasDesdeJueves = (diaSemana - 4 + 7) % 7;
+    return addDays(ahora, -diasDesdeJueves);
+}
+
+function obtenerDecisionAt(produccion: any): Date {
+    const createdAt = new Date(produccion.createdAt);
+    const updatedAt = produccion?.updatedAt
+        ? new Date(produccion.updatedAt)
+        : null;
+
+    if (!updatedAt || Number.isNaN(updatedAt.getTime())) {
+        return createdAt;
+    }
+
+    return updatedAt.getTime() > createdAt.getTime() ? updatedAt : createdAt;
+}
+
 async function obtenerMapasRecetas() {
     const recetas = await prisma.receta.findMany({
         select: {
@@ -315,10 +335,14 @@ export async function GET(req: NextRequest) {
         });
 
         const groupedProducciones: any[] = [];
+        const inicioCicloActual = obtenerInicioCicloActual();
 
         for (const produccion of producciones) {
             const platoCodigo = normalizarTexto(produccion.platoCodigo);
             const platoPadreCodigo = normalizarTexto(produccion.platoPadreCodigo);
+            const decisionAt = obtenerDecisionAt(produccion);
+            const esAnteriorACiclo =
+                decisionAt.getTime() < inicioCicloActual.getTime();
             const platoNombre = resolverNombrePlato(
                 platoCodigo,
                 produccion.plato,
@@ -350,6 +374,7 @@ export async function GET(req: NextRequest) {
                 existingPlato.produccion.push({
                     fecha: addDays(produccion.fecha, previa ? -1 : 1),
                     cantidad: produccion.cantidad,
+                    esAnteriorACiclo,
                     comentario:
                         existingPlato.comentario +
                         (produccion.observacionProduccion || '') +
@@ -366,6 +391,7 @@ export async function GET(req: NextRequest) {
                         {
                             fecha: addDays(produccion.fecha, previa ? -1 : 1),
                             cantidad: produccion.cantidad,
+                            esAnteriorACiclo,
                             comentario:
                                 (produccion.observacionProduccion || '') + '\n',
                         },
