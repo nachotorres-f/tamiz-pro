@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Button, Col, Container, Form, Row } from 'react-bootstrap';
 import DatePicker from 'react-datepicker';
 import Select from 'react-select';
@@ -18,8 +18,8 @@ type FilaPlato = {
     fecha: Date;
 };
 
-const crearFilaPlato = (fecha?: Date): FilaPlato => ({
-    id: Date.now() + Math.floor(Math.random() * 10000),
+const crearFilaPlato = (id: number, fecha?: Date): FilaPlato => ({
+    id,
     platoCodigo: '',
     cantidad: '',
     fecha: fecha ? new Date(fecha) : new Date(),
@@ -37,6 +37,8 @@ const toastConfig = {
     transition: Slide,
 };
 
+const FILA_INICIAL_ID = 1;
+
 export default function AgregarPlato({
     salon,
     produccion,
@@ -46,9 +48,10 @@ export default function AgregarPlato({
     produccion: boolean;
     setSemanaBase: (date: Date) => void;
 }) {
+    const nextFilaIdRef = useRef(FILA_INICIAL_ID + 1);
     const [platos, setPlatos] = useState<Plato[]>([]);
     const [filasPlatos, setFilasPlatos] = useState<FilaPlato[]>([
-        crearFilaPlato(),
+        crearFilaPlato(FILA_INICIAL_ID),
     ]);
     const [loading, setLoading] = useState(false);
     const [mounted, setMounted] = useState(false);
@@ -84,7 +87,10 @@ export default function AgregarPlato({
     const agregarFila = () => {
         setFilasPlatos((prev) => {
             const ultimaFecha = prev[prev.length - 1]?.fecha;
-            return [...prev, crearFilaPlato(ultimaFecha)];
+            return [
+                ...prev,
+                crearFilaPlato(nextFilaIdRef.current++, ultimaFecha),
+            ];
         });
     };
 
@@ -92,7 +98,7 @@ export default function AgregarPlato({
         setFilasPlatos((prev) => {
             const nuevasFilas = prev.filter((fila) => fila.id !== id);
             if (nuevasFilas.length === 0) {
-                return [crearFilaPlato()];
+                return [crearFilaPlato(nextFilaIdRef.current++)];
             }
 
             return nuevasFilas;
@@ -188,7 +194,7 @@ export default function AgregarPlato({
             }
 
             setSemanaBase(new Date());
-            setFilasPlatos([crearFilaPlato()]);
+            setFilasPlatos([crearFilaPlato(nextFilaIdRef.current++)]);
 
             mostrarToast(
                 'success',

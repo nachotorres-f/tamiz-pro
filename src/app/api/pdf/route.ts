@@ -21,6 +21,10 @@ function normalizarTexto(valor: string | null | undefined): string {
     return (valor ?? '').trim();
 }
 
+const ordenProduccion = {
+    platoCodigo: 'asc' as const,
+};
+
 export async function POST(req: NextRequest) {
     process.env.TZ = 'America/Argentina/Buenos_Aires';
 
@@ -77,8 +81,12 @@ const buscarProduccionPorFecha = async (fecha: Date, salon: string) => {
                 gte,
                 lte,
             },
+            cantidad: {
+                gt: 0,
+            },
             salon,
         },
+        orderBy: ordenProduccion,
     });
 
     return Promise.all(produccionList.map(buscarReceta));
@@ -101,9 +109,13 @@ const buscarProduccionPorPlato = async (
                 gte,
                 lte,
             },
+            cantidad: {
+                gt: 0,
+            },
             salon,
             platoCodigo: { in: platosCodigos },
         },
+        orderBy: ordenProduccion,
     });
 
     return Promise.all(produccionList.map(buscarReceta));
