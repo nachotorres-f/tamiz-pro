@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Button, Col, Container, Form, Row } from 'react-bootstrap';
+import { Button, Col, Container, Form, Modal, Row } from 'react-bootstrap';
 import DatePicker from 'react-datepicker';
 import Select from 'react-select';
 import { MoonLoader } from 'react-spinners';
@@ -18,13 +18,34 @@ type FilaPlato = {
     fecha: Date;
 };
 type FilaAEnviar = {
+    filaId: number;
     platoCodigo: string;
     cantidad: string;
     fecha: string;
+    platoPadreCodigo?: string;
 };
 type ResultadoValidacionFilas =
     | { ok: false; error: string }
     | { ok: true; filas: FilaAEnviar[] };
+
+type PadreCandidato = {
+    codigo: string;
+    nombre: string;
+};
+
+type FilaAmbigua = {
+    index: number;
+    filaId: number | null;
+    platoCodigo: string;
+    fecha: string;
+    cantidad: number;
+    padres: PadreCandidato[];
+};
+
+type ResultadoGuardarProduccion =
+    | { status: 'ok' }
+    | { status: 'ambiguo'; ambiguos: FilaAmbigua[] }
+    | { status: 'error' };
 
 const crearFilaPlato = (id: number, fecha?: Date): FilaPlato => ({
     id,
@@ -46,6 +67,42 @@ const toastConfig = {
 };
 
 const FILA_INICIAL_ID = 1;
+const CODIGO_ERROR_AMBIGUO = 'PLATO_PADRE_AMBIGUO';
+
+const construirMensajeExito = (cantidadFilas: number) =>
+    `${cantidadFilas} plato${cantidadFilas > 1 ? 's' : ''} agregado${
+        cantidadFilas > 1 ? 's' : ''
+    } correctamente`;
+
+const esObjeto = (valor: unknown): valor is Record<string, unknown> =>
+    typeof valor === 'object' && valor !== null;
+
+const esPadreCandidato = (valor: unknown): valor is PadreCandidato => {
+    if (!esObjeto(valor)) {
+        return false;
+    }
+
+    return typeof valor.codigo === 'string' && typeof valor.nombre === 'string';
+};
+
+const esFilaAmbigua = (valor: unknown): valor is FilaAmbigua => {
+    if (!esObjeto(valor)) {
+        return false;
+    }
+
+    if (
+        typeof valor.index !== 'number' ||
+        (typeof valor.filaId !== 'number' && valor.filaId !== null) ||
+        typeof valor.platoCodigo !== 'string' ||
+        typeof valor.fecha !== 'string' ||
+        typeof valor.cantidad !== 'number' ||
+        !Array.isArray(valor.padres)
+    ) {
+        return false;
+    }
+
+    return valor.padres.every(esPadreCandidato);
+};
 
 export default function AgregarPlato({
     salon,
@@ -63,8 +120,23 @@ export default function AgregarPlato({
     ]);
     const [loading, setLoading] = useState(false);
     const [mounted, setMounted] = useState(false);
-
     const [client, setIsClient] = useState(false);
+
+    const [showModalPadre, setShowModalPadre] = useState(false);
+    const [ambiguedadesPendientes, setAmbiguedadesPendientes] = useState<
+        FilaAmbigua[]
+    >([]);
+    const [indiceAmbiguedad, setIndiceAmbiguedad] = useState(0);
+    const [padreSeleccionadoActual, setPadreSeleccionadoActual] =
+        useState('');
+    const [resolucionesPadre, setResolucionesPadre] = useState<
+        Record<string, string>
+    >({});
+    const [filasPendientes, setFilasPendientes] = useState<FilaAEnviar[] | null>(
+        null,
+    );
+
+    const ambiguedadActual = ambiguedadesPendientes[indiceAmbiguedad] ?? null;
 
     useEffect(() => {
         setIsClient(true);
@@ -77,6 +149,22 @@ export default function AgregarPlato({
                 setPlatos(data.platos);
             });
     }, []);
+
+    useEffect(() => {
+        if (!showModalPadre || !ambiguedadActual) {
+            setPadreSeleccionadoActual('');
+            return;
+        }
+
+        const clave =
+            ambiguedadActual.filaId !== null
+                ? `id:${ambiguedadActual.filaId}`
+                : `idx:${ambiguedadActual.index}`;
+
+        setPadreSeleccionadoActual(
+            resolucionesPadre[clave] || ambiguedadActual.padres[0]?.codigo || '',
+        );
+    }, [showModalPadre, ambiguedadActual, resolucionesPadre]);
 
     const mostrarToast = (
         tipo: 'warn' | 'error' | 'success',
@@ -152,11 +240,165 @@ export default function AgregarPlato({
         return {
             ok: true,
             filas: filasConDatos.map((fila) => ({
+                filaId: fila.id,
                 platoCodigo: fila.platoCodigo,
                 cantidad: Number(fila.cantidad).toFixed(2),
                 fecha: fila.fecha.toISOString(),
             })),
         };
+    };
+
+    const resetResolucionPadre = () => {
+        setShowModalPadre(false);
+        setAmbiguedadesPendientes([]);
+        setIndiceAmbiguedad(0);
+        setPadreSeleccionadoActual('');
+        setResolucionesPadre({});
+        setFilasPendientes(null);
+    };
+
+    const aplicarResolucionesPadre = (
+        filas: FilaAEnviar[],
+        resoluciones: Record<string, string>,
+    ): FilaAEnviar[] => {
+        return filas.map((fila, index) => {
+            const codigoPadre =
+                resoluciones[`id:${fila.filaId}`] || resoluciones[`idx:${index}`];
+
+            if (!codigoPadre) {
+                return { ...fila };
+            }
+
+            return {
+                ...fila,
+                platoPadreCodigo: codigoPadre,
+            };
+        });
+    };
+
+    const enviarPlatosProduccion = async (
+        filas: FilaAEnviar[],
+    ): Promise<ResultadoGuardarProduccion> => {
+        const response = await fetch('api/produccion/plato', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                salon,
+                platos: filas,
+            }),
+        });
+
+        if (response.ok) {
+            return { status: 'ok' };
+        }
+
+        let payload: unknown = null;
+        try {
+            payload = await response.json();
+        } catch {
+            payload = null;
+        }
+
+        if (response.status === 409 && esObjeto(payload)) {
+            const code =
+                typeof payload.code === 'string' ? payload.code : undefined;
+            const ambiguosRaw = Array.isArray(payload.ambiguos)
+                ? payload.ambiguos
+                : [];
+            const ambiguos = ambiguosRaw.filter(esFilaAmbigua);
+
+            if (code === CODIGO_ERROR_AMBIGUO && ambiguos.length > 0) {
+                return { status: 'ambiguo', ambiguos };
+            }
+        }
+
+        return { status: 'error' };
+    };
+
+    const iniciarResolucionPadre = (
+        filas: FilaAEnviar[],
+        ambiguos: FilaAmbigua[],
+    ) => {
+        setFilasPendientes(filas);
+        setAmbiguedadesPendientes(ambiguos);
+        setIndiceAmbiguedad(0);
+        setResolucionesPadre({});
+        setPadreSeleccionadoActual(ambiguos[0]?.padres[0]?.codigo || '');
+        setShowModalPadre(true);
+    };
+
+    const completarAltaExitosa = (cantidadFilas: number) => {
+        setSemanaBase(new Date());
+        setFilasPlatos([crearFilaPlato(nextFilaIdRef.current++)]);
+        mostrarToast('success', construirMensajeExito(cantidadFilas));
+    };
+
+    const cancelarResolucionPadre = () => {
+        resetResolucionPadre();
+        mostrarToast('warn', 'Alta cancelada. No se guardaron cambios');
+    };
+
+    const confirmarSeleccionPadre = async () => {
+        if (!ambiguedadActual || !padreSeleccionadoActual) {
+            return;
+        }
+
+        const clave =
+            ambiguedadActual.filaId !== null
+                ? `id:${ambiguedadActual.filaId}`
+                : `idx:${ambiguedadActual.index}`;
+
+        const nuevasResoluciones = {
+            ...resolucionesPadre,
+            [clave]: padreSeleccionadoActual,
+        };
+
+        if (indiceAmbiguedad < ambiguedadesPendientes.length - 1) {
+            setResolucionesPadre(nuevasResoluciones);
+            setIndiceAmbiguedad((prev) => prev + 1);
+            return;
+        }
+
+        if (!filasPendientes) {
+            resetResolucionPadre();
+            return;
+        }
+
+        setResolucionesPadre(nuevasResoluciones);
+        setShowModalPadre(false);
+        setLoading(true);
+
+        try {
+            const filasResueltas = aplicarResolucionesPadre(
+                filasPendientes,
+                nuevasResoluciones,
+            );
+
+            const resultado = await enviarPlatosProduccion(filasResueltas);
+
+            if (resultado.status === 'ok') {
+                completarAltaExitosa(filasResueltas.length);
+                resetResolucionPadre();
+                return;
+            }
+
+            if (resultado.status === 'ambiguo') {
+                iniciarResolucionPadre(filasResueltas, resultado.ambiguos);
+                mostrarToast(
+                    'warn',
+                    'Falta seleccionar el plato padre para algunas filas',
+                );
+                return;
+            }
+
+            throw new Error('Error en producción');
+        } catch {
+            mostrarToast('error', 'Error al agregar platos');
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -172,18 +414,20 @@ export default function AgregarPlato({
 
         try {
             if (produccion) {
-                const response = await fetch('api/produccion/plato', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        salon,
-                        platos: validacion.filas,
-                    }),
-                });
+                const resultado = await enviarPlatosProduccion(validacion.filas);
 
-                if (!response.ok) throw new Error('Error en producción');
+                if (resultado.status === 'ambiguo') {
+                    iniciarResolucionPadre(validacion.filas, resultado.ambiguos);
+                    mostrarToast(
+                        'warn',
+                        'Selecciona el plato padre para continuar',
+                    );
+                    return;
+                }
+
+                if (resultado.status === 'error') {
+                    throw new Error('Error en producción');
+                }
             } else {
                 const responses = await Promise.all(
                     validacion.filas.map((fila) =>
@@ -202,17 +446,7 @@ export default function AgregarPlato({
                 }
             }
 
-            setSemanaBase(new Date());
-            setFilasPlatos([crearFilaPlato(nextFilaIdRef.current++)]);
-
-            mostrarToast(
-                'success',
-                `${validacion.filas.length} plato${
-                    validacion.filas.length > 1 ? 's' : ''
-                } agregado${
-                    validacion.filas.length > 1 ? 's' : ''
-                } correctamente`,
-            );
+            completarAltaExitosa(validacion.filas.length);
         } catch {
             mostrarToast('error', 'Error al agregar platos');
         } finally {
@@ -225,25 +459,14 @@ export default function AgregarPlato({
         label: `${plato.codigo} - ${plato.nombreProducto}`,
     }));
 
+    const obtenerNombrePlato = (codigo: string) => {
+        const plato = platos.find((item) => String(item.codigo) === codigo);
+        return plato?.nombreProducto || codigo;
+    };
+
     if (loading) {
         return (
             <>
-                {/* {mounted && (
-                    <ToastContainer
-                        position="bottom-right"
-                        autoClose={5000}
-                        limit={5000}
-                        hideProgressBar={false}
-                        newestOnTop={false}
-                        closeOnClick
-                        rtl={false}
-                        pauseOnFocusLoss
-                        draggable
-                        pauseOnHover
-                        theme="colored"
-                        transition={Slide}
-                    />
-                )} */}
                 <div
                     style={{
                         position: 'fixed',
@@ -297,9 +520,7 @@ export default function AgregarPlato({
                                         <Select
                                             options={opciones}
                                             value={opciones.find(
-                                                (o) =>
-                                                    o.value ===
-                                                    fila.platoCodigo,
+                                                (o) => o.value === fila.platoCodigo,
                                             )}
                                             isClearable={true}
                                             onChange={(opcion) =>
@@ -356,12 +577,9 @@ export default function AgregarPlato({
                                                 dateFormat={'dd-MM-yyyy'}
                                                 onChange={(date) => {
                                                     if (date) {
-                                                        actualizarFila(
-                                                            fila.id,
-                                                            {
-                                                                fecha: date,
-                                                            },
-                                                        );
+                                                        actualizarFila(fila.id, {
+                                                            fecha: date,
+                                                        });
                                                     }
                                                 }}
                                             />
@@ -412,6 +630,81 @@ export default function AgregarPlato({
                     </Col>
                 </Row>
             </Form>
+
+            <Modal
+                show={showModalPadre}
+                onHide={cancelarResolucionPadre}
+                backdrop="static"
+                keyboard={false}
+                centered>
+                <Modal.Header closeButton>
+                    <Modal.Title>Seleccionar Plato Padre</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    {ambiguedadActual ? (
+                        <>
+                            <p className="mb-2">
+                                El plato seleccionado tiene más de un plato
+                                padre en recetas.
+                            </p>
+                            <p className="mb-1">
+                                <strong>Fila:</strong> {indiceAmbiguedad + 1} de{' '}
+                                {ambiguedadesPendientes.length}
+                            </p>
+                            <p className="mb-1">
+                                <strong>Plato:</strong>{' '}
+                                {ambiguedadActual.platoCodigo} -{' '}
+                                {obtenerNombrePlato(
+                                    ambiguedadActual.platoCodigo,
+                                )}
+                            </p>
+                            <p className="mb-3">
+                                <strong>Fecha / Cantidad:</strong>{' '}
+                                {ambiguedadActual.fecha} /{' '}
+                                {ambiguedadActual.cantidad}
+                            </p>
+
+                            <Form>
+                                {ambiguedadActual.padres.map((padre) => (
+                                    <Form.Check
+                                        key={`${padre.codigo}-${padre.nombre}`}
+                                        type="radio"
+                                        name="padre-opcion"
+                                        id={`padre-${padre.codigo}`}
+                                        label={`${padre.codigo} - ${padre.nombre}`}
+                                        checked={
+                                            padreSeleccionadoActual === padre.codigo
+                                        }
+                                        onChange={() => {
+                                            setPadreSeleccionadoActual(
+                                                padre.codigo,
+                                            );
+                                        }}
+                                        className="mb-2"
+                                    />
+                                ))}
+                            </Form>
+                        </>
+                    ) : (
+                        <p>No hay filas ambiguas pendientes.</p>
+                    )}
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button
+                        variant="secondary"
+                        onClick={cancelarResolucionPadre}>
+                        Cancelar
+                    </Button>
+                    <Button
+                        variant="primary"
+                        disabled={!ambiguedadActual || !padreSeleccionadoActual}
+                        onClick={() => {
+                            void confirmarSeleccionPadre();
+                        }}>
+                        Confirmar
+                    </Button>
+                </Modal.Footer>
+            </Modal>
         </Container>
     );
 }
