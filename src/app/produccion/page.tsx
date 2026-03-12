@@ -398,13 +398,26 @@ export default function ProduccionPage() {
     const calcularAnchoColumna = (
         filas: Array<Array<string | number>>,
         indiceColumna: number,
+        padding = 2,
     ) => {
         const maximoCaracteres = filas.reduce((maximo, fila) => {
             const valor = fila[indiceColumna] ?? '';
             return Math.max(maximo, String(valor).length);
         }, 0);
 
-        return maximoCaracteres + 2;
+        return maximoCaracteres + padding;
+    };
+
+    const obtenerAnchosColumnasPrincipales = (datos: any[]) => {
+        const filasParaAncho: Array<Array<string | number>> = [
+            ['Plato', 'Elaboracion'],
+            ...datos.map((dato) => [dato.platoPadre || '', dato.plato || '']),
+        ];
+
+        return [
+            { wch: calcularAnchoColumna(filasParaAncho, 0, 0.7) },
+            { wch: calcularAnchoColumna(filasParaAncho, 1, 0.7) },
+        ];
     };
 
     const aplicarEstiloHeader = (
@@ -464,51 +477,194 @@ export default function ProduccionPage() {
         return `${nombreDiaCapitalizado} ${format(dia, 'd-M')}`;
     };
 
-    const exportarExcel = () => {
-        const encabezados = [
-            'Plato',
-            'Elaboracion',
-            ...diasVisibles.map((dia) =>
-                format(dia, 'EEE, dd-MM', { locale: es }),
-            ),
-        ];
+    const normalizarFecha = (fecha: Date) => {
+        const fechaNormalizada = new Date(fecha);
+        fechaNormalizada.setHours(0, 0, 0, 0);
+        return fechaNormalizada;
+    };
 
-        const filasExcel: Array<Array<string | number>> = [encabezados];
-        const filasComentario: number[] = [];
+    const obtenerUltimaFechaConProduccion = (datos: any[]) => {
+        let ultimaFecha: Date | null = null;
 
-        datosVisibles.forEach((dato) => {
-            const filaPlato: Array<string | number> = [
-                dato.platoPadre || '',
-                dato.plato || '',
-            ];
-
-            diasVisibles.forEach((dia) => {
-                filaPlato.push(obtenerCantidadPorDia(dato, dia));
-            });
-
-            filasExcel.push(filaPlato);
-
-            if (dato.comentario && dato.comentario.replace('\n', '') !== '') {
-                filasComentario.push(filasExcel.length);
-                filasExcel.push([
-                    '',
-                    dato.comentario,
-                    ...Array(diasVisibles.length).fill(''),
-                ]);
+        datos.forEach((dato) => {
+            if (!Array.isArray(dato.produccion)) {
+                return;
             }
+
+            dato.produccion.forEach((prod: any) => {
+                const cantidad = Number(prod.cantidad);
+                if (!Number.isFinite(cantidad) || cantidad <= 0) {
+                    return;
+                }
+
+                const fechaProduccion = normalizarFecha(new Date(prod.fecha));
+                if (
+                    !ultimaFecha ||
+                    fechaProduccion.getTime() > ultimaFecha.getTime()
+                ) {
+                    ultimaFecha = fechaProduccion;
+                }
+            });
         });
 
-        import('xlsx-js-style').then((xlsxModule) => {
+        return ultimaFecha;
+    };
+
+    const construirDiasExportacion = (
+        diasBase: Date[],
+        ultimaFechaConProduccion: Date | null,
+    ) => {
+        if (diasBase.length === 0) {
+            return [];
+        }
+
+        const diasOrdenados = [...diasBase].sort(
+            (a, b) => a.getTime() - b.getTime(),
+        );
+        const inicio = normalizarFecha(diasOrdenados[0]);
+        const finMinimo = normalizarFecha(diasOrdenados[diasOrdenados.length - 1]);
+
+        const fin =
+            ultimaFechaConProduccion &&
+            ultimaFechaConProduccion.getTime() > finMinimo.getTime()
+                ? normalizarFecha(ultimaFechaConProduccion)
+                : finMinimo;
+
+        const dias: Date[] = [];
+        for (
+            let fecha = new Date(inicio);
+            fecha.getTime() <= fin.getTime();
+            fecha = addDays(fecha, 1)
+        ) {
+            dias.push(new Date(fecha));
+        }
+
+        return dias;
+    };
+
+    const filtrarDatosParaExportacion = (datos: any[], dias: Date[]) => {
+        if (dias.length === 0) {
+            return [];
+        }
+
+        const fechasValidas = new Set(
+            dias.map((dia) => normalizarFecha(dia).getTime()),
+        );
+
+        return datos.filter((dato) =>
+            Array.isArray(dato.produccion) &&
+            dato.produccion.some((prod: any) => {
+                const cantidad = Number(prod.cantidad);
+                if (!Number.isFinite(cantidad) || cantidad <= 0) {
+                    return false;
+                }
+
+                const fechaProduccion = normalizarFecha(new Date(prod.fecha));
+                return fechasValidas.has(fechaProduccion.getTime());
+            }),
+        );
+    };
+
+    const obtenerDatosExportacionExtendida = async () => {
+        const respuesta = await fetch(
+            '/api/produccion?fechaInicio=' +
+                semanaBase.toISOString() +
+                '&salon=' +
+                salon +
+                '&hastaUltimo=true',
+        );
+
+        if (!respuesta.ok) {
+            throw new Error('Error al obtener datos para exportar');
+        }
+
+        const payload = await respuesta.json();
+        return Array.isArray(payload.data) ? payload.data : [];
+    };
+
+    const exportarExcel = async () => {
+        if (diasVisibles.length === 0) {
+            return;
+        }
+
+        const toastId = toast.loading('Generando Excel', {
+            position: 'bottom-right',
+            type: 'info',
+            theme: 'colored',
+            transition: Slide,
+        });
+
+        try {
+            const datosExtendidos = await obtenerDatosExportacionExtendida();
+            const ultimaFechaConProduccion =
+                obtenerUltimaFechaConProduccion(datosExtendidos);
+            const diasExportacion = construirDiasExportacion(
+                diasVisibles,
+                ultimaFechaConProduccion,
+            );
+            const datosExportacion = filtrarDatosParaExportacion(
+                datosExtendidos,
+                diasExportacion,
+            );
+
+            if (
+                diasExportacion.length === 0 ||
+                datosExportacion.length === 0
+            ) {
+                toast.update(toastId, {
+                    render: 'No hay datos para exportar',
+                    type: 'info',
+                    isLoading: false,
+                    autoClose: 3000,
+                    closeOnClick: true,
+                    draggable: true,
+                });
+                return;
+            }
+
+            const encabezados = [
+                'Plato',
+                'Elaboracion',
+                ...diasExportacion.map((dia) =>
+                    format(dia, 'EEE, dd-MM', { locale: es }),
+                ),
+            ];
+
+            const filasExcel: Array<Array<string | number>> = [encabezados];
+            const filasComentario: number[] = [];
+
+            datosExportacion.forEach((dato) => {
+                const filaPlato: Array<string | number> = [
+                    dato.platoPadre || '',
+                    dato.plato || '',
+                ];
+
+                diasExportacion.forEach((dia) => {
+                    filaPlato.push(obtenerCantidadPorDia(dato, dia));
+                });
+
+                filasExcel.push(filaPlato);
+
+                if (dato.comentario && dato.comentario.replace('\n', '') !== '') {
+                    filasComentario.push(filasExcel.length);
+                    filasExcel.push([
+                        '',
+                        dato.comentario,
+                        ...Array(diasExportacion.length).fill(''),
+                    ]);
+                }
+            });
+
+            const xlsxModule = await import('xlsx-js-style');
             const XLSX: typeof import('xlsx-js-style') =
                 'default' in xlsxModule
                     ? (xlsxModule.default as typeof import('xlsx-js-style'))
                     : xlsxModule;
 
             const worksheet = XLSX.utils.aoa_to_sheet(filasExcel);
-            worksheet['!cols'] = [
-                { wch: calcularAnchoColumna(filasExcel, 0) },
-                { wch: calcularAnchoColumna(filasExcel, 1) },
-            ];
+            worksheet['!cols'] = obtenerAnchosColumnasPrincipales(
+                datosExportacion,
+            );
             aplicarEstiloHeader(worksheet, XLSX);
             aplicarEstiloFilasComentario(
                 worksheet,
@@ -521,7 +677,7 @@ export default function ProduccionPage() {
 
             XLSX.utils.book_append_sheet(workbook, worksheet, 'Produccion');
 
-            diasVisibles.forEach((dia) => {
+            diasExportacion.forEach((dia) => {
                 const encabezadoDia = format(dia, 'EEE, dd-MM', {
                     locale: es,
                 });
@@ -529,7 +685,7 @@ export default function ProduccionPage() {
                     ['Plato', 'Elaboracion', encabezadoDia, 'Tips'],
                 ];
 
-                datosVisibles.forEach((dato) => {
+                datosExportacion.forEach((dato) => {
                     const cantidad = obtenerCantidadPorDia(dato, dia);
 
                     if (typeof cantidad !== 'number' || cantidad <= 0) {
@@ -546,8 +702,14 @@ export default function ProduccionPage() {
 
                 const hojaDia = XLSX.utils.aoa_to_sheet(filasDia);
                 hojaDia['!cols'] = [
-                    { wch: calcularAnchoColumna(filasDia, 0) },
-                    { wch: calcularAnchoColumna(filasDia, 1) },
+                    ...obtenerAnchosColumnasPrincipales(
+                        filasDia
+                            .slice(1)
+                            .map((fila) => ({
+                                platoPadre: fila[0],
+                                plato: fila[1],
+                            })),
+                    ),
                     { wch: calcularAnchoColumna(filasDia, 2) },
                     { wch: calcularAnchoColumna(filasDia, 3) },
                 ];
@@ -562,7 +724,24 @@ export default function ProduccionPage() {
             });
 
             XLSX.writeFile(workbook, 'produccion.xlsx');
-        });
+            toast.update(toastId, {
+                render: 'Excel exportado',
+                type: 'success',
+                isLoading: false,
+                autoClose: 3000,
+                closeOnClick: true,
+                draggable: true,
+            });
+        } catch {
+            toast.update(toastId, {
+                render: 'Error al exportar a Excel',
+                type: 'error',
+                isLoading: false,
+                autoClose: 5000,
+                closeOnClick: true,
+                draggable: true,
+            });
+        }
     };
 
     return (
@@ -747,7 +926,9 @@ export default function ProduccionPage() {
                             diasVisibles.length === 0 ||
                             datosVisibles.length === 0
                         }
-                        onClick={exportarExcel}>
+                        onClick={() => {
+                            void exportarExcel();
+                        }}>
                         Exportar a Excel
                     </Button>
                 </div>

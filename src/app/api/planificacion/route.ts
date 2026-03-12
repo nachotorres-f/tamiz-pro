@@ -9,6 +9,7 @@ const TIPO_RECETA_PT = 'PT';
 const DIAS_EVENTOS_CICLO = 6;
 const DIAS_INICIO_ADELANTOS = 7;
 const DIAS_PRODUCCION_EXTRA = { anterior: 5, posterior: 9 };
+const PLATOS_PADRE_EXCLUIDOS = new Set(['barra de tragos el central']);
 const SUBPLATOS_EXCLUIDOS_POR_PLATO: Record<string, Set<string>> = {
     'mesa dulce': new Set([
         'helado para bochear + insumos (x pax)',
@@ -522,7 +523,10 @@ async function calcularIngredientesPT(
                 continue;
             }
 
-            if (!debeExcluirSubPlato(platoPrincipal, ingrediente)) {
+            if (
+                !debeExcluirSubPlato(platoPrincipal, ingrediente) &&
+                !debeExcluirPlatoPadre(platoPadre)
+            ) {
                 resultado.push({
                     plato: ingrediente,
                     platoCodigo: ingredienteCodigo,
@@ -758,4 +762,8 @@ function debeExcluirSubPlato(platoPrincipal: string, subPlato: string): boolean 
     }
 
     return subPlatosExcluidos.has(normalizarClaveFiltro(subPlato));
+}
+
+function debeExcluirPlatoPadre(platoPadre: string): boolean {
+    return PLATOS_PADRE_EXCLUIDOS.has(normalizarClaveFiltro(platoPadre));
 }

@@ -13,6 +13,12 @@ function normalizarClave(valor: string | null | undefined): string {
     return normalizarTexto(valor).toLocaleLowerCase('es');
 }
 
+function normalizarFechaInicioDia(valor: Date): Date {
+    const fechaNormalizada = new Date(valor);
+    fechaNormalizada.setHours(0, 0, 0, 0);
+    return fechaNormalizada;
+}
+
 async function obtenerMapasRecetas() {
     const recetas = await prisma.receta.findMany({
         select: {
@@ -244,6 +250,7 @@ export async function GET(req: NextRequest) {
         const fechaInicio = searchParams.get('fechaInicio');
         const previa = searchParams.get('previa');
         const salon = searchParams.get('salon');
+        const hastaUltimo = searchParams.get('hastaUltimo') === 'true';
 
         if (!fechaInicio) {
             return NextResponse.json(
@@ -255,7 +262,39 @@ export async function GET(req: NextRequest) {
         const desde = addDays(new Date(fechaInicio), previa ? 1 : -1);
         desde.setHours(0, 0, 0, 0);
         const hasta = addDays(desde, 7);
-        hasta.setHours(0, 0, 0, 0);
+        hasta.setHours(23, 59, 59, 999);
+
+        if (hastaUltimo) {
+            const ultimaProduccion = await prisma.produccion.findFirst({
+                where: {
+                    fecha: {
+                        gte: desde,
+                    },
+                    cantidad: {
+                        gt: 0,
+                    },
+                    salon,
+                },
+                select: {
+                    fecha: true,
+                },
+                orderBy: {
+                    fecha: 'desc',
+                },
+            });
+
+            if (ultimaProduccion?.fecha) {
+                const ultimaFecha = normalizarFechaInicioDia(
+                    ultimaProduccion.fecha,
+                );
+                const ultimaFechaFinDia = new Date(ultimaFecha);
+                ultimaFechaFinDia.setHours(23, 59, 59, 999);
+
+                if (ultimaFechaFinDia.getTime() > hasta.getTime()) {
+                    hasta.setTime(ultimaFechaFinDia.getTime());
+                }
+            }
+        }
 
         const { nombrePorCodigoPadre, nombrePorSubCodigo } = await obtenerMapasRecetas();
 
@@ -345,6 +384,7 @@ export async function GET(req: NextRequest) {
             detalle: {
                 fechaInicio,
                 previa: Boolean(previa),
+                hastaUltimo,
                 salon,
                 filas: groupedProducciones.length,
             },
