@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { addDays } from 'date-fns';
 import { NextRequest, NextResponse } from 'next/server';
 import { logAudit } from '@/lib/audit';
 
@@ -19,17 +20,14 @@ export async function POST(req: NextRequest) {
     try {
         const payload = (await req.json()) as Body;
         body = payload;
-        const { platoCodigo, cantidad, fecha, comentario, platoPadreCodigo, salon } =
+        const { platoCodigo, fecha, comentario, platoPadreCodigo, salon } =
             payload;
-        const cantidadNum = Number(cantidad);
 
         if (
             !platoCodigo ||
-            !cantidad ||
             !fecha ||
             typeof platoPadreCodigo !== 'string' ||
-            !salon ||
-            !Number.isFinite(cantidadNum)
+            !salon
         ) {
             await logAudit({
                 modulo: 'produccion',
@@ -47,13 +45,18 @@ export async function POST(req: NextRequest) {
             );
         }
 
+        const fechaBase = new Date(fecha.split('T')[0]);
+        const fechaCompensada = addDays(fechaBase, -1);
+
         const data = await prisma.produccion.findFirst({
             where: {
                 platoCodigo,
                 platoPadreCodigo,
-                fecha: new Date(fecha.split('T')[0]),
-                cantidad: cantidadNum,
                 salon,
+                OR: [{ fecha: fechaBase }, { fecha: fechaCompensada }],
+            },
+            orderBy: {
+                id: 'desc',
             },
         });
 
@@ -69,7 +72,6 @@ export async function POST(req: NextRequest) {
                     platoCodigo,
                     platoPadreCodigo,
                     fecha,
-                    cantidad: cantidadNum,
                     salon,
                 },
             });

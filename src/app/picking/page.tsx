@@ -2,7 +2,7 @@
 
 import { SalonContext } from '@/components/filtroPlatos';
 import { Loading } from '@/components/loading';
-import { format } from 'date-fns';
+import { addDays, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useContext, useEffect, useMemo, useState } from 'react';
 import type { CellObject, CellStyle } from 'xlsx-js-style';
@@ -45,11 +45,19 @@ function formatearCantidad(cantidad: number) {
 
 function calcularAnchoColumna(valores: Array<string | number>): number {
     const maximoCaracteres = valores.reduce<number>((maximo, valor) => {
-        const largo = String(valor ?? '').length;
+        const largo = String(valor ?? '')
+            .split('\n')
+            .reduce((maxLinea, linea) => Math.max(maxLinea, linea.length), 0);
         return Math.max(maximo, largo);
     }, 0);
 
     return maximoCaracteres + 2;
+}
+
+function normalizarFechaSinHora(fecha: string | Date): Date {
+    const normalizada = new Date(fecha);
+    normalizada.setHours(0, 0, 0, 0);
+    return normalizada;
 }
 
 const estiloNumeroCentrado: CellStyle = {
@@ -73,6 +81,7 @@ const estiloHeaderOscuro: CellStyle = {
     alignment: {
         horizontal: 'center',
         vertical: 'center',
+        wrapText: true,
     },
     fill: {
         patternType: 'solid',
@@ -149,14 +158,25 @@ export default function PickingPage() {
         };
     }, [salon]);
 
-    const comandasOrdenadas = useMemo(
+    const inicioRango = useMemo(() => normalizarFechaSinHora(new Date()), []);
+    const finRango = useMemo(() => addDays(inicioRango, 6), [inicioRango]);
+
+    const comandasSemana = useMemo(
         () =>
-            [...data.comandas].sort(
-                (a, b) =>
-                    new Date(a.fecha).getTime() - new Date(b.fecha).getTime() ||
-                    a.id - b.id,
-            ),
-        [data.comandas],
+            data.comandas
+                .filter((comanda) => {
+                    const fechaComanda = normalizarFechaSinHora(comanda.fecha);
+                    return (
+                        fechaComanda.getTime() >= inicioRango.getTime() &&
+                        fechaComanda.getTime() <= finRango.getTime()
+                    );
+                })
+                .sort(
+                    (a, b) =>
+                        new Date(a.fecha).getTime() -
+                            new Date(b.fecha).getTime() || a.id - b.id,
+                ),
+        [data.comandas, inicioRango, finRango],
     );
 
     const filasFiltradas = useMemo(() => {
@@ -177,17 +197,17 @@ export default function PickingPage() {
     }
 
     const mostrarTabla =
-        comandasOrdenadas.length > 0 && filasFiltradas.length > 0;
+        comandasSemana.length > 0 && filasFiltradas.length > 0;
 
     const exportarExcel = () => {
         const filasExcel = filasFiltradas.map((fila) => {
-            const total = comandasOrdenadas.reduce(
+            const total = comandasSemana.reduce(
                 (acumulado, comanda) =>
                     acumulado +
                     (fila.cantidadesPorComanda[String(comanda.id)] ?? 0),
                 0,
             );
-            const tieneAlgunaCantidad = comandasOrdenadas.some(
+            const tieneAlgunaCantidad = comandasSemana.some(
                 (comanda) =>
                     fila.cantidadesPorComanda[String(comanda.id)] !== undefined,
             );
@@ -198,10 +218,10 @@ export default function PickingPage() {
                 Total: tieneAlgunaCantidad ? total : '',
             };
 
-            comandasOrdenadas.forEach((comanda) => {
+            comandasSemana.forEach((comanda) => {
                 const claveComanda = `${format(new Date(comanda.fecha), 'EEE dd/MM', {
                     locale: es,
-                })} | ${comanda.lugar} - ${comanda.salon}`;
+                })}\n${comanda.lugar}\n${comanda.salon}`;
                 const cantidad =
                     fila.cantidadesPorComanda[String(comanda.id)];
                 filaExportacion[claveComanda] =
@@ -217,6 +237,7 @@ export default function PickingPage() {
                     ? (xlsxModule.default as typeof import('xlsx-js-style'))
                     : xlsxModule;
             const worksheet = XLSX.utils.json_to_sheet(filasExcel);
+            worksheet['!rows'] = [{ hpt: 48 }];
 
             const columnas = Object.keys(filasExcel[0] ?? {});
             worksheet['!cols'] = columnas.map((columna, indice) => {
@@ -234,9 +255,22 @@ export default function PickingPage() {
                         : [columna];
 
                 const anchoBase = calcularAnchoColumna(valoresColumna);
+                const limitesAncho = {
+                    min: indice <= 1 ? 14 : 0,
+                    max:
+                        indice === 0
+                            ? 48
+                            : indice === 1
+                              ? 42
+                              : Number.POSITIVE_INFINITY,
+                };
+                const anchoAjustado = Math.max(
+                    limitesAncho.min,
+                    Math.min(anchoBase, limitesAncho.max),
+                );
 
                 return {
-                    wch: anchoBase,
+                    wch: anchoAjustado,
                 };
             });
 
@@ -305,7 +339,7 @@ export default function PickingPage() {
                 </Form.Group>
 
                 <p className="text-muted mb-3">
-                    {`Comandas: ${comandasOrdenadas.length} | Filas: ${filasFiltradas.length}`}
+                    {`Comandas: ${comandasSemana.length} | Filas: ${filasFiltradas.length}`}
                 </p>
 
                 <Button
@@ -346,7 +380,7 @@ export default function PickingPage() {
                                         style={{ minWidth: 120 }}>
                                         Total
                                     </th>
-                                    {comandasOrdenadas.map((comanda) => (
+                                    {comandasSemana.map((comanda) => (
                                         <th
                                             className="align-middle text-center text-white"
                                             key={comanda.id}
@@ -377,7 +411,7 @@ export default function PickingPage() {
                             </thead>
                             <tbody>
                                 {filasFiltradas.map((fila, indexFila) => {
-                                    const totalFila = comandasOrdenadas.reduce(
+                                    const totalFila = comandasSemana.reduce(
                                         (acumulado, comanda) =>
                                             acumulado +
                                             (fila.cantidadesPorComanda[
@@ -411,7 +445,7 @@ export default function PickingPage() {
                                             <td className="text-center fw-semibold">
                                                 {formatearCantidad(totalFila)}
                                             </td>
-                                            {comandasOrdenadas.map((comanda) => {
+                                            {comandasSemana.map((comanda) => {
                                                 const cantidad =
                                                     fila.cantidadesPorComanda[
                                                         String(comanda.id)

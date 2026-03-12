@@ -6,6 +6,8 @@ import { saveAs } from 'file-saver';
 
 interface Plato {
     plato: string;
+    platoPadre: string;
+    platoPadreCodigo: string;
     cantidad: number;
     observacion: string | null;
     codigo: string;
@@ -16,6 +18,23 @@ interface Plato {
 }
 
 const head = [['Codigo', 'Descripcion', 'Unidad', 'Porcion Bruta']];
+
+const normalizarTexto = (valor: string | null | undefined) =>
+    (valor ?? '').trim();
+
+const construirLineaPlato = (
+    etiqueta: 'Plato' | 'Elab',
+    codigo: string | null | undefined,
+    nombre: string | null | undefined,
+) => {
+    const codigoNormalizado = normalizarTexto(codigo);
+    const nombreNormalizado = normalizarTexto(nombre);
+    const detalle = [codigoNormalizado, nombreNormalizado]
+        .filter(Boolean)
+        .join(' - ');
+
+    return `${etiqueta}: ${detalle || 'Sin datos'}`;
+};
 
 export const generarPDFReceta = async (
     listaPlatos: string[],
@@ -130,14 +149,31 @@ const renderReceta = (
     fecha: Date,
     entregaMP: boolean = false,
 ) => {
+    const codigoPadre = normalizarTexto(plato.platoPadreCodigo);
+    const nombrePadre = normalizarTexto(plato.platoPadre);
+
+    if (codigoPadre || nombrePadre) {
+        doc.setFontSize(12);
+        doc.text(
+            construirLineaPlato('Plato', codigoPadre, nombrePadre),
+            14,
+            yPosition,
+        );
+        yPosition += 6;
+    }
+
     doc.setFontSize(16);
-    doc.text(`${plato.codigo} - ${plato.plato}`, 14, yPosition);
+    doc.text(
+        construirLineaPlato('Elab', plato.codigo, plato.plato),
+        14,
+        yPosition,
+    );
 
     yPosition += 5;
 
     doc.setFontSize(10);
     doc.text(
-        `${entregaMP ? 'Cantidad' : 'Cantidad a producir:'} ${plato.cantidad} ${plato.unidadMedida}`,
+        `${entregaMP ? 'Cantidad' : 'Cantidad a producir:'} ${plato.cantidad}`,
         14,
         yPosition,
     );

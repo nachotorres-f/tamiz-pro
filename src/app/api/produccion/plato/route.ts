@@ -1,13 +1,69 @@
+import { logAudit } from '@/lib/audit';
 import { prisma } from '@/lib/prisma';
 import { NextRequest, NextResponse } from 'next/server';
-import { logAudit } from '@/lib/audit';
 
-interface Body {
+interface PlatoPayload {
     platoCodigo?: string;
     cantidad?: number | string;
     fecha?: string;
     salon?: string;
 }
+
+interface Body extends PlatoPayload {
+    platos?: PlatoPayload[];
+}
+
+interface PlatoNormalizado {
+    platoCodigo: string;
+    cantidad: number;
+    fecha: string;
+    salon: string;
+}
+
+const normalizarPayload = (payload: Body): PlatoPayload[] => {
+    if (Array.isArray(payload.platos) && payload.platos.length > 0) {
+        return payload.platos.map((plato) => ({
+            ...plato,
+            salon: plato.salon ?? payload.salon,
+        }));
+    }
+
+    return [payload];
+};
+
+const sanitizarPlatos = (platos: PlatoPayload[]) => {
+    const invalidos: Array<{ index: number; plato: PlatoPayload }> = [];
+    const normalizados: PlatoNormalizado[] = [];
+
+    platos.forEach((plato, index) => {
+        const platoCodigo = String(plato.platoCodigo ?? '').trim();
+        const fecha = String(plato.fecha ?? '').trim();
+        const salon = String(plato.salon ?? '').trim();
+        const cantidadNum = Number(plato.cantidad);
+        const fechaNormalizada = new Date(fecha.split('T')[0]);
+
+        if (
+            !platoCodigo ||
+            !fecha ||
+            !salon ||
+            !Number.isFinite(cantidadNum) ||
+            cantidadNum <= 0 ||
+            !Number.isFinite(fechaNormalizada.getTime())
+        ) {
+            invalidos.push({ index, plato });
+            return;
+        }
+
+        normalizados.push({
+            platoCodigo,
+            cantidad: Number(cantidadNum.toFixed(2)),
+            fecha,
+            salon,
+        });
+    });
+
+    return { invalidos, normalizados };
+};
 
 export async function POST(req: NextRequest) {
     process.env.TZ = 'America/Argentina/Buenos_Aires';
@@ -17,24 +73,22 @@ export async function POST(req: NextRequest) {
     try {
         const payload = (await req.json()) as Body;
         body = payload;
-        const { platoCodigo, cantidad, fecha, salon } = payload;
-        const cantidadNum = Number(cantidad);
 
-        if (
-            !platoCodigo ||
-            !cantidad ||
-            !fecha ||
-            !salon ||
-            !Number.isFinite(cantidadNum)
-        ) {
+        const platosRecibidos = normalizarPayload(payload);
+        const { invalidos, normalizados } = sanitizarPlatos(platosRecibidos);
+
+        if (normalizados.length === 0 || invalidos.length > 0) {
             await logAudit({
                 modulo: 'produccion',
                 accion: 'agregar_plato_produccion',
                 ruta: '/api/produccion/plato',
                 metodo: 'POST',
                 estado: 'warning',
-                resumen: 'Datos incompletos para agregar plato a producción',
-                detalle: payload,
+                resumen: 'Datos incompletos para agregar platos a producción',
+                detalle: {
+                    payload,
+                    invalidos,
+                },
             });
 
             return NextResponse.json(
@@ -43,30 +97,38 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        const receta = await prisma.receta.findFirst({
-            where: {
-                codigo: platoCodigo,
-            },
+        const codigos = Array.from(
+            new Set(normalizados.map((item) => item.platoCodigo)),
+        );
+
+        const recetas = await prisma.receta.findMany({
+            where: { codigo: { in: codigos } },
             select: {
+                codigo: true,
                 nombreProducto: true,
-            },
-            orderBy: {
-                id: 'asc',
             },
         });
 
-        if (!receta) {
+        const recetasPorCodigo = new Map(
+            recetas.map((receta) => [receta.codigo, receta.nombreProducto]),
+        );
+
+        const codigosFaltantes = codigos.filter(
+            (codigo) => !recetasPorCodigo.has(codigo),
+        );
+
+        if (codigosFaltantes.length > 0) {
             await logAudit({
                 modulo: 'produccion',
                 accion: 'agregar_plato_produccion',
                 ruta: '/api/produccion/plato',
                 metodo: 'POST',
                 estado: 'warning',
-                resumen: 'No se encontró receta para código en producción',
+                resumen:
+                    'No se encontraron recetas para uno o más códigos en producción',
                 detalle: {
-                    platoCodigo,
-                    fecha,
-                    salon,
+                    codigosFaltantes,
+                    payload,
                 },
             });
 
@@ -76,52 +138,83 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        const data = await prisma.produccion.findFirst({
-            where: {
-                platoCodigo,
-            platoPadreCodigo: '',
-            platoPadre: '',
-            fecha: new Date(fecha.split('T')[0]),
-            cantidad: cantidadNum,
-            salon,
-        },
-    });
+        const resultados: Array<{
+            platoCodigo: string;
+            fecha: string;
+            cantidad: number;
+            salon: string;
+            modo: 'update' | 'create';
+        }> = [];
 
-    if (data) {
-        await prisma.produccion.update({
-            where: { id: data.id },
-            data: { cantidad: data.cantidad + cantidadNum },
+        await prisma.$transaction(async (tx) => {
+            for (const plato of normalizados) {
+                const fecha = new Date(plato.fecha.split('T')[0]);
+                const existente = await tx.produccion.findFirst({
+                    where: {
+                        platoCodigo: plato.platoCodigo,
+                        platoPadreCodigo: '',
+                        platoPadre: '',
+                        fecha,
+                        salon: plato.salon,
+                    },
+                    orderBy: {
+                        id: 'asc',
+                    },
+                });
+
+                if (existente) {
+                    await tx.produccion.update({
+                        where: { id: existente.id },
+                        data: {
+                            cantidad: existente.cantidad + plato.cantidad,
+                        },
+                    });
+
+                    resultados.push({
+                        platoCodigo: plato.platoCodigo,
+                        fecha: plato.fecha.split('T')[0],
+                        cantidad: plato.cantidad,
+                        salon: plato.salon,
+                        modo: 'update',
+                    });
+                    continue;
+                }
+
+                await tx.produccion.create({
+                    data: {
+                        plato: recetasPorCodigo.get(plato.platoCodigo) || '',
+                        platoCodigo: plato.platoCodigo,
+                        platoPadre: '',
+                        platoPadreCodigo: '',
+                        cantidad: plato.cantidad,
+                        fecha,
+                        salon: plato.salon,
+                    },
+                });
+
+                resultados.push({
+                    platoCodigo: plato.platoCodigo,
+                    fecha: plato.fecha.split('T')[0],
+                    cantidad: plato.cantidad,
+                    salon: plato.salon,
+                    modo: 'create',
+                });
+            }
         });
-    } else {
-        await prisma.produccion.create({
-            data: {
-                plato: receta.nombreProducto,
-                platoCodigo,
-                platoPadre: '',
-                platoPadreCodigo: '',
-                cantidad: cantidadNum,
-                fecha: new Date(fecha.split('T')[0]),
-                salon,
-            },
-            });
-        }
 
         await logAudit({
             modulo: 'produccion',
             accion: 'agregar_plato_produccion',
             ruta: '/api/produccion/plato',
             metodo: 'POST',
-            resumen: `Plato agregado en producción ${platoCodigo}`,
+            resumen: `Se agregaron ${resultados.length} platos en producción`,
             detalle: {
-                platoCodigo,
-                fecha: fecha.split('T')[0],
-                cantidad: cantidadNum,
-                salon,
-                modo: data ? 'update' : 'create',
+                total: resultados.length,
+                resultados,
             },
         });
 
-        return NextResponse.json({ ok: true });
+        return NextResponse.json({ ok: true, total: resultados.length });
     } catch (error) {
         await logAudit({
             modulo: 'produccion',
@@ -129,7 +222,7 @@ export async function POST(req: NextRequest) {
             ruta: '/api/produccion/plato',
             metodo: 'POST',
             estado: 'error',
-            resumen: 'Error agregando plato a producción',
+            resumen: 'Error agregando platos a producción',
             detalle: {
                 body,
                 error: error instanceof Error ? error.message : String(error),
@@ -137,7 +230,7 @@ export async function POST(req: NextRequest) {
         });
 
         return NextResponse.json(
-            { error: 'Error al agregar plato a producción' },
+            { error: 'Error al agregar platos a producción' },
             { status: 500 },
         );
     }

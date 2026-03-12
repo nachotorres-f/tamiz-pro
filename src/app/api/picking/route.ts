@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { endOfWeek, startOfWeek } from 'date-fns';
+import { addDays } from 'date-fns';
 import { NextRequest, NextResponse } from 'next/server';
 import { logAudit } from '@/lib/audit';
 
@@ -108,13 +108,16 @@ export async function GET(req: NextRequest) {
     try {
         const lugares = ['El Central', 'La Rural'];
         const usarNotIn = salon === 'A';
+        const inicioRango = new Date();
+        inicioRango.setHours(0, 0, 0, 0);
+        const finRangoExclusivo = addDays(inicioRango, 7);
 
         const [comandas, recetasIndice] = await Promise.all([
             prisma.comanda.findMany({
                 where: {
                     fecha: {
-                        gte: startOfWeek(new Date(), { weekStartsOn: 1 }),
-                        lt: endOfWeek(new Date(), { weekStartsOn: 1 }),
+                        gte: inicioRango,
+                        lt: finRangoExclusivo,
                     },
                     lugar: usarNotIn ? { notIn: lugares } : { in: lugares },
                 },

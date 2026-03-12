@@ -71,10 +71,10 @@ export default function AppNavbar({
     }
 
     const routeList: Route[] = [
-        {
-            path: '/importar',
-            title: 'Importar',
-        },
+        // {
+        //     path: '/importar',
+        //     title: 'Importar',
+        // },
         {
             path: '/calendario',
             title: 'Calendario',

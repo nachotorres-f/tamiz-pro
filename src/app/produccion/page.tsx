@@ -5,7 +5,7 @@ import { NavegacionSemanal } from '@/components/navegacionSemanal';
 import { addDays, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import React, { useContext, useEffect, useRef, useState } from 'react';
-import type { CellObject, CellStyle } from 'xlsx-js-style';
+import type { CellObject, CellStyle, WorkSheet } from 'xlsx-js-style';
 import {
     Accordion,
     Button,
@@ -52,6 +52,15 @@ const estiloHeaderOscuro: CellStyle = {
     },
 };
 
+const estiloFilaComentario: CellStyle = {
+    fill: {
+        patternType: 'solid',
+        fgColor: {
+            rgb: 'FFF3CD',
+        },
+    },
+};
+
 export default function ProduccionPage() {
     const salon = useContext(SalonContext);
     const RolProvider = useContext(RolContext);
@@ -61,7 +70,6 @@ export default function ProduccionPage() {
     const [diaActivo, setDiaActivo] = useState('');
     const [semanaBase, setSemanaBase] = useState(new Date());
     const [datosApi, setDatosApi] = useState<any[]>([]);
-    const [datos, setDatos] = useState<any[]>([]);
     const [showModal, setShowModal] = useState(false);
     const [loading, setLoading] = useState(false);
     const [fechaImprimir, setFechaImprimir] = useState<Date | null>(null);
@@ -69,13 +77,6 @@ export default function ProduccionPage() {
     const [showModalProduccion, setShowModalProduccion] = useState(false);
     const [observacionModal, setObservacionModal] = useState('');
     const [showModalObservacion, setShowModalObservacion] = useState(false);
-    const [paginado, setPaginado] = useState(false);
-    const [registrosPagina, setRegistrosPagina] = useState(30);
-    const [paginaActual, setPaginaActual] = useState(0);
-    const [totalPaginas, setTotalPaginas] = useState(0);
-    const [intervaloSegundos, setIntervaloSegundos] = useState(30);
-    const [intervaloPaginado, setIntervaloPaginado] =
-        useState<ReturnType<typeof setInterval>>();
     const [platoModalProduccion, setPlatoModalProduccion] = useState({
         plato: '',
         platoCodigo: '',
@@ -98,7 +99,6 @@ export default function ProduccionPage() {
             .then((res) => res.data)
             .then((data) => {
                 setDatosApi(data);
-                setDatos(data);
             })
             .finally(() => {
                 setLoading(false);
@@ -161,16 +161,51 @@ export default function ProduccionPage() {
         return true;
     };
 
-    const generarPDF = (modo: 'unico' | 'separado') => {
-        toast.info('Imprimiendo recetas', {
+    const imprimirRecetas = async (
+        listaPlatos: string[],
+        fecha: Date,
+        modo: 'unico' | 'separado',
+        mensajeCarga: string,
+        mensajeExito: string,
+    ) => {
+        const toastId = toast.loading(mensajeCarga, {
             position: 'bottom-right',
+            type: 'info',
             theme: 'colored',
             transition: Slide,
         });
 
-        generarPDFReceta([], fechaImprimir || new Date(), salon, modo, false);
+        try {
+            await generarPDFReceta(listaPlatos, fecha, salon, modo, false);
+            toast.update(toastId, {
+                render: mensajeExito,
+                type: 'success',
+                isLoading: false,
+                autoClose: 3000,
+                closeOnClick: true,
+                draggable: true,
+            });
+        } catch {
+            toast.update(toastId, {
+                render: 'Error al imprimir recetas',
+                type: 'error',
+                isLoading: false,
+                autoClose: 5000,
+                closeOnClick: true,
+                draggable: true,
+            });
+        }
+    };
 
+    const generarPDF = async (modo: 'unico' | 'separado') => {
         handleClose();
+        await imprimirRecetas(
+            [],
+            fechaImprimir || new Date(),
+            modo,
+            'Imprimiendo recetas',
+            'Recetas impresas',
+        );
     };
 
     const handleClose = () => setShowModal(false);
@@ -216,6 +251,19 @@ export default function ProduccionPage() {
     };
 
     function guardarComentario() {
+        if (
+            !platoModalProduccion.platoCodigo ||
+            !platoModalProduccion.fecha ||
+            !salon
+        ) {
+            toast.error('Selecciona un plato con producción para comentar', {
+                position: 'bottom-right',
+                theme: 'colored',
+                transition: Slide,
+            });
+            return;
+        }
+
         toast.warn('Agregando Comentario', {
             position: 'bottom-right',
             theme: 'colored',
@@ -234,6 +282,12 @@ export default function ProduccionPage() {
                 salon,
             }),
         })
+            .then((res) => {
+                if (!res.ok) {
+                    throw new Error('Error al guardar comentario');
+                }
+                return res.json();
+            })
             .then(() => {
                 toast.success('Comentario guardado', {
                     position: 'bottom-right',
@@ -312,62 +366,6 @@ export default function ProduccionPage() {
             });
     };
 
-    const tooglePaginado = () => {
-        if (paginado) {
-            setPaginado(false);
-            clearInterval(intervaloPaginado);
-            setDatos(datosApi);
-            return;
-        }
-
-        const totalPags = Math.ceil(datosApi.length / registrosPagina);
-
-        setPaginado(true);
-        setTotalPaginas(totalPags);
-        setPaginaActual(0);
-    };
-
-    useEffect(() => {
-        if (!paginado) return;
-        if (totalPaginas === 0) return;
-
-        const intervalo = setInterval(() => {
-            setPaginaActual((prevPagina) => {
-                const nuevaPagina = prevPagina + 1;
-                if (nuevaPagina >= totalPaginas) {
-                    return 0;
-                }
-                return nuevaPagina;
-            });
-        }, intervaloSegundos * 1000);
-
-        setIntervaloPaginado(intervalo);
-
-        return () => clearInterval(intervaloPaginado);
-    }, [paginado, totalPaginas, intervaloSegundos]);
-
-    useEffect(() => {
-        if (!paginado) return;
-
-        const inicio = paginaActual * registrosPagina;
-        const fin = inicio + registrosPagina;
-        const datosPaginados = datosApi
-            .filter(filterPlatosPorDia)
-            .slice(inicio, fin);
-
-        setDatos(datosPaginados);
-    }, [paginado, paginaActual, registrosPagina]);
-
-    useEffect(() => {
-        if (!paginado) return;
-
-        const totalPags = Math.ceil(
-            datosApi.filter(filterPlatosPorDia).length / registrosPagina,
-        );
-        setTotalPaginas(totalPags);
-        setPaginaActual(0);
-    }, [diaActivo, paginado, registrosPagina]);
-
     if (loading) {
         return (
             <div
@@ -393,8 +391,8 @@ export default function ProduccionPage() {
     }
 
     const diasVisibles = diasSemana.filter(filterDias);
-    const datosVisibles = datos
-        ? datos.filter((dato) => filterPlatosPorDia(dato))
+    const datosVisibles = datosApi
+        ? datosApi.filter((dato) => filterPlatosPorDia(dato))
         : [];
 
     const calcularAnchoColumna = (
@@ -409,6 +407,63 @@ export default function ProduccionPage() {
         return maximoCaracteres + 2;
     };
 
+    const aplicarEstiloHeader = (
+        worksheet: WorkSheet,
+        XLSX: typeof import('xlsx-js-style'),
+    ) => {
+        const rango = worksheet['!ref']
+            ? XLSX.utils.decode_range(worksheet['!ref'])
+            : null;
+
+        if (!rango) {
+            return;
+        }
+
+        for (let c = 0; c <= rango.e.c; c += 1) {
+            const direccionHeader = XLSX.utils.encode_cell({
+                r: 0,
+                c,
+            });
+            const headerCelda = worksheet[direccionHeader] as
+                | CellObject
+                | undefined;
+
+            if (!headerCelda) continue;
+
+            headerCelda.s = estiloHeaderOscuro;
+        }
+    };
+
+    const aplicarEstiloFilasComentario = (
+        worksheet: WorkSheet,
+        filasComentario: number[],
+        totalColumnas: number,
+        XLSX: typeof import('xlsx-js-style'),
+    ) => {
+        filasComentario.forEach((fila) => {
+            for (let c = 0; c < totalColumnas; c += 1) {
+                const direccionCelda = XLSX.utils.encode_cell({ r: fila, c });
+                const celdaExistente = worksheet[direccionCelda] as
+                    | CellObject
+                    | undefined;
+                const celda = celdaExistente || { t: 's', v: '' };
+                celda.s = {
+                    ...(celda.s || {}),
+                    ...estiloFilaComentario,
+                };
+                worksheet[direccionCelda] = celda;
+            }
+        });
+    };
+
+    const obtenerNombreHojaDia = (dia: Date) => {
+        const nombreDia = format(dia, 'EEEE', { locale: es });
+        const nombreDiaCapitalizado =
+            nombreDia.charAt(0).toUpperCase() + nombreDia.slice(1);
+
+        return `${nombreDiaCapitalizado} ${format(dia, 'd-M')}`;
+    };
+
     const exportarExcel = () => {
         const encabezados = [
             'Plato',
@@ -419,6 +474,7 @@ export default function ProduccionPage() {
         ];
 
         const filasExcel: Array<Array<string | number>> = [encabezados];
+        const filasComentario: number[] = [];
 
         datosVisibles.forEach((dato) => {
             const filaPlato: Array<string | number> = [
@@ -433,6 +489,7 @@ export default function ProduccionPage() {
             filasExcel.push(filaPlato);
 
             if (dato.comentario && dato.comentario.replace('\n', '') !== '') {
+                filasComentario.push(filasExcel.length);
                 filasExcel.push([
                     '',
                     dato.comentario,
@@ -452,30 +509,58 @@ export default function ProduccionPage() {
                 { wch: calcularAnchoColumna(filasExcel, 0) },
                 { wch: calcularAnchoColumna(filasExcel, 1) },
             ];
-
-            const rango = worksheet['!ref']
-                ? XLSX.utils.decode_range(worksheet['!ref'])
-                : null;
-
-            if (rango) {
-                for (let c = 0; c <= rango.e.c; c += 1) {
-                    const direccionHeader = XLSX.utils.encode_cell({
-                        r: 0,
-                        c,
-                    });
-                    const headerCelda = worksheet[direccionHeader] as
-                        | CellObject
-                        | undefined;
-
-                    if (!headerCelda) continue;
-
-                    headerCelda.s = estiloHeaderOscuro;
-                }
-            }
+            aplicarEstiloHeader(worksheet, XLSX);
+            aplicarEstiloFilasComentario(
+                worksheet,
+                filasComentario,
+                encabezados.length,
+                XLSX,
+            );
 
             const workbook = XLSX.utils.book_new();
 
             XLSX.utils.book_append_sheet(workbook, worksheet, 'Produccion');
+
+            diasVisibles.forEach((dia) => {
+                const encabezadoDia = format(dia, 'EEE, dd-MM', {
+                    locale: es,
+                });
+                const filasDia: Array<Array<string | number>> = [
+                    ['Plato', 'Elaboracion', encabezadoDia, 'Tips'],
+                ];
+
+                datosVisibles.forEach((dato) => {
+                    const cantidad = obtenerCantidadPorDia(dato, dia);
+
+                    if (typeof cantidad !== 'number' || cantidad <= 0) {
+                        return;
+                    }
+
+                    filasDia.push([
+                        dato.platoPadre || '',
+                        dato.plato || '',
+                        cantidad,
+                        dato.comentario || '',
+                    ]);
+                });
+
+                const hojaDia = XLSX.utils.aoa_to_sheet(filasDia);
+                hojaDia['!cols'] = [
+                    { wch: calcularAnchoColumna(filasDia, 0) },
+                    { wch: calcularAnchoColumna(filasDia, 1) },
+                    { wch: calcularAnchoColumna(filasDia, 2) },
+                    { wch: calcularAnchoColumna(filasDia, 3) },
+                ];
+
+                aplicarEstiloHeader(hojaDia, XLSX);
+
+                XLSX.utils.book_append_sheet(
+                    workbook,
+                    hojaDia,
+                    obtenerNombreHojaDia(dia),
+                );
+            });
+
             XLSX.writeFile(workbook, 'produccion.xlsx');
         });
     };
@@ -508,84 +593,6 @@ export default function ProduccionPage() {
                             </Col>
                         </Row>
                     )}
-                    <Row>
-                        <Col>
-                            <Accordion className="mb-5">
-                                <Accordion.Item eventKey="0">
-                                    <Accordion.Header>
-                                        Paginar platos
-                                    </Accordion.Header>
-                                    <Accordion.Body>
-                                        <Container>
-                                            <Row>
-                                                <Col>
-                                                    <Form.Group>
-                                                        <Form.Label>
-                                                            Cantidad de platos
-                                                        </Form.Label>
-                                                        <Form.Control
-                                                            type="text"
-                                                            step="1"
-                                                            min={1}
-                                                            placeholder="Ingresa la cantidad de platos"
-                                                            value={
-                                                                registrosPagina
-                                                            }
-                                                            disabled={paginado}
-                                                            onChange={(e) =>
-                                                                setRegistrosPagina(
-                                                                    Number(
-                                                                        e.target
-                                                                            .value,
-                                                                    ),
-                                                                )
-                                                            }></Form.Control>
-                                                    </Form.Group>
-                                                </Col>
-                                                <Col>
-                                                    <Form.Group>
-                                                        <Form.Label>
-                                                            Intervalo (segundos)
-                                                        </Form.Label>
-                                                        <Form.Control
-                                                            type="text"
-                                                            step="any"
-                                                            placeholder="Ingresa el intervalo en segundos"
-                                                            value={
-                                                                intervaloSegundos
-                                                            }
-                                                            disabled={paginado}
-                                                            onChange={(e) =>
-                                                                setIntervaloSegundos(
-                                                                    Number(
-                                                                        e.target
-                                                                            .value,
-                                                                    ),
-                                                                )
-                                                            }></Form.Control>
-                                                    </Form.Group>
-                                                </Col>
-                                                <Col>
-                                                    <Button
-                                                        style={{
-                                                            marginTop: '2rem',
-                                                        }}
-                                                        className="d-block mx-auto"
-                                                        onClick={() =>
-                                                            tooglePaginado()
-                                                        }>
-                                                        {paginado
-                                                            ? 'Detener'
-                                                            : 'Iniciar'}
-                                                    </Button>
-                                                </Col>
-                                            </Row>
-                                        </Container>
-                                    </Accordion.Body>
-                                </Accordion.Item>
-                            </Accordion>
-                        </Col>
-                    </Row>
                 </Container>
 
                 <Modal
@@ -601,14 +608,14 @@ export default function ProduccionPage() {
                         <Button
                             variant="primary"
                             onClick={() => {
-                                generarPDF('unico');
+                                void generarPDF('unico');
                             }}>
                             Imprimir juntas
                         </Button>
                         <Button
                             variant="primary"
                             onClick={() => {
-                                generarPDF('separado');
+                                void generarPDF('separado');
                             }}>
                             Imprimir separadas
                         </Button>
@@ -665,20 +672,14 @@ export default function ProduccionPage() {
                         <Button
                             variant="danger"
                             onClick={() => {
-                                generarPDFReceta(
+                                handleCloseModalProduccion();
+                                void imprimirRecetas(
                                     [platoModalProduccion.platoCodigo],
                                     platoModalProduccion.fecha,
-                                    salon,
                                     'separado',
-                                    false,
+                                    'Imprimiendo receta',
+                                    'Receta impresa',
                                 );
-
-                                toast.info('Imprimiendo receta', {
-                                    position: 'bottom-right',
-                                    theme: 'colored',
-                                    transition: Slide,
-                                });
-                                handleCloseModalProduccion();
                             }}>
                             <FiletypePdf /> Imprimir receta
                         </Button>
@@ -777,11 +778,7 @@ export default function ProduccionPage() {
                                 </Button>
                             </th>
                             <th>
-                                {paginado
-                                    ? `Pagina: ${
-                                          paginaActual + 1
-                                      } / ${totalPaginas}`
-                                    : 'Todos los platos'}
+                                Todos los platos
                             </th>
                             {[0, 1, 2, 3, 4, 5, 6]
                                 .filter(
@@ -855,97 +852,88 @@ export default function ProduccionPage() {
                     </thead>
                     <tbody>
                         {datosVisibles.map((dato, indexDato) => (
-                                    <React.Fragment
-                                        key={
-                                            (dato.platoCodigo || dato.plato) +
-                                            '|' +
-                                            (dato.platoPadreCodigo ||
-                                                dato.platoPadre) +
-                                            '|' +
-                                            indexDato
-                                        }>
-                                        <tr>
-                                            <td>{dato.platoPadre}</td>
-                                            <td>{dato.plato}</td>
+                            <React.Fragment
+                                key={
+                                    (dato.platoCodigo || dato.plato) +
+                                    '|' +
+                                    (dato.platoPadreCodigo || dato.platoPadre) +
+                                    '|' +
+                                    indexDato
+                                }>
+                                <tr>
+                                    <td>{dato.platoPadre}</td>
+                                    <td>{dato.plato}</td>
 
-                                            {diasVisibles.map((dia, i) => {
-                                                    dia.setHours(0, 0, 0, 0);
+                                    {diasVisibles.map((dia, i) => {
+                                        dia.setHours(0, 0, 0, 0);
 
-                                                    const produccion =
-                                                        dato.produccion.find(
-                                                            (prod: any) => {
-                                                                const fecha =
-                                                                    new Date(
-                                                                        prod.fecha,
-                                                                    );
-                                                                fecha.setHours(
-                                                                    0,
-                                                                    0,
-                                                                    0,
-                                                                    0,
-                                                                );
+                                        const produccion = dato.produccion.find(
+                                            (prod: any) => {
+                                                const fecha = new Date(
+                                                    prod.fecha,
+                                                );
+                                                fecha.setHours(0, 0, 0, 0);
 
-                                                                return (
-                                                                    fecha.getTime() ===
-                                                                    dia.getTime()
-                                                                );
-                                                            },
-                                                        );
-                                                    const cantidad = produccion
-                                                        ? produccion.cantidad
-                                                        : 0;
-                                                    return (
-                                                        <td
-                                                            key={i}
-                                                            className={
-                                                                cantidad > 0
-                                                                    ? 'link-pdf'
-                                                                    : ''
-                                                            }
-                                                            onClick={() => {
-                                                                setPlatoModalProduccion(
-                                                                    {
-                                                                        plato: dato.plato,
-                                                                        platoCodigo:
-                                                                            dato.platoCodigo,
-                                                                        platoPadre:
-                                                                            dato.platoPadre,
-                                                                        platoPadreCodigo:
-                                                                            dato.platoPadreCodigo,
-                                                                        cantidad,
-                                                                        fecha: produccion.fecha,
-                                                                        comentario:
-                                                                            produccion.comentario
-                                                                                ? dato.comentario
-                                                                                : '',
-                                                                    },
-                                                                );
-                                                                setShowModalProduccion(
-                                                                    true,
-                                                                );
-                                                            }}>
-                                                            {cantidad || ''}
-                                                        </td>
+                                                return (
+                                                    fecha.getTime() ===
+                                                    dia.getTime()
+                                                );
+                                            },
+                                        );
+                                        const cantidad = produccion
+                                            ? produccion.cantidad
+                                            : 0;
+                                        return (
+                                            <td
+                                                key={i}
+                                                className={
+                                                    cantidad > 0
+                                                        ? 'link-pdf'
+                                                        : ''
+                                                }
+                                                onClick={() => {
+                                                    if (!produccion || cantidad <= 0) {
+                                                        return;
+                                                    }
+                                                    setPlatoModalProduccion({
+                                                        plato: dato.plato,
+                                                        platoCodigo:
+                                                            dato.platoCodigo,
+                                                        platoPadre:
+                                                            dato.platoPadre,
+                                                        platoPadreCodigo:
+                                                            dato.platoPadreCodigo,
+                                                        cantidad,
+                                                        fecha: produccion.fecha,
+                                                        comentario:
+                                                            produccion.comentario
+                                                                ? dato.comentario
+                                                                : '',
+                                                    });
+                                                    setShowModalProduccion(
+                                                        true,
                                                     );
-                                                })}
+                                                }}>
+                                                {cantidad || ''}
+                                            </td>
+                                        );
+                                    })}
+                                </tr>
+                                {dato.comentario &&
+                                    dato.comentario.replace('\n', '') !==
+                                        '' && (
+                                        <tr className="fst-italic fs-6 text-secondary">
+                                            <td className="bg-warning-subtle"></td>
+                                            <td className="bg-warning-subtle">
+                                                {dato.comentario}
+                                            </td>
+                                            <td
+                                                className="bg-warning-subtle"
+                                                colSpan={999}></td>
                                         </tr>
-                                        {dato.comentario &&
-                                            dato.comentario.replace(
-                                                '\n',
-                                                '',
-                                            ) !== '' && (
-                                                <tr className="fst-italic fs-6 text-secondary">
-                                                    <td className="bg-warning-subtle"></td>
-                                                    <td className="bg-warning-subtle">
-                                                        {dato.comentario}
-                                                    </td>
-                                                    <td
-                                                        className="bg-warning-subtle"
-                                                        colSpan={999}></td>
-                                                </tr>
-                                            )}
-                                    </React.Fragment>
-                                ))}
+                                    )}
+                            </React.Fragment>
+                        ))}
                     </tbody>
                 </Table>
             </div>

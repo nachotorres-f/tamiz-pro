@@ -15,7 +15,11 @@ import {
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { PlatoDetalle } from './platoDetalle';
-import { ChatRightText } from 'react-bootstrap-icons';
+import {
+    ArrowsFullscreen,
+    ChatRightText,
+    FullscreenExit,
+} from 'react-bootstrap-icons';
 import { EventoPlanificacion } from '@/app/planificacion/page';
 import { RolContext } from './filtroPlatos';
 
@@ -100,8 +104,10 @@ export function TablaPlanificacion({
         Set<number>
     >(new Set());
     const [cerrandoModalAdelanto, setCerrandoModalAdelanto] = useState(false);
+    const [isFullscreenTablas, setIsFullscreenTablas] = useState(false);
     const solicitudesAdelantoPendientesRef = useRef<Promise<boolean>[]>([]);
     const timerRefrescoPlanificacionRef = useRef<number | null>(null);
+    const contenedorTablasRef = useRef<HTMLDivElement | null>(null);
     //const [primeraCargaModal, setPrimeraCargaModal] = useState(true);
 
     useEffect(() => {
@@ -226,6 +232,41 @@ export function TablaPlanificacion({
         },
         [],
     );
+
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            setIsFullscreenTablas(
+                document.fullscreenElement === contenedorTablasRef.current,
+            );
+        };
+
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        handleFullscreenChange();
+
+        return () => {
+            document.removeEventListener(
+                'fullscreenchange',
+                handleFullscreenChange,
+            );
+        };
+    }, []);
+
+    const handleToggleFullscreenTablas = async () => {
+        const contenedor = contenedorTablasRef.current;
+
+        if (!contenedor) return;
+
+        try {
+            if (document.fullscreenElement === contenedor) {
+                await document.exitFullscreen();
+                return;
+            }
+
+            await contenedor.requestFullscreen();
+        } catch (error) {
+            console.error('No se pudo cambiar a pantalla completa:', error);
+        }
+    };
 
     useEffect(() => {
         if (adelantarEvento == 0) return;
@@ -453,6 +494,8 @@ export function TablaPlanificacion({
     type DragCantidadPayload = {
         mode: 'set' | 'add';
         value: number;
+        platoCodigo: string;
+        platoPadreCodigo: string;
     };
 
     const DRAG_CANTIDAD_MIME = 'application/x-tamiz-planificacion-cantidad';
@@ -469,6 +512,8 @@ export function TablaPlanificacion({
         const payloadNormalizado: DragCantidadPayload = {
             mode: payload.mode,
             value,
+            platoCodigo: payload.platoCodigo,
+            platoPadreCodigo: payload.platoPadreCodigo,
         };
 
         event.dataTransfer.setData(
@@ -489,41 +534,70 @@ export function TablaPlanificacion({
                 const payload = JSON.parse(dataCustom) as Partial<DragCantidadPayload>;
                 const mode = payload.mode;
                 const value = Number(payload.value);
+                const platoCodigo = String(payload.platoCodigo || '');
+                const platoPadreCodigo = String(payload.platoPadreCodigo || '');
 
                 if (
                     (mode === 'set' || mode === 'add') &&
-                    Number.isFinite(value)
+                    Number.isFinite(value) &&
+                    platoCodigo &&
+                    platoPadreCodigo
                 ) {
-                    return { mode, value };
+                    return {
+                        mode,
+                        value,
+                        platoCodigo,
+                        platoPadreCodigo,
+                    };
                 }
             } catch {}
         }
 
-        const dataTexto = dataTransfer.getData('text/plain');
-        const value = Number.parseFloat(dataTexto.replace(',', '.'));
-
-        if (!Number.isFinite(value)) {
-            return null;
-        }
-
-        return {
-            mode: 'set',
-            value,
-        };
+        return null;
     };
+
+    const esMismaFilaDrag = (
+        payload: DragCantidadPayload,
+        {
+            platoCodigo,
+            platoPadreCodigo,
+        }: {
+            platoCodigo: string;
+            platoPadreCodigo: string;
+        },
+    ) =>
+        payload.platoCodigo === platoCodigo &&
+        payload.platoPadreCodigo === platoPadreCodigo;
 
     const handleDragOverInputCantidad = (
         event: React.DragEvent<HTMLElement>,
+        {
+            platoCodigo,
+            platoPadreCodigo,
+        }: {
+            platoCodigo: string;
+            platoPadreCodigo: string;
+        },
     ) => {
         if (RolProvider === 'consultor') {
             return;
         }
 
         const tipos = Array.from(event.dataTransfer.types || []);
-        const esDragCompatible =
-            tipos.includes(DRAG_CANTIDAD_MIME) || tipos.includes('text/plain');
+        const esDragCompatible = tipos.includes(DRAG_CANTIDAD_MIME);
 
         if (!esDragCompatible) {
+            return;
+        }
+
+        const payload = obtenerDragCantidad(event.dataTransfer);
+        if (
+            payload &&
+            !esMismaFilaDrag(payload, {
+                platoCodigo,
+                platoPadreCodigo,
+            })
+        ) {
             return;
         }
 
@@ -560,6 +634,14 @@ export function TablaPlanificacion({
         }
 
         event.preventDefault();
+        if (
+            !esMismaFilaDrag(payload, {
+                platoCodigo,
+                platoPadreCodigo,
+            })
+        ) {
+            return;
+        }
 
         const actual = Number(cantidadActual);
         const actualValido = Number.isFinite(actual) ? actual : null;
@@ -807,9 +889,12 @@ export function TablaPlanificacion({
             </Modal>
 
             <div
+                ref={contenedorTablasRef}
                 style={{
                     display: 'flex',
-                    maxHeight: '90vh',
+                    maxHeight: isFullscreenTablas ? '100vh' : '90vh',
+                    height: isFullscreenTablas ? '100vh' : undefined,
+                    backgroundColor: '#fff',
                 }}>
                 <div
                     id="left-table"
@@ -873,7 +958,39 @@ export function TablaPlanificacion({
                                         top: 0,
                                         zIndex: 4,
                                         backgroundColor: '#BDBDBD',
-                                    }}></th>
+                                    }}>
+                                    <Button
+                                        size="sm"
+                                        variant="outline-dark"
+                                        onClick={() => {
+                                            void handleToggleFullscreenTablas();
+                                        }}
+                                        title={
+                                            isFullscreenTablas
+                                                ? 'Salir de pantalla completa'
+                                                : 'Ver en pantalla completa'
+                                        }
+                                        aria-label={
+                                            isFullscreenTablas
+                                                ? 'Salir de pantalla completa'
+                                                : 'Ver en pantalla completa'
+                                        }
+                                        style={{
+                                            width: '1.5rem',
+                                            height: '1.5rem',
+                                            display: 'inline-flex',
+                                            justifyContent: 'center',
+                                            alignItems: 'center',
+                                            fontSize: '0.75rem',
+                                            padding: 0,
+                                        }}>
+                                        {isFullscreenTablas ? (
+                                            <FullscreenExit />
+                                        ) : (
+                                            <ArrowsFullscreen />
+                                        )}
+                                    </Button>
+                                </th>
                                 <th
                                     style={{
                                         position: 'sticky',
@@ -927,159 +1044,163 @@ export function TablaPlanificacion({
                                         platoCodigo,
                                         platoPadre,
                                         platoPadreCodigo,
-                                    }) => (
-                                        <React.Fragment
-                                            key={
-                                                platoCodigo +
-                                                platoPadreCodigo
-                                            }>
-                                        <tr style={{ textAlign: 'center' }}>
-                                            <td style={styleTd}>
-                                                <Button
-                                                    size="sm"
-                                                    variant="primary"
+                                    }) => {
+                                        const totalNecesario = datos
+                                            .filter(
+                                                (dato) =>
+                                                    dato.platoCodigo ===
+                                                        platoCodigo &&
+                                                    dato.platoPadreCodigo ===
+                                                        platoPadreCodigo,
+                                            )
+                                            .reduce(
+                                                (sum, d) => sum + d.cantidad,
+                                                0,
+                                            );
+                                        const totalProducido = produccion
+                                            .filter(
+                                                (d) =>
+                                                    d.platoCodigo ===
+                                                        platoCodigo &&
+                                                    d.platoPadreCodigo ===
+                                                        platoPadreCodigo,
+                                            )
+                                            .reduce(
+                                                (sum, d) => sum + d.cantidad,
+                                                0,
+                                            );
+                                        const diferenciaTotal =
+                                            totalProducido - totalNecesario;
+                                        const claseColorTotal =
+                                            diferenciaTotal < -0.01
+                                                ? 'text-danger'
+                                                : diferenciaTotal > 0.01
+                                                  ? 'text-success'
+                                                  : 'text-dark';
+
+                                        return (
+                                            <React.Fragment
+                                                key={
+                                                    platoCodigo +
+                                                    platoPadreCodigo
+                                                }>
+                                                <tr
                                                     style={{
-                                                        width: '2rem',
-                                                        height: '2.2rem',
-                                                        display: 'flex',
-                                                        justifyContent:
-                                                            'center',
-                                                        alignItems: 'center',
-                                                    }}
-                                                    onClick={() => {
-                                                        const observacion =
-                                                            observaciones.find(
-                                                                (o) =>
-                                                                    o.platoCodigo ===
-                                                                        platoCodigo &&
-                                                                    o.platoPadreCodigo ===
-                                                                        platoPadreCodigo,
-                                                            )?.observacion ||
-                                                            observacionModal;
-
-                                                        if (observacion) {
-                                                            setObservacionModal(
-                                                                observacion,
-                                                            );
-                                                        } else {
-                                                            const prod =
-                                                                produccion.filter(
-                                                                    (p) =>
-                                                                        p.platoCodigo ===
-                                                                            platoCodigo &&
-                                                                        p.platoPadreCodigo ===
-                                                                            platoPadreCodigo &&
-                                                                        p.observacion,
-                                                                );
-
-                                                            if (
-                                                                prod.length > 0
-                                                            ) {
-                                                                setObservacionModal(
-                                                                    prod[0]
-                                                                        .observacion,
-                                                                );
-                                                            } else {
-                                                                setObservacionModal(
-                                                                    '',
-                                                                );
-                                                            }
-                                                        }
-
-                                                        setPlatoModal(plato);
-                                                        setPlatoCodigoModal(
-                                                            platoCodigo,
-                                                        );
-                                                        setPlatoPadreModal(
-                                                            platoPadre,
-                                                        );
-                                                        setPlatoPadreCodigoModal(
-                                                            platoPadreCodigo,
-                                                        );
-                                                        setShow(true);
+                                                        textAlign: 'center',
                                                     }}>
-                                                    <ChatRightText />
-                                                </Button>
-                                            </td>
-                                            <td style={styleTd}>
-                                                <OverlayTrigger
-                                                    overlay={
-                                                        <Tooltip
-                                                            id={
-                                                                plato +
-                                                                platoPadre
-                                                            }>
-                                                            {platoPadre}
-                                                        </Tooltip>
-                                                    }>
-                                                    <span>{platoPadre}</span>
-                                                </OverlayTrigger>
-                                            </td>
-                                            <td style={styleTd}>
-                                                <OverlayTrigger
-                                                    overlay={
-                                                        <Tooltip
-                                                            id={
-                                                                platoPadre +
-                                                                plato
-                                                            }>
-                                                            {plato}
-                                                        </Tooltip>
-                                                    }>
-                                                    <span>{plato}</span>
-                                                </OverlayTrigger>
-                                            </td>
-                                            <td
-                                                className={
-                                                    datos
-                                                        .filter(
-                                                            (dato) =>
-                                                                dato.platoCodigo ===
-                                                                    platoCodigo &&
-                                                                dato.platoPadreCodigo ===
-                                                                    platoPadreCodigo,
-                                                        )
-                                                        .reduce(
-                                                            (sum, d) =>
-                                                                sum +
-                                                                d.cantidad,
-                                                            0,
-                                                        ) >
-                                                    produccion
-                                                        .filter(
-                                                            (d) =>
-                                                                d.platoCodigo ===
-                                                                    platoCodigo &&
-                                                                d.platoPadreCodigo ===
-                                                                    platoPadreCodigo,
-                                                        )
-                                                        .reduce(
-                                                            (sum, d) =>
-                                                                sum +
-                                                                d.cantidad,
-                                                            0,
-                                                        )
-                                                        ? 'text-danger'
-                                                        : ''
-                                                }
-                                                style={styleTd}>
-                                                {(() => {
-                                                    const totalFila = datos
-                                                        .filter(
-                                                            (dato) =>
-                                                                dato.platoCodigo ===
-                                                                    platoCodigo &&
-                                                                dato.platoPadreCodigo ===
-                                                                    platoPadreCodigo,
-                                                        )
-                                                        .reduce(
-                                                            (sum, d) =>
-                                                                sum +
-                                                                d.cantidad,
-                                                            0,
-                                                        );
+                                                    <td style={styleTd}>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="primary"
+                                                            style={{
+                                                                width: '2rem',
+                                                                height: '2.2rem',
+                                                                display: 'flex',
+                                                                justifyContent:
+                                                                    'center',
+                                                                alignItems:
+                                                                    'center',
+                                                            }}
+                                                            onClick={() => {
+                                                                const observacion =
+                                                                    observaciones.find(
+                                                                        (
+                                                                            o,
+                                                                        ) =>
+                                                                            o.platoCodigo ===
+                                                                                platoCodigo &&
+                                                                            o.platoPadreCodigo ===
+                                                                                platoPadreCodigo,
+                                                                    )
+                                                                        ?.observacion ||
+                                                                    observacionModal;
 
-                                                    return (
+                                                                if (
+                                                                    observacion
+                                                                ) {
+                                                                    setObservacionModal(
+                                                                        observacion,
+                                                                    );
+                                                                } else {
+                                                                    const prod =
+                                                                        produccion.filter(
+                                                                            (
+                                                                                p,
+                                                                            ) =>
+                                                                                p.platoCodigo ===
+                                                                                    platoCodigo &&
+                                                                                p.platoPadreCodigo ===
+                                                                                    platoPadreCodigo &&
+                                                                                p.observacion,
+                                                                        );
+
+                                                                    if (
+                                                                        prod.length >
+                                                                        0
+                                                                    ) {
+                                                                        setObservacionModal(
+                                                                            prod[0]
+                                                                                .observacion,
+                                                                        );
+                                                                    } else {
+                                                                        setObservacionModal(
+                                                                            '',
+                                                                        );
+                                                                    }
+                                                                }
+
+                                                                setPlatoModal(
+                                                                    plato,
+                                                                );
+                                                                setPlatoCodigoModal(
+                                                                    platoCodigo,
+                                                                );
+                                                                setPlatoPadreModal(
+                                                                    platoPadre,
+                                                                );
+                                                                setPlatoPadreCodigoModal(
+                                                                    platoPadreCodigo,
+                                                                );
+                                                                setShow(true);
+                                                            }}>
+                                                            <ChatRightText />
+                                                        </Button>
+                                                    </td>
+                                                    <td style={styleTd}>
+                                                        <OverlayTrigger
+                                                            overlay={
+                                                                <Tooltip
+                                                                    id={
+                                                                        plato +
+                                                                        platoPadre
+                                                                    }>
+                                                                    {platoPadre}
+                                                                </Tooltip>
+                                                            }>
+                                                            <span>
+                                                                {platoPadre}
+                                                            </span>
+                                                        </OverlayTrigger>
+                                                    </td>
+                                                    <td style={styleTd}>
+                                                        <OverlayTrigger
+                                                            overlay={
+                                                                <Tooltip
+                                                                    id={
+                                                                        platoPadre +
+                                                                        plato
+                                                                    }>
+                                                                    {plato}
+                                                                </Tooltip>
+                                                            }>
+                                                            <span>{plato}</span>
+                                                        </OverlayTrigger>
+                                                    </td>
+                                                    <td
+                                                        className={
+                                                            claseColorTotal
+                                                        }
+                                                        style={styleTd}>
                                                         <span
                                                             draggable={
                                                                 RolProvider !==
@@ -1092,7 +1213,9 @@ export function TablaPlanificacion({
                                                                     event,
                                                                     {
                                                                         mode: 'set',
-                                                                        value: totalFila,
+                                                                        value: totalNecesario,
+                                                                        platoCodigo,
+                                                                        platoPadreCodigo,
                                                                     },
                                                                 );
                                                             }}
@@ -1109,18 +1232,17 @@ export function TablaPlanificacion({
                                                                 RolProvider ===
                                                                 'consultor'
                                                                     ? undefined
-                                                                    : 'Arrastrá para pegar este total en una celda'
+                                                                    : 'Arrastrá para pegar este total en una celda de la misma fila'
                                                             }>
-                                                            {totalFila.toFixed(
+                                                            {totalNecesario.toFixed(
                                                                 2,
                                                             )}
                                                         </span>
-                                                    );
-                                                })()}
-                                            </td>
-                                        </tr>
-                                    </React.Fragment>
-                                    ),
+                                                    </td>
+                                                </tr>
+                                            </React.Fragment>
+                                        );
+                                    },
                                 )}
                         </tbody>
                     </Table>
@@ -1455,12 +1577,22 @@ export function TablaPlanificacion({
                                                                         {
                                                                             mode: 'add',
                                                                             value: totalConsumo,
+                                                                            platoCodigo,
+                                                                            platoPadreCodigo,
                                                                         },
                                                                     );
                                                                 }}
-                                                                onDragOver={
-                                                                    handleDragOverInputCantidad
-                                                                }
+                                                                onDragOver={(
+                                                                    event,
+                                                                ) => {
+                                                                    handleDragOverInputCantidad(
+                                                                        event,
+                                                                        {
+                                                                            platoCodigo,
+                                                                            platoPadreCodigo,
+                                                                        },
+                                                                    );
+                                                                }}
                                                                 onDrop={(
                                                                     event,
                                                                 ) => {
@@ -1479,7 +1611,7 @@ export function TablaPlanificacion({
                                                                 }}
                                                                 title={
                                                                     placeholderArrastrable
-                                                                        ? 'Arrastrá este valor para sumarlo en otra celda'
+                                                                        ? 'Arrastrá este valor para sumarlo en otra celda de la misma fila'
                                                                         : undefined
                                                                 }
                                                                 onChange={(
