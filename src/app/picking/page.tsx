@@ -45,7 +45,9 @@ function formatearCantidad(cantidad: number) {
 
 function calcularAnchoColumna(valores: Array<string | number>): number {
     const maximoCaracteres = valores.reduce<number>((maximo, valor) => {
-        const largo = String(valor ?? '').length;
+        const largo = String(valor ?? '')
+            .split('\n')
+            .reduce((maxLinea, linea) => Math.max(maxLinea, linea.length), 0);
         return Math.max(maximo, largo);
     }, 0);
 
@@ -79,6 +81,7 @@ const estiloHeaderOscuro: CellStyle = {
     alignment: {
         horizontal: 'center',
         vertical: 'center',
+        wrapText: true,
     },
     fill: {
         patternType: 'solid',
@@ -218,7 +221,7 @@ export default function PickingPage() {
             comandasSemana.forEach((comanda) => {
                 const claveComanda = `${format(new Date(comanda.fecha), 'EEE dd/MM', {
                     locale: es,
-                })} | ${comanda.lugar} - ${comanda.salon}`;
+                })}\n${comanda.lugar}\n${comanda.salon}`;
                 const cantidad =
                     fila.cantidadesPorComanda[String(comanda.id)];
                 filaExportacion[claveComanda] =
@@ -234,6 +237,7 @@ export default function PickingPage() {
                     ? (xlsxModule.default as typeof import('xlsx-js-style'))
                     : xlsxModule;
             const worksheet = XLSX.utils.json_to_sheet(filasExcel);
+            worksheet['!rows'] = [{ hpt: 48 }];
 
             const columnas = Object.keys(filasExcel[0] ?? {});
             worksheet['!cols'] = columnas.map((columna, indice) => {
@@ -251,9 +255,22 @@ export default function PickingPage() {
                         : [columna];
 
                 const anchoBase = calcularAnchoColumna(valoresColumna);
+                const limitesAncho = {
+                    min: indice <= 1 ? 14 : 0,
+                    max:
+                        indice === 0
+                            ? 48
+                            : indice === 1
+                              ? 42
+                              : Number.POSITIVE_INFINITY,
+                };
+                const anchoAjustado = Math.max(
+                    limitesAncho.min,
+                    Math.min(anchoBase, limitesAncho.max),
+                );
 
                 return {
-                    wch: anchoBase,
+                    wch: anchoAjustado,
                 };
             });
 
