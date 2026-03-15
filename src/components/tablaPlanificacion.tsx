@@ -15,6 +15,8 @@ import type { EventoPlanificacion } from '@/lib/planificacion/types';
 import { RolContext } from './filtroPlatos';
 import { ObservacionPlatoModal } from './planificacion/ObservacionPlatoModal';
 import { AdelantarEventoModal } from './planificacion/AdelantarEventoModal';
+import { LeftPlanificacionTable } from './planificacion/LeftPlanificacionTable';
+import { RightPlanificacionTable } from './planificacion/RightPlanificacionTable';
 
 export function TablaPlanificacion({
     pageOcultos,
@@ -752,18 +754,7 @@ export function TablaPlanificacion({
                     height: isFullscreenTablas ? '100vh' : undefined,
                     backgroundColor: '#fff',
                 }}>
-                <div
-                    id="left-table"
-                    className="no-scrollbar"
-                    style={{
-                        flexShrink: 0,
-                        // borderCollapse: 'collapse',
-                        overflow: 'auto',
-                        position: 'sticky',
-                        left: 0,
-                        zIndex: 3,
-                    }}
-                    onScroll={handleVerticalScrollLeft}>
+                <LeftPlanificacionTable onScroll={handleVerticalScrollLeft}>
                     <Table
                         style={{
                             width: 'max-content',
@@ -1102,15 +1093,8 @@ export function TablaPlanificacion({
                                 )}
                         </tbody>
                     </Table>
-                </div>
-                <div
-                    id="right-table"
-                    className="no-scrollbar"
-                    style={{
-                        overflow: 'auto',
-                        flexGrow: 1,
-                    }}
-                    onScroll={handleVerticalScrollRight}>
+                </LeftPlanificacionTable>
+                <RightPlanificacionTable onScroll={handleVerticalScrollRight}>
                     <Table
                         style={{
                             width: '100%',
@@ -1500,7 +1484,7 @@ export function TablaPlanificacion({
                                 )}
                         </tbody>
                     </Table>
-                </div>
+                </RightPlanificacionTable>
             </div>
 
             {/* <div
