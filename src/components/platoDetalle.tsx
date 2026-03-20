@@ -23,10 +23,12 @@ export function PlatoDetalle({
     plato,
     platoCodigo,
     diasSemanaProp,
+    columnCount,
 }: {
     plato: string;
     platoCodigo?: string;
     diasSemanaProp: Date[];
+    columnCount?: number;
 }) {
     const [datos, setDatos] = useState<any>({});
     // const [isEditar, setIsEditar] = useState(false);
@@ -107,7 +109,7 @@ export function PlatoDetalle({
 
     return (
         <tr style={{ textAlign: 'center' }}>
-            <td colSpan={diasSemana.length + 8}>
+            <td colSpan={columnCount ?? diasSemana.length + 8}>
                 {/* <div className="bg-success-subtle px-3 py-2 rounded mb-2 fw-semibold text-uppercase">
                     Comanda
                 </div> */}
