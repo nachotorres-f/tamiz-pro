@@ -20,7 +20,12 @@ import {
     ChatRightText,
     FullscreenExit,
 } from 'react-bootstrap-icons';
-import { EventoPlanificacion } from '@/app/planificacion/page';
+import type {
+    EventoPlanificacion,
+    ObservacionPlanificacion,
+    ProduccionChange,
+    ProduccionPlanificacion,
+} from '@/app/planificacion/page';
 import { RolContext } from './filtroPlatos';
 
 export function TablaPlanificacion({
@@ -55,28 +60,18 @@ export function TablaPlanificacion({
     filtro: string;
     diaActivo: string;
     platoExpandido: string | null;
-    produccion: any[];
-    produccionUpdate: any[];
-    observaciones: {
-        plato: string;
-        platoCodigo: string;
-        observacion: string;
-        platoPadre: string;
-        platoPadreCodigo: string;
-    }[];
+    produccion: ProduccionPlanificacion[];
+    produccionUpdate: ProduccionChange[];
+    observaciones: ObservacionPlanificacion[];
     eventos: EventoPlanificacion[];
     maxCantidadEventosDia: number;
-    setObservaciones: (
-        value: {
-            plato: string;
-            platoCodigo: string;
-            observacion: string;
-            platoPadre: string;
-            platoPadreCodigo: string;
-        }[],
-    ) => void;
-    setProduccion: (value: any[]) => void;
-    setProduccionUpdate: (value: any[]) => void;
+    setObservaciones: (value: ObservacionPlanificacion[]) => void;
+    setProduccion: React.Dispatch<
+        React.SetStateAction<ProduccionPlanificacion[]>
+    >;
+    setProduccionUpdate: React.Dispatch<
+        React.SetStateAction<ProduccionChange[]>
+    >;
     // anchoButton: any;
     // anchoPlato: any;
     // anchoTotal: any;
@@ -173,6 +168,38 @@ export function TablaPlanificacion({
         const mesNumero = format(dia, 'M'); // "8"
         return `${letraDia} ${diaNumero}-${mesNumero}`;
     };
+
+    const normalizarFechaInicioDia = (fecha: string | Date) => {
+        const normalizada = new Date(fecha);
+        normalizada.setHours(0, 0, 0, 0);
+        return normalizada;
+    };
+
+    const normalizarFechaProduccion = (fecha: string | Date) => {
+        const normalizada = normalizarFechaInicioDia(fecha);
+        normalizada.setDate(normalizada.getDate() + 1);
+        return normalizada;
+    };
+
+    const obtenerClaveDia = (
+        fecha: string | Date,
+        esFechaProduccion = false,
+    ) => {
+        const normalizada = esFechaProduccion
+            ? normalizarFechaProduccion(fecha)
+            : normalizarFechaInicioDia(fecha);
+        return format(normalizada, 'yyyy-MM-dd');
+    };
+
+    const sumarCantidad = (
+        items: Array<{ cantidad?: number | string | null }>,
+    ) =>
+        Number(
+            items
+                .reduce((sum, item) => sum + Number(item.cantidad ?? 0), 0)
+                .toFixed(2),
+        );
+
     const handleClose = () => setShow(false);
 
     const handleVerticalScrollLeft = (e: React.UIEvent<HTMLDivElement>) => {
@@ -446,14 +473,14 @@ export function TablaPlanificacion({
         );
 
         if (valorInput === '') {
-            const valorEliminado = {
+            const valorEliminado: ProduccionChange = {
                 plato,
                 platoCodigo,
                 platoPadre,
                 platoPadreCodigo,
                 fecha,
                 cantidad: null,
-                eliminar: true,
+                eliminar: true as const,
             };
 
             if (index > -1) {
@@ -472,14 +499,14 @@ export function TablaPlanificacion({
             return;
         }
 
-        const valorActualizado = {
+        const valorActualizado: ProduccionChange = {
             plato,
             platoCodigo,
             platoPadre,
             platoPadreCodigo,
             fecha,
             cantidad: Number(cantidad.toFixed(2)),
-            eliminar: false,
+            eliminar: false as const,
         };
 
         if (index > -1) {
@@ -658,6 +685,89 @@ export function TablaPlanificacion({
             fecha,
             nuevoValor.toString(),
         );
+    };
+
+    const diasVisibles = diasSemana
+        .map((dia, indexOriginal) => ({
+            dia,
+            diaLimpio: normalizarFechaInicioDia(dia),
+            indexOriginal,
+            fechaClave: obtenerClaveDia(dia),
+        }))
+        .filter(({ dia }) => filterDias(dia));
+
+    const indiceDiaPorClave = new Map<string, number>(
+        diasSemana.map((dia, index) => [obtenerClaveDia(dia), index]),
+    );
+
+    type EstadoCeldaProduccion = {
+        cantidad: number | string;
+        cantidadAnteriorACiclo: number;
+        updateCant: boolean;
+        mostrarComoAnteriorACiclo: boolean;
+    };
+
+    const obtenerEstadoCeldaProduccion = ({
+        platoCodigo,
+        platoPadreCodigo,
+        fechaClave,
+        indexOriginal,
+    }: {
+        platoCodigo: string;
+        platoPadreCodigo: string;
+        fechaClave: string;
+        indexOriginal: number;
+    }): EstadoCeldaProduccion => {
+        const registrosPersistidos = produccion.filter(
+            (item) =>
+                item.platoCodigo === platoCodigo &&
+                item.platoPadreCodigo === platoPadreCodigo &&
+                obtenerClaveDia(item.fecha, true) === fechaClave,
+        );
+
+        const cantidadPersistida = sumarCantidad(registrosPersistidos);
+        const cantidadAnteriorACiclo = sumarCantidad(
+            registrosPersistidos.filter((item) => item.esAnteriorACiclo),
+        );
+        const cambiosPendientes = produccionUpdate.filter(
+            (item) =>
+                item.platoCodigo === platoCodigo &&
+                item.platoPadreCodigo === platoPadreCodigo &&
+                obtenerClaveDia(item.fecha, true) === fechaClave,
+        );
+
+        let cantidad: number | string =
+            registrosPersistidos.length > 0 ? cantidadPersistida : '';
+        let updateCant = false;
+
+        if (cambiosPendientes.length > 0) {
+            updateCant = true;
+            const tieneEliminacion = cambiosPendientes.some(
+                (item) =>
+                    item?.eliminar === true ||
+                    item?.cantidad === null,
+            );
+
+            if (tieneEliminacion) {
+                cantidad = '';
+            } else {
+                cantidad = sumarCantidad(cambiosPendientes);
+            }
+        }
+
+        const mostrarComoAnteriorACiclo =
+            indexOriginal < 4 &&
+            !updateCant &&
+            cantidadPersistida > 0 &&
+            cantidadAnteriorACiclo > 0 &&
+            Math.abs(cantidadPersistida - cantidadAnteriorACiclo) < 0.01;
+
+        return {
+            cantidad,
+            cantidadAnteriorACiclo,
+            updateCant,
+            mostrarComoAnteriorACiclo,
+        };
     };
 
     const todosAdelantados =
@@ -1045,6 +1155,14 @@ export function TablaPlanificacion({
                                         platoPadre,
                                         platoPadreCodigo,
                                     }) => {
+                                        const produccionFila =
+                                            produccion.filter(
+                                                (item) =>
+                                                    item.platoCodigo ===
+                                                        platoCodigo &&
+                                                    item.platoPadreCodigo ===
+                                                        platoPadreCodigo,
+                                            );
                                         const totalNecesario = datos
                                             .filter(
                                                 (dato) =>
@@ -1057,20 +1175,30 @@ export function TablaPlanificacion({
                                                 (sum, d) => sum + d.cantidad,
                                                 0,
                                             );
-                                        const totalProducido = produccion
-                                            .filter(
-                                                (d) =>
-                                                    d.platoCodigo ===
-                                                        platoCodigo &&
-                                                    d.platoPadreCodigo ===
-                                                        platoPadreCodigo,
-                                            )
-                                            .reduce(
-                                                (sum, d) => sum + d.cantidad,
-                                                0,
+                                        const totalProducidoConsiderado =
+                                            sumarCantidad(
+                                                produccionFila.filter(
+                                                    (item) => {
+                                                        const indexOriginal =
+                                                            indiceDiaPorClave.get(
+                                                                obtenerClaveDia(
+                                                                    item.fecha,
+                                                                    true,
+                                                                ),
+                                                            );
+
+                                                        return !(
+                                                            indexOriginal !==
+                                                                undefined &&
+                                                            indexOriginal < 4 &&
+                                                            item.esAnteriorACiclo
+                                                        );
+                                                    },
+                                                ),
                                             );
                                         const diferenciaTotal =
-                                            totalProducido - totalNecesario;
+                                            totalProducidoConsiderado -
+                                            totalNecesario;
                                         const claseColorTotal =
                                             diferenciaTotal < -0.01
                                                 ? 'text-danger'
@@ -1140,7 +1268,8 @@ export function TablaPlanificacion({
                                                                     ) {
                                                                         setObservacionModal(
                                                                             prod[0]
-                                                                                .observacion,
+                                                                                .observacion ||
+                                                                                '',
                                                                         );
                                                                     } else {
                                                                         setObservacionModal(
@@ -1272,57 +1401,70 @@ export function TablaPlanificacion({
                                             width: 'max-content',
                                             border: 'none',
                                         }}>
-                                        {diasSemana.map((dia, i) => {
-                                            const diaLimpio = new Date(dia);
-                                            diaLimpio.setHours(0, 0, 0, 0);
-                                            const eventosDia = eventos.filter(
-                                                (d) => {
-                                                    const fecha = new Date(
-                                                        d.fecha,
-                                                    );
-                                                    fecha.setHours(0, 0, 0, 0);
+                                        {diasVisibles.map(
+                                            ({ diaLimpio, indexOriginal }) => {
+                                                const eventosDia =
+                                                    eventos.filter((d) => {
+                                                        const fecha =
+                                                            new Date(d.fecha);
+                                                        fecha.setHours(
+                                                            0,
+                                                            0,
+                                                            0,
+                                                            0,
+                                                        );
+                                                        return (
+                                                            fecha.getTime() ===
+                                                            diaLimpio.getTime()
+                                                        );
+                                                    });
+                                                const offset =
+                                                    maxCantidadEventosDia -
+                                                    eventosDia.length;
+                                                const eventoIndex =
+                                                    index - offset;
+
+                                                if (eventoIndex >= 0) {
+                                                    const evento =
+                                                        eventosDia[eventoIndex];
                                                     return (
-                                                        fecha.getTime() ===
-                                                        diaLimpio.getTime()
+                                                        <td
+                                                            className="link-pdf"
+                                                            onClick={() => {
+                                                                if (
+                                                                    RolProvider ===
+                                                                    'consultor'
+                                                                )
+                                                                    return;
+                                                                setAdelantarEvento(
+                                                                    evento.id,
+                                                                );
+                                                            }}
+                                                            key={
+                                                                indexOriginal +
+                                                                index
+                                                            }
+                                                            style={{
+                                                                ...styleEventos,
+                                                                verticalAlign:
+                                                                    'middle',
+                                                                border: 'none',
+                                                            }}>
+                                                            {abreviar(
+                                                                evento.lugar,
+                                                            )}
+                                                            {' - '}
+                                                            {evento.salon}
+                                                        </td>
                                                     );
-                                                },
-                                            );
-                                            const offset =
-                                                maxCantidadEventosDia -
-                                                eventosDia.length;
-                                            const eventoIndex = index - offset;
-                                            if (eventoIndex >= 0) {
-                                                const evento =
-                                                    eventosDia[eventoIndex];
+                                                }
+
                                                 return (
                                                     <td
-                                                        className="link-pdf"
-                                                        onClick={() => {
-                                                            if (
-                                                                RolProvider ===
-                                                                'consultor'
-                                                            )
-                                                                return;
-                                                            setAdelantarEvento(
-                                                                evento.id,
-                                                            );
-                                                        }}
-                                                        key={i + index}
-                                                        style={{
-                                                            ...styleEventos,
-                                                            verticalAlign:
-                                                                'middle',
-                                                            border: 'none',
-                                                        }}>
-                                                        {abreviar(evento.lugar)}
-                                                        {' - '}
-                                                        {evento.salon}
-                                                    </td>
-                                                );
-                                            } else {
-                                                return (
-                                                    <td
-                                                        key={i + index}
+                                                        key={
+                                                            indexOriginal +
+                                                            index
+                                                        }
                                                         style={{
                                                             ...styleEventos,
                                                             verticalAlign:
@@ -1332,30 +1474,30 @@ export function TablaPlanificacion({
                                                         &nbsp;
                                                     </td>
                                                 );
-                                            }
-                                        })}
+                                            },
+                                        )}
                                     </tr>
                                 ),
                             )}
                             <tr style={{ textAlign: 'center' }}>
-                                {diasSemana
-                                    .filter(filterDias)
-                                    .map((dia, idx) => (
+                                {diasVisibles.map(
+                                    ({ dia, indexOriginal, fechaClave }) => (
                                         <th
-                                            key={idx}
+                                            key={fechaClave}
                                             style={{
                                                 position: 'sticky',
                                                 top: 0,
                                                 zIndex: 2,
                                                 minWidth: '15rem',
                                                 backgroundColor:
-                                                    idx < 11
+                                                    indexOriginal < 11
                                                         ? 'rgb(255, 255, 0)'
                                                         : '#BDBDBD',
                                             }}>
                                             {formatFecha(dia)}
                                         </th>
-                                    ))}
+                                    ),
+                                )}
                             </tr>
                         </thead>
                         <tbody>
@@ -1374,99 +1516,23 @@ export function TablaPlanificacion({
                                                 platoPadreCodigo
                                             }>
                                         <tr style={{ textAlign: 'center' }}>
-                                            {diasSemana
-                                                .filter(filterDias)
-                                                .map((dia, i) => {
-                                                    const diaLimpio = new Date(
-                                                        dia,
-                                                    );
-                                                    diaLimpio.setHours(
-                                                        0,
-                                                        0,
-                                                        0,
-                                                        0,
-                                                    );
-
-                                                    const total =
-                                                        produccion.filter(
-                                                            (d) => {
-                                                                const fecha =
-                                                                    new Date(
-                                                                        d.fecha,
-                                                                    );
-                                                                fecha.setHours(
-                                                                    0,
-                                                                    0,
-                                                                    0,
-                                                                    0,
-                                                                );
-                                                                fecha.setDate(
-                                                                    fecha.getDate() +
-                                                                        1,
-                                                                ); // Ajuste para comparar con el día limpio
-
-                                                                return (
-                                                                    d.platoCodigo ===
-                                                                        platoCodigo &&
-                                                                    d.platoPadreCodigo ===
-                                                                        platoPadreCodigo &&
-                                                                    fecha.getTime() ===
-                                                                        diaLimpio.getTime()
-                                                                );
-                                                            },
-                                                        );
-
-                                                    const update =
-                                                        produccionUpdate.filter(
-                                                            (d) => {
-                                                                const fecha =
-                                                                    new Date(
-                                                                        d.fecha,
-                                                                    );
-                                                                fecha.setHours(
-                                                                    0,
-                                                                    0,
-                                                                    0,
-                                                                    0,
-                                                                );
-                                                                fecha.setDate(
-                                                                    fecha.getDate() +
-                                                                        1,
-                                                                ); // Ajuste para comparar con el día limpio
-
-                                                                return (
-                                                                    d.platoCodigo ===
-                                                                        platoCodigo &&
-                                                                    d.platoPadreCodigo ===
-                                                                        platoPadreCodigo &&
-                                                                    fecha.getTime() ===
-                                                                        diaLimpio.getTime()
-                                                                );
-                                                            },
-                                                        );
-
+                                            {diasVisibles.map(
+                                                ({
+                                                    fechaClave,
+                                                    indexOriginal,
+                                                }) => {
                                                     const totalConsumo = datos
-                                                        .filter((d) => {
-                                                            const fecha =
-                                                                new Date(
-                                                                    d.fecha,
-                                                                );
-                                                            fecha.setHours(
-                                                                0,
-                                                                0,
-                                                                0,
-                                                                0,
-                                                            );
-
-                                                            return (
+                                                        .filter(
+                                                            (d) =>
                                                                 d.platoCodigo ===
                                                                     platoCodigo &&
                                                                 d.platoPadreCodigo ===
                                                                     platoPadreCodigo &&
-                                                                fecha.getTime() ===
-                                                                    dia.getTime()
-                                                            );
-                                                        })
+                                                                obtenerClaveDia(
+                                                                    d.fecha,
+                                                                ) ===
+                                                                    fechaClave,
+                                                        )
                                                         .reduce(
                                                             (sum, d) =>
                                                                 sum +
@@ -1474,55 +1540,58 @@ export function TablaPlanificacion({
                                                             0,
                                                         );
 
-                                                    let cantidad = '';
-
-                                                    if (total.length > 0) {
-                                                        cantidad = total.reduce(
-                                                            (sum, d) =>
-                                                                sum +
-                                                                d.cantidad,
-                                                            0,
+                                                    const {
+                                                        cantidad,
+                                                        cantidadAnteriorACiclo,
+                                                        updateCant,
+                                                        mostrarComoAnteriorACiclo,
+                                                    } =
+                                                        obtenerEstadoCeldaProduccion(
+                                                            {
+                                                                platoCodigo,
+                                                                platoPadreCodigo,
+                                                                fechaClave,
+                                                                indexOriginal,
+                                                            },
                                                         );
-                                                    }
 
-                                                    let updateCant = false;
-
-                                                    if (update.length > 0) {
-                                                        updateCant = true;
-                                                        const tieneEliminacion =
-                                                            update.some(
-                                                                (d) =>
-                                                                    d?.eliminar ===
-                                                                        true ||
-                                                                    d?.cantidad ===
-                                                                        null ||
-                                                                    d?.cantidad ===
-                                                                        '',
-                                                            );
-
-                                                        if (tieneEliminacion) {
-                                                            cantidad = '';
-                                                        } else {
-                                                            cantidad =
-                                                                update.reduce(
-                                                                    (sum, d) =>
-                                                                        sum +
-                                                                        Number(
-                                                                            d.cantidad,
-                                                                        ),
-                                                                    0,
-                                                            );
-                                                        }
-                                                    }
-
-                                                    const fechaCelda = format(
-                                                        diaLimpio,
-                                                        'yyyy-MM-dd',
-                                                    );
+                                                    const fechaCelda =
+                                                        fechaClave;
+                                                    const valorInput =
+                                                        mostrarComoAnteriorACiclo
+                                                            ? ''
+                                                            : cantidad;
+                                                    const badgeNecesarioArrastrable =
+                                                        !mostrarComoAnteriorACiclo &&
+                                                        totalConsumo > 0 &&
+                                                        RolProvider !==
+                                                            'consultor';
+                                                    const badgeDerecho =
+                                                        mostrarComoAnteriorACiclo
+                                                            ? {
+                                                                  className:
+                                                                      'planificacion-badge-anterior-ciclo',
+                                                                  texto: cantidadAnteriorACiclo.toFixed(
+                                                                      2,
+                                                                  ),
+                                                                  title: 'Cantidad decidida antes del ciclo actual',
+                                                              }
+                                                            : totalConsumo > 0
+                                                              ? {
+                                                                    className:
+                                                                        'planificacion-badge-necesario',
+                                                                    texto: totalConsumo.toFixed(
+                                                                        2,
+                                                                    ),
+                                                                    title: 'Cantidad necesaria para este día',
+                                                                    draggable:
+                                                                        badgeNecesarioArrastrable,
+                                                                }
+                                                              : null;
                                                     const placeholderArrastrable =
                                                         RolProvider !==
                                                             'consultor' &&
-                                                        cantidad === '' &&
+                                                        valorInput === '' &&
                                                         totalConsumo > 0;
 
                                                     return (
@@ -1535,102 +1604,156 @@ export function TablaPlanificacion({
                                                             key={
                                                                 platoCodigo +
                                                                 platoPadreCodigo +
-                                                                i
+                                                                fechaClave
                                                             }>
-                                                            <Form.Control
-                                                                type="number"
-                                                                disabled={
-                                                                    RolProvider ===
-                                                                    'consultor'
-                                                                }
-                                                                style={{
-                                                                    width: '100%',
-                                                                    color: updateCant
-                                                                        ? '#ff0000'
-                                                                        : '#000000',
-                                                                    cursor: placeholderArrastrable
-                                                                        ? 'grab'
-                                                                        : 'text',
-                                                                }}
-                                                                className="form-control form-control-sm input"
-                                                                value={cantidad}
-                                                                placeholder={
-                                                                    totalConsumo
-                                                                        ? totalConsumo.toString()
-                                                                        : ''
-                                                                }
-                                                                step={0.1}
-                                                                min={0}
-                                                                draggable={
-                                                                    placeholderArrastrable
-                                                                }
-                                                                onDragStart={(
-                                                                    event,
-                                                                ) => {
-                                                                    if (
-                                                                        !placeholderArrastrable
-                                                                    ) {
-                                                                        return;
+                                                            <div
+                                                                className={
+                                                                    badgeDerecho
+                                                                        ? 'planificacion-celda-con-badge'
+                                                                        : undefined
+                                                                }>
+                                                                <Form.Control
+                                                                    type="number"
+                                                                    disabled={
+                                                                        RolProvider ===
+                                                                        'consultor'
                                                                     }
-                                                                    iniciarDragCantidad(
+                                                                    style={{
+                                                                        width: '100%',
+                                                                        color: updateCant
+                                                                            ? '#ff0000'
+                                                                            : undefined,
+                                                                        cursor: placeholderArrastrable
+                                                                            ? 'grab'
+                                                                            : 'text',
+                                                                    }}
+                                                                    className="form-control form-control-sm input"
+                                                                    value={
+                                                                        valorInput
+                                                                    }
+                                                                    placeholder={
+                                                                        !badgeDerecho &&
+                                                                        totalConsumo
+                                                                            ? totalConsumo.toString()
+                                                                            : ''
+                                                                    }
+                                                                    step={0.1}
+                                                                    min={0}
+                                                                    draggable={
+                                                                        placeholderArrastrable
+                                                                    }
+                                                                    onDragStart={(
                                                                         event,
-                                                                        {
-                                                                            mode: 'add',
-                                                                            value: totalConsumo,
-                                                                            platoCodigo,
-                                                                            platoPadreCodigo,
-                                                                        },
-                                                                    );
-                                                                }}
-                                                                onDragOver={(
-                                                                    event,
-                                                                ) => {
-                                                                    handleDragOverInputCantidad(
+                                                                    ) => {
+                                                                        if (
+                                                                            !placeholderArrastrable
+                                                                        ) {
+                                                                            return;
+                                                                        }
+                                                                        iniciarDragCantidad(
+                                                                            event,
+                                                                            {
+                                                                                mode: 'add',
+                                                                                value: totalConsumo,
+                                                                                platoCodigo,
+                                                                                platoPadreCodigo,
+                                                                            },
+                                                                        );
+                                                                    }}
+                                                                    onDragOver={(
                                                                         event,
-                                                                        {
-                                                                            platoCodigo,
-                                                                            platoPadreCodigo,
-                                                                        },
-                                                                    );
-                                                                }}
-                                                                onDrop={(
-                                                                    event,
-                                                                ) => {
-                                                                    handleDropInputCantidad(
+                                                                    ) => {
+                                                                        handleDragOverInputCantidad(
+                                                                            event,
+                                                                            {
+                                                                                platoCodigo,
+                                                                                platoPadreCodigo,
+                                                                            },
+                                                                        );
+                                                                    }}
+                                                                    onDrop={(
                                                                         event,
-                                                                        {
+                                                                    ) => {
+                                                                        handleDropInputCantidad(
+                                                                            event,
+                                                                            {
+                                                                                plato,
+                                                                                platoCodigo,
+                                                                                platoPadre,
+                                                                                platoPadreCodigo,
+                                                                                fecha: fechaCelda,
+                                                                                cantidadActual:
+                                                                                    valorInput,
+                                                                            },
+                                                                        );
+                                                                    }}
+                                                                    title={
+                                                                        placeholderArrastrable
+                                                                            ? 'Arrastrá este valor para sumarlo en otra celda de la misma fila'
+                                                                            : undefined
+                                                                    }
+                                                                    onChange={(
+                                                                        e,
+                                                                    ) => {
+                                                                        actualizarProduccionCelda(
                                                                             plato,
                                                                             platoCodigo,
                                                                             platoPadre,
                                                                             platoPadreCodigo,
-                                                                            fecha: fechaCelda,
-                                                                            cantidadActual:
-                                                                                cantidad,
-                                                                        },
-                                                                    );
-                                                                }}
-                                                                title={
-                                                                    placeholderArrastrable
-                                                                        ? 'Arrastrá este valor para sumarlo en otra celda de la misma fila'
-                                                                        : undefined
-                                                                }
-                                                                onChange={(
-                                                                    e,
-                                                                ) => {
-                                                                    actualizarProduccionCelda(
-                                                                        plato,
-                                                                        platoCodigo,
-                                                                        platoPadre,
-                                                                        platoPadreCodigo,
-                                                                        fechaCelda,
-                                                                        e.target
-                                                                            .value,
-                                                                    );
-                                                                }}
-                                                            />
+                                                                            fechaCelda,
+                                                                            e.target
+                                                                                .value,
+                                                                        );
+                                                                    }}
+                                                                />
+                                                                {badgeDerecho && (
+                                                                    <span
+                                                                        draggable={
+                                                                            badgeDerecho.draggable ===
+                                                                            true
+                                                                        }
+                                                                        className={
+                                                                            `${badgeDerecho.className}${
+                                                                                badgeDerecho.draggable
+                                                                                    ? ' planificacion-badge-arrastrable'
+                                                                                    : ''
+                                                                            }`
+                                                                        }
+                                                                        onDragStart={(
+                                                                            event,
+                                                                        ) => {
+                                                                            if (
+                                                                                badgeDerecho.draggable !==
+                                                                                true
+                                                                            ) {
+                                                                                return;
+                                                                            }
+
+                                                                            iniciarDragCantidad(
+                                                                                event,
+                                                                                {
+                                                                                    mode: 'add',
+                                                                                    value: totalConsumo,
+                                                                                    platoCodigo,
+                                                                                    platoPadreCodigo,
+                                                                                },
+                                                                            );
+                                                                        }}
+                                                                        title={
+                                                                            badgeDerecho.draggable
+                                                                                ? 'Arrastrá este valor para sumarlo en otra celda de la misma fila'
+                                                                                : badgeDerecho.title
+                                                                        }>
+                                                                        {
+                                                                            badgeDerecho.texto
+                                                                        }
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                         </td>
                                                     );
-                                                })}
+                                                },
+                                            )}
                                         </tr>
                                         {platoExpandido === plato && (
                                             <PlatoDetalle

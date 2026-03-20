@@ -39,7 +39,7 @@ export interface EventoPlanificacion {
     // agrega aquí otras propiedades si existen
 }
 
-interface ProduccionBase {
+export interface ProduccionBase {
     plato: string;
     platoCodigo: string;
     platoPadre: string;
@@ -47,17 +47,36 @@ interface ProduccionBase {
     fecha: string;
 }
 
-interface ProduccionEdit extends ProduccionBase {
+export interface ProduccionPlanificacion extends ProduccionBase {
+    id?: number;
+    cantidad: number;
+    observacion?: string | null;
+    observacionProduccion?: string | null;
+    salon?: string | null;
+    createdAt?: string;
+    updatedAt?: string;
+    esAnteriorACiclo?: boolean;
+}
+
+export interface ProduccionEdit extends ProduccionBase {
     cantidad: number;
     eliminar?: false;
 }
 
-interface ProduccionDelete extends ProduccionBase {
+export interface ProduccionDelete extends ProduccionBase {
     cantidad: null;
     eliminar: true;
 }
 
-type ProduccionChange = ProduccionEdit | ProduccionDelete;
+export type ProduccionChange = ProduccionEdit | ProduccionDelete;
+
+export interface ObservacionPlanificacion {
+    plato: string;
+    platoCodigo: string;
+    observacion: string;
+    platoPadre: string;
+    platoPadreCodigo: string;
+}
 
 type EstadoAutoGuardado = 'idle' | 'pending' | 'saving' | 'saved' | 'error';
 
@@ -152,10 +171,10 @@ function construirFirmaProduccion(items: ProduccionChange[]): string {
 }
 
 function mergeProduccionGuardada(
-    produccionActual: any[],
+    produccionActual: ProduccionPlanificacion[],
     cambiosGuardados: ProduccionChange[],
-): any[] {
-    const porClave = new Map<string, any>();
+): ProduccionPlanificacion[] {
+    const porClave = new Map<string, ProduccionPlanificacion>();
 
     for (const item of produccionActual) {
         const clave = construirClaveProduccion({
@@ -184,6 +203,7 @@ function mergeProduccionGuardada(
             platoPadreCodigo: item.platoPadreCodigo,
             fecha: item.fecha,
             cantidad: item.cantidad,
+            esAnteriorACiclo: false,
         });
     }
 
@@ -207,23 +227,19 @@ export default function PlanificacionPage() {
         number | null
     >(null);
     const [maxCantidadEventosDia, setMaxCantidadEventosDia] = useState(0);
-    const [produccion, setProduccion] = useState<any[]>([]);
+    const [produccion, setProduccion] = useState<ProduccionPlanificacion[]>([]);
     const [datosFiltrados, setDatosFiltrados] = useState<any[]>([]);
     const [filtro] = useState('');
     const [diaActivo, setDiaActivo] = useState('');
     const [platoExpandido, setPlatoExpandido] = useState<string | null>(null);
-    const [produccionUpdate, setProduccionUpdate] = React.useState<any[]>([]);
+    const [produccionUpdate, setProduccionUpdate] = React.useState<
+        ProduccionChange[]
+    >([]);
     const [loading, setLoading] = useState(false);
     const [actualizandoPlanificacion, setActualizandoPlanificacion] =
         useState(false);
     const [observaciones, setObservaciones] = useState<
-        {
-            plato: string;
-            platoCodigo: string;
-            observacion: string;
-            platoPadre: string;
-            platoPadreCodigo: string;
-        }[]
+        ObservacionPlanificacion[]
     >([]);
     const [eventoAdelantado, setEventoAdelantado] = useState(0);
     const [estadoAutoGuardado, setEstadoAutoGuardado] =
@@ -287,7 +303,9 @@ export default function PlanificacionPage() {
             .then((res) => res.json())
             .then((data) => {
                 setDatos(data.planifacion || []);
-                setProduccion(data.produccion || []);
+                setProduccion(
+                    (data.produccion || []) as ProduccionPlanificacion[],
+                );
             })
             .catch((error) => {
                 if (error?.name === 'AbortError') {
@@ -316,9 +334,11 @@ export default function PlanificacionPage() {
     useEffect(() => {
         const cambiosGuardados = JSON.parse(
             localStorage.getItem('produccionUpdate') || '[]',
-        );
+        ) as unknown;
         setProduccionUpdate(
-            Array.isArray(cambiosGuardados) ? cambiosGuardados : [],
+            Array.isArray(cambiosGuardados)
+                ? (cambiosGuardados as ProduccionChange[])
+                : [],
         );
         cambiosInicialesCargadosRef.current = true;
     }, []);

@@ -65,8 +65,30 @@ function normalizarTexto(valor: string | null | undefined): string {
     return (valor ?? '').trim();
 }
 
+function normalizarFechaInicioDia(valor: Date): Date {
+    const fechaNormalizada = new Date(valor);
+    fechaNormalizada.setHours(0, 0, 0, 0);
+    return fechaNormalizada;
+}
+
 function normalizarClave(valor: string | null | undefined): string {
     return normalizarTexto(valor).toLocaleLowerCase('es');
+}
+
+function obtenerDecisionAt(produccion: {
+    createdAt: Date;
+    updatedAt?: Date | null;
+}): Date {
+    const createdAt = new Date(produccion.createdAt);
+    const updatedAt = produccion?.updatedAt
+        ? new Date(produccion.updatedAt)
+        : null;
+
+    if (!updatedAt || Number.isNaN(updatedAt.getTime())) {
+        return createdAt;
+    }
+
+    return updatedAt.getTime() > createdAt.getTime() ? updatedAt : createdAt;
 }
 
 function crearMapasRecetas(recetas: Receta[]): MapasRecetas {
@@ -726,6 +748,7 @@ async function obtenerProduccion(
     salon: string,
     mapasRecetas: MapasRecetas,
 ) {
+    const inicioCiclo = normalizarFechaInicioDia(inicio);
     const produccion = await prisma.produccion.findMany({
         where: {
             fecha: {
@@ -745,6 +768,8 @@ async function obtenerProduccion(
             prod.platoPadre,
         ),
         cantidad: parseFloat(prod.cantidad.toFixed(2)),
+        esAnteriorACiclo:
+            obtenerDecisionAt(prod).getTime() < inicioCiclo.getTime(),
     }));
 }
 
