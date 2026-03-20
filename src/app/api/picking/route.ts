@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { addDays } from 'date-fns';
+import { addDays, format } from 'date-fns';
 import { NextRequest, NextResponse } from 'next/server';
 import { logAudit } from '@/lib/audit';
 
@@ -56,6 +56,8 @@ interface FilaPicking {
     subPlato: string;
     subPlatoCodigo: string;
     cantidadesPorComanda: Record<string, number>;
+    cantidadesPorFechaPedido?: Record<string, number>;
+    cantidadesPorFechaProduccion?: Record<string, number>;
 }
 
 const SUBPLATOS_EXCLUIDOS_POR_PLATO: Record<string, Set<string>> = {
@@ -99,11 +101,36 @@ function redondearCantidad(valor: number): number {
     return Number(valor.toFixed(4));
 }
 
+function normalizarFechaInicioDia(fecha: string | Date): Date {
+    const normalizada = new Date(fecha);
+    normalizada.setHours(0, 0, 0, 0);
+    return normalizada;
+}
+
+function obtenerClaveFecha(fecha: string | Date): string {
+    return format(normalizarFechaInicioDia(fecha), 'yyyy-MM-dd');
+}
+
+function obtenerClaveFechaProduccion(fecha: string | Date): string {
+    const normalizada = normalizarFechaInicioDia(fecha);
+    normalizada.setDate(normalizada.getDate() + 1);
+    return format(normalizada, 'yyyy-MM-dd');
+}
+
+function acumularCantidadPorClave(
+    cantidades: Record<string, number>,
+    clave: string,
+    cantidad: number,
+) {
+    cantidades[clave] = redondearCantidad((cantidades[clave] ?? 0) + cantidad);
+}
+
 export async function GET(req: NextRequest) {
     process.env.TZ = 'America/Argentina/Buenos_Aires';
 
     const { searchParams } = req.nextUrl;
     const salon: string = searchParams.get('salon') || 'A';
+    const incluirProduccion = searchParams.get('incluirProduccion') === 'true';
 
     try {
         const lugares = ['El Central', 'La Rural'];
@@ -153,6 +180,7 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({
                 comandas: [],
                 filas: [],
+                fechasExportacion: [],
             });
         }
 
@@ -219,8 +247,14 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({
                 comandas: [],
                 filas: [],
+                fechasExportacion: [],
             });
         }
+
+        const fechasExportacion = Array.from(
+            new Set(comandasTipadas.map((comanda) => obtenerClaveFecha(comanda.fecha))),
+        ).sort();
+        const fechasExportacionSet = new Set(fechasExportacion);
 
         const grafoRecetas = await construirGrafoRecetas(
             codigosPlatosComanda,
@@ -282,6 +316,18 @@ export async function GET(req: NextRequest) {
                                     cantidadSubPlato,
                             );
 
+                            if (incluirProduccion) {
+                                if (!fila.cantidadesPorFechaPedido) {
+                                    fila.cantidadesPorFechaPedido = {};
+                                }
+
+                                acumularCantidadPorClave(
+                                    fila.cantidadesPorFechaPedido,
+                                    obtenerClaveFecha(comanda.fecha),
+                                    cantidadSubPlato,
+                                );
+                            }
+
                             if (platoPadreCodigo !== codigo) {
                                 return null;
                             }
@@ -331,6 +377,77 @@ export async function GET(req: NextRequest) {
             codigosPlatosComanda,
         );
 
+        let filasRespuesta = filas;
+
+        if (incluirProduccion) {
+            const clavesFila = new Set(
+                filas.map(
+                    (fila) =>
+                        `${fila.platoPrincipalCodigo}|||${fila.subPlatoCodigo}`,
+                ),
+            );
+            const produccionDesde = addDays(inicioRango, -1);
+            const produccionHastaExclusivo = addDays(finRangoExclusivo, -1);
+            const producciones = await prisma.produccion.findMany({
+                where: {
+                    fecha: {
+                        gte: produccionDesde,
+                        lt: produccionHastaExclusivo,
+                    },
+                    cantidad: {
+                        gt: 0,
+                    },
+                    salon,
+                },
+                select: {
+                    fecha: true,
+                    cantidad: true,
+                    platoCodigo: true,
+                    platoPadreCodigo: true,
+                },
+            });
+            const produccionPorFila = new Map<string, Record<string, number>>();
+
+            for (const produccion of producciones) {
+                const platoCodigo = normalizarTexto(produccion.platoCodigo);
+                const platoPadreCodigo = normalizarTexto(
+                    produccion.platoPadreCodigo,
+                );
+                const claveFila = `${platoPadreCodigo}|||${platoCodigo}`;
+
+                if (!clavesFila.has(claveFila)) {
+                    continue;
+                }
+
+                const claveFecha = obtenerClaveFechaProduccion(produccion.fecha);
+
+                if (!fechasExportacionSet.has(claveFecha)) {
+                    continue;
+                }
+
+                if (!produccionPorFila.has(claveFila)) {
+                    produccionPorFila.set(claveFila, {});
+                }
+
+                acumularCantidadPorClave(
+                    produccionPorFila.get(claveFila)!,
+                    claveFecha,
+                    produccion.cantidad,
+                );
+            }
+
+            filasRespuesta = filas.map((fila) => {
+                const claveFila = `${fila.platoPrincipalCodigo}|||${fila.subPlatoCodigo}`;
+
+                return {
+                    ...fila,
+                    cantidadesPorFechaPedido: fila.cantidadesPorFechaPedido ?? {},
+                    cantidadesPorFechaProduccion:
+                        produccionPorFila.get(claveFila) ?? {},
+                };
+            });
+        }
+
         await logAudit({
             modulo: 'picking',
             accion: 'consultar_picking',
@@ -339,14 +456,16 @@ export async function GET(req: NextRequest) {
             resumen: `Consulta picking para salon ${salon}`,
             detalle: {
                 salon,
+                incluirProduccion,
                 comandas: comandasDesglosadas.length,
-                filas: filas.length,
+                filas: filasRespuesta.length,
             },
         });
 
         return NextResponse.json({
             comandas: comandasDesglosadas,
-            filas,
+            filas: filasRespuesta,
+            fechasExportacion,
         });
     } catch (error) {
         await logAudit({
