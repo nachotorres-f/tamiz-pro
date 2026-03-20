@@ -1,20 +1,24 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import React, { useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+    useCallback,
+    useContext,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from 'react';
 import {
     Button,
     FloatingLabel,
     Form,
     Modal,
-    OverlayTrigger,
     Spinner,
     Table,
-    Tooltip,
 } from 'react-bootstrap';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { PlatoDetalle } from './platoDetalle';
 import {
     ArrowsFullscreen,
     ChatRightText,
@@ -72,6 +76,11 @@ function sumarCantidad(items: Array<{ cantidad?: number | string | null }>) {
     );
 }
 
+const HEIGHT_TD = '3rem';
+const HEIGHT_HEADER_DIAS = '2.25rem';
+const STICKY_COLUMN_WIDTHS = ['3.5rem', '15rem', '15rem', '7rem'] as const;
+const ANCHO_DIA = '15rem';
+
 export function TablaPlanificacion({
     pageOcultos,
     platosUnicos,
@@ -79,7 +88,6 @@ export function TablaPlanificacion({
     datos,
     filtro,
     diaActivo,
-    platoExpandido,
     produccion,
     produccionUpdate,
     observaciones,
@@ -103,7 +111,6 @@ export function TablaPlanificacion({
     datos: any[];
     filtro: string;
     diaActivo: string;
-    platoExpandido: string | null;
     produccion: ProduccionPlanificacion[];
     produccionUpdate: ProduccionChange[];
     observaciones: ObservacionPlanificacion[];
@@ -119,9 +126,15 @@ export function TablaPlanificacion({
     // anchoButton: any;
     // anchoPlato: any;
     // anchoTotal: any;
-    setPlatoExpandido: (value: string | null) => void;
     setEventoAdelantado: (value: number) => void;
 }) {
+    type PlatoAdelantado = {
+        cantidad: number;
+        fecha: string | null;
+        id: number;
+        nombre: string;
+    };
+
     const RolProvider = useContext(RolContext);
 
     const [ocultos, setOcultos] = React.useState<Set<string>>(new Set());
@@ -132,13 +145,28 @@ export function TablaPlanificacion({
     const [platoPadreCodigoModal, setPlatoPadreCodigoModal] = useState('');
     const [observacionModal, setObservacionModal] = useState('');
     const [adelantarEvento, setAdelantarEvento] = useState(0);
-    const [platosAdelantados, setPlatosAdelantados] = useState<any[]>([]);
+    const [platosAdelantados, setPlatosAdelantados] = useState<
+        PlatoAdelantado[]
+    >([]);
     const [cargandoPlatosAdelantados, setCargandoPlatosAdelantados] =
         useState(false);
     const [adelantandoTodo, setAdelantandoTodo] = useState(false);
     const [accionMasivaAdelanto, setAccionMasivaAdelanto] = useState<
         'adelantar' | 'desadelantar' | null
     >(null);
+    const [celdaEditando, setCeldaEditando] = useState<string | null>(null);
+    const [valorCeldaEditando, setValorCeldaEditando] = useState('');
+    const [tooltipCompartido, setTooltipCompartido] = useState<{
+        left: number;
+        text: string;
+        top: number;
+        visible: boolean;
+    }>({
+        left: 0,
+        text: '',
+        top: 0,
+        visible: false,
+    });
     const [platosGuardandoAdelanto, setPlatosGuardandoAdelanto] = useState<
         Set<number>
     >(new Set());
@@ -147,6 +175,9 @@ export function TablaPlanificacion({
     const solicitudesAdelantoPendientesRef = useRef<Promise<boolean>[]>([]);
     const timerRefrescoPlanificacionRef = useRef<number | null>(null);
     const contenedorTablasRef = useRef<HTMLDivElement | null>(null);
+    const cachePlatosAdelantadosRef = useRef<
+        Map<number, PlatoAdelantado[]>
+    >(new Map());
     //const [primeraCargaModal, setPrimeraCargaModal] = useState(true);
 
     useEffect(() => {
@@ -173,7 +204,34 @@ export function TablaPlanificacion({
     //     setOcultos(nuevos);
     // };
 
-    const handleClose = () => setShow(false);
+    const handleClose = useCallback(() => setShow(false), []);
+
+    const ocultarTooltipCompartido = useCallback(() => {
+        setTooltipCompartido((prev) =>
+            prev.visible ? { ...prev, visible: false } : prev,
+        );
+    }, []);
+
+    const mostrarTooltipCompartido = useCallback((
+        event:
+            | React.MouseEvent<HTMLElement>
+            | React.FocusEvent<HTMLElement>,
+        text: string,
+    ) => {
+        if (!text.trim()) {
+            ocultarTooltipCompartido();
+            return;
+        }
+
+        const rect = event.currentTarget.getBoundingClientRect();
+
+        setTooltipCompartido({
+            left: rect.left + rect.width / 2,
+            text,
+            top: rect.bottom + 8,
+            visible: true,
+        });
+    }, [ocultarTooltipCompartido]);
 
     const dispararActualizacionPlanificacion = (inmediato = false) => {
         if (timerRefrescoPlanificacionRef.current !== null) {
@@ -206,6 +264,7 @@ export function TablaPlanificacion({
             setIsFullscreenTablas(
                 document.fullscreenElement === contenedorTablasRef.current,
             );
+            ocultarTooltipCompartido();
         };
 
         document.addEventListener('fullscreenchange', handleFullscreenChange);
@@ -217,9 +276,28 @@ export function TablaPlanificacion({
                 handleFullscreenChange,
             );
         };
-    }, []);
+    }, [ocultarTooltipCompartido]);
 
-    const handleToggleFullscreenTablas = async () => {
+    useEffect(() => {
+        const contenedor = contenedorTablasRef.current;
+
+        if (!contenedor) {
+            return;
+        }
+
+        contenedor.addEventListener('scroll', ocultarTooltipCompartido, {
+            passive: true,
+        });
+
+        return () => {
+            contenedor.removeEventListener(
+                'scroll',
+                ocultarTooltipCompartido,
+            );
+        };
+    }, [ocultarTooltipCompartido]);
+
+    const handleToggleFullscreenTablas = useCallback(async () => {
         const contenedor = contenedorTablasRef.current;
 
         if (!contenedor) return;
@@ -234,21 +312,50 @@ export function TablaPlanificacion({
         } catch (error) {
             console.error('No se pudo cambiar a pantalla completa:', error);
         }
-    };
+    }, []);
+
+    const abrirAdelantoEvento = useCallback(
+        (eventoId: number) => {
+            if (RolProvider === 'consultor') {
+                return;
+            }
+
+            const cached =
+                cachePlatosAdelantadosRef.current.get(eventoId) ?? null;
+
+            setAdelantarEvento(eventoId);
+            setPlatosAdelantados(cached ?? []);
+            setCargandoPlatosAdelantados(cached === null);
+        },
+        [RolProvider],
+    );
 
     useEffect(() => {
         if (adelantarEvento == 0) return;
 
+        const cached =
+            cachePlatosAdelantadosRef.current.get(adelantarEvento) ?? null;
+
+        if (cached !== null) {
+            setPlatosAdelantados(cached);
+            setCargandoPlatosAdelantados(false);
+            return;
+        }
+
         const abortController = new AbortController();
         setCargandoPlatosAdelantados(true);
-        setPlatosAdelantados([]);
 
         fetch(`/api/planificacion/adelantarEvento?id=${adelantarEvento}`, {
             signal: abortController.signal,
         })
             .then((res) => res.json())
             .then((data) => {
-                setPlatosAdelantados(data.Plato || []);
+                const platos = Array.isArray(data?.Plato)
+                    ? (data.Plato as PlatoAdelantado[])
+                    : [];
+
+                cachePlatosAdelantadosRef.current.set(adelantarEvento, platos);
+                setPlatosAdelantados(platos);
             })
             .catch((error) => {
                 if (error?.name === 'AbortError') {
@@ -269,6 +376,17 @@ export function TablaPlanificacion({
         };
     }, [adelantarEvento]);
 
+    useEffect(() => {
+        if (adelantarEvento === 0 || cargandoPlatosAdelantados) {
+            return;
+        }
+
+        cachePlatosAdelantadosRef.current.set(
+            adelantarEvento,
+            platosAdelantados,
+        );
+    }, [adelantarEvento, cargandoPlatosAdelantados, platosAdelantados]);
+
     const registrarSolicitudAdelanto = (solicitud: Promise<boolean>) => {
         solicitudesAdelantoPendientesRef.current.push(solicitud);
         void solicitud.finally(() => {
@@ -287,7 +405,12 @@ export function TablaPlanificacion({
         setPlatosAdelantados((prev) =>
             prev.map((item) =>
                 item.id === platoId
-                    ? { ...item, fecha: adelantar ? new Date() : null }
+                    ? {
+                          ...item,
+                          fecha: adelantar
+                              ? new Date().toISOString()
+                              : null,
+                      }
                     : item,
             ),
         );
@@ -397,7 +520,7 @@ export function TablaPlanificacion({
         }
     };
 
-    const actualizarProduccionCelda = (
+    const actualizarProduccionCelda = useCallback((
         plato: string,
         platoCodigo: string,
         platoPadre: string,
@@ -405,59 +528,106 @@ export function TablaPlanificacion({
         fecha: string,
         valorInput: string,
     ) => {
-        const nuevaProduccion = [...produccionUpdate];
-        const index = nuevaProduccion.findIndex(
-            (p) =>
-                p.platoCodigo === platoCodigo &&
-                p.platoPadreCodigo === platoPadreCodigo &&
-                p.fecha === fecha,
-        );
+        setProduccionUpdate((prevProduccion) => {
+            const nuevaProduccion = [...prevProduccion];
+            const index = nuevaProduccion.findIndex(
+                (p) =>
+                    p.platoCodigo === platoCodigo &&
+                    p.platoPadreCodigo === platoPadreCodigo &&
+                    p.fecha === fecha,
+            );
 
-        if (valorInput === '') {
-            const valorEliminado: ProduccionChange = {
+            if (valorInput === '') {
+                const valorEliminado: ProduccionChange = {
+                    plato,
+                    platoCodigo,
+                    platoPadre,
+                    platoPadreCodigo,
+                    fecha,
+                    cantidad: null,
+                    eliminar: true as const,
+                };
+
+                if (index > -1) {
+                    nuevaProduccion[index] = valorEliminado;
+                } else {
+                    nuevaProduccion.push(valorEliminado);
+                }
+
+                return nuevaProduccion;
+            }
+
+            const cantidad = Number.parseFloat(valorInput.replace(',', '.'));
+
+            if (!Number.isFinite(cantidad)) {
+                return prevProduccion;
+            }
+
+            const valorActualizado: ProduccionChange = {
                 plato,
                 platoCodigo,
                 platoPadre,
                 platoPadreCodigo,
                 fecha,
-                cantidad: null,
-                eliminar: true as const,
+                cantidad: Number(cantidad.toFixed(2)),
+                eliminar: false as const,
             };
 
             if (index > -1) {
-                nuevaProduccion[index] = valorEliminado;
+                nuevaProduccion[index] = valorActualizado;
             } else {
-                nuevaProduccion.push(valorEliminado);
+                nuevaProduccion.push(valorActualizado);
             }
 
-            setProduccionUpdate(nuevaProduccion);
+            return nuevaProduccion;
+        });
+    }, [setProduccionUpdate]);
+
+    const iniciarEdicionCelda = useCallback((
+        celdaKey: string,
+        valorActual: number | string,
+    ) => {
+        if (RolProvider === 'consultor') {
             return;
         }
 
-        const cantidad = Number.parseFloat(valorInput.replace(',', '.'));
+        setCeldaEditando(celdaKey);
+        setValorCeldaEditando(valorActual === '' ? '' : String(valorActual));
+    }, [RolProvider]);
 
-        if (!Number.isFinite(cantidad)) {
-            return;
-        }
+    const cerrarEdicionCelda = useCallback(() => {
+        setCeldaEditando(null);
+        setValorCeldaEditando('');
+    }, []);
 
-        const valorActualizado: ProduccionChange = {
+    const guardarEdicionCelda = useCallback(({
+        celdaKey,
+        fecha,
+        plato,
+        platoCodigo,
+        platoPadre,
+        platoPadreCodigo,
+    }: {
+        celdaKey: string;
+        fecha: string;
+        plato: string;
+        platoCodigo: string;
+        platoPadre: string;
+        platoPadreCodigo: string;
+    }) => {
+        actualizarProduccionCelda(
             plato,
             platoCodigo,
             platoPadre,
             platoPadreCodigo,
             fecha,
-            cantidad: Number(cantidad.toFixed(2)),
-            eliminar: false as const,
-        };
+            valorCeldaEditando,
+        );
 
-        if (index > -1) {
-            nuevaProduccion[index] = valorActualizado;
-        } else {
-            nuevaProduccion.push(valorActualizado);
+        if (celdaEditando === celdaKey) {
+            cerrarEdicionCelda();
         }
-
-        setProduccionUpdate(nuevaProduccion);
-    };
+    }, [actualizarProduccionCelda, celdaEditando, cerrarEdicionCelda, valorCeldaEditando]);
 
     type DragCantidadPayload = {
         mode: 'set' | 'add';
@@ -468,7 +638,7 @@ export function TablaPlanificacion({
 
     const DRAG_CANTIDAD_MIME = 'application/x-tamiz-planificacion-cantidad';
 
-    const iniciarDragCantidad = (
+    const iniciarDragCantidad = useCallback((
         event: React.DragEvent<HTMLElement>,
         payload: DragCantidadPayload,
     ) => {
@@ -490,9 +660,9 @@ export function TablaPlanificacion({
         );
         event.dataTransfer.setData('text/plain', String(value));
         event.dataTransfer.effectAllowed = 'copy';
-    };
+    }, []);
 
-    const obtenerDragCantidad = (
+    const obtenerDragCantidad = useCallback((
         dataTransfer: DataTransfer,
     ): DragCantidadPayload | null => {
         const dataCustom = dataTransfer.getData(DRAG_CANTIDAD_MIME);
@@ -522,9 +692,9 @@ export function TablaPlanificacion({
         }
 
         return null;
-    };
+    }, []);
 
-    const esMismaFilaDrag = (
+    const esMismaFilaDrag = useCallback((
         payload: DragCantidadPayload,
         {
             platoCodigo,
@@ -535,9 +705,10 @@ export function TablaPlanificacion({
         },
     ) =>
         payload.platoCodigo === platoCodigo &&
-        payload.platoPadreCodigo === platoPadreCodigo;
+        payload.platoPadreCodigo === platoPadreCodigo,
+    []);
 
-    const handleDragOverInputCantidad = (
+    const handleDragOverInputCantidad = useCallback((
         event: React.DragEvent<HTMLElement>,
         {
             platoCodigo,
@@ -571,9 +742,9 @@ export function TablaPlanificacion({
 
         event.preventDefault();
         event.dataTransfer.dropEffect = 'copy';
-    };
+    }, [RolProvider, esMismaFilaDrag, obtenerDragCantidad]);
 
-    const handleDropInputCantidad = (
+    const handleDropInputCantidad = useCallback((
         event: React.DragEvent<HTMLElement>,
         {
             plato,
@@ -626,7 +797,12 @@ export function TablaPlanificacion({
             fecha,
             nuevoValor.toString(),
         );
-    };
+    }, [
+        RolProvider,
+        actualizarProduccionCelda,
+        esMismaFilaDrag,
+        obtenerDragCantidad,
+    ]);
 
     const construirClaveFila = (
         platoCodigo: string,
@@ -796,6 +972,7 @@ export function TablaPlanificacion({
 
     type CeldaPlanificacionModel = {
         badgeDerecho: BadgeCelda | null;
+        cellKey: string;
         fechaClave: string;
         indexOriginal: number;
         placeholderArrastrable: boolean;
@@ -946,6 +1123,7 @@ export function TablaPlanificacion({
 
                             return {
                                 badgeDerecho,
+                                cellKey: celdaKey,
                                 fechaClave,
                                 indexOriginal,
                                 placeholderArrastrable:
@@ -998,37 +1176,56 @@ export function TablaPlanificacion({
         platosAdelantados.length > 0 &&
         platosAdelantados.every((plato) => !!plato.fecha);
 
-    const heightTd = '3rem';
-    const stickyColumnWidths = ['3.5rem', '15rem', '15rem', '7rem'] as const;
-    const stickyColumnLefts = [
-        '0px',
-        stickyColumnWidths[0],
-        `calc(${stickyColumnWidths[0]} + ${stickyColumnWidths[1]})`,
-        `calc(${stickyColumnWidths[0]} + ${stickyColumnWidths[1]} + ${stickyColumnWidths[2]})`,
-    ] as const;
-    const anchoDia = '15rem';
-    const totalColumnasPlanificacion =
-        stickyColumnWidths.length + diasVisibles.length;
+    const stickyColumnLefts = useMemo(
+        () =>
+            [
+                '0px',
+                STICKY_COLUMN_WIDTHS[0],
+                `calc(${STICKY_COLUMN_WIDTHS[0]} + ${STICKY_COLUMN_WIDTHS[1]})`,
+                `calc(${STICKY_COLUMN_WIDTHS[0]} + ${STICKY_COLUMN_WIDTHS[1]} + ${STICKY_COLUMN_WIDTHS[2]})`,
+            ] as const,
+        [],
+    );
 
-    const styleCeldaBase: React.CSSProperties = {
-        height: heightTd,
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        verticalAlign: 'middle',
-        whiteSpace: 'nowrap',
-    };
+    const styleCeldaBase = useMemo<React.CSSProperties>(
+        () => ({
+            height: HEIGHT_TD,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            verticalAlign: 'middle',
+            whiteSpace: 'nowrap',
+        }),
+        [],
+    );
 
-    const styleCeldaDia: React.CSSProperties = {
-        ...styleCeldaBase,
-        maxWidth: anchoDia,
-        minWidth: anchoDia,
-        width: anchoDia,
-    };
+    const styleCeldaDia = useMemo<React.CSSProperties>(
+        () => ({
+            ...styleCeldaBase,
+            maxWidth: ANCHO_DIA,
+            minWidth: ANCHO_DIA,
+            width: ANCHO_DIA,
+        }),
+        [styleCeldaBase],
+    );
 
-    const obtenerTopSticky = (headerIndex: number) =>
-        `calc(${headerIndex} * ${heightTd})`;
+    const styleHeaderDiasBase = useMemo<React.CSSProperties>(
+        () => ({
+            ...styleCeldaBase,
+            fontSize: '0.95rem',
+            height: HEIGHT_HEADER_DIAS,
+            lineHeight: 1.1,
+            paddingBottom: '0.25rem',
+            paddingTop: '0.25rem',
+        }),
+        [styleCeldaBase],
+    );
 
-    const obtenerStyleStickyIzquierda = (
+    const obtenerTopSticky = useCallback(
+        (headerIndex: number) => `calc(${headerIndex} * ${HEIGHT_TD})`,
+        [],
+    );
+
+    const obtenerStyleStickyIzquierda = useCallback((
         columnIndex: number,
         backgroundColor: string,
         extra: React.CSSProperties = {},
@@ -1036,37 +1233,483 @@ export function TablaPlanificacion({
         ...styleCeldaBase,
         backgroundColor,
         left: stickyColumnLefts[columnIndex],
-        maxWidth: stickyColumnWidths[columnIndex],
-        minWidth: stickyColumnWidths[columnIndex],
+        maxWidth: STICKY_COLUMN_WIDTHS[columnIndex],
+        minWidth: STICKY_COLUMN_WIDTHS[columnIndex],
         position: 'sticky',
-        width: stickyColumnWidths[columnIndex],
+        width: STICKY_COLUMN_WIDTHS[columnIndex],
         zIndex: 3,
         ...extra,
-    });
+    }), [stickyColumnLefts, styleCeldaBase]);
 
-    const obtenerStyleHeaderStickyIzquierda = (
+    const obtenerStyleHeaderStickyIzquierda = useCallback((
         columnIndex: number,
         headerIndex: number,
         backgroundColor: string,
         extra: React.CSSProperties = {},
     ): React.CSSProperties => ({
-        ...obtenerStyleStickyIzquierda(columnIndex, backgroundColor, extra),
+        ...obtenerStyleStickyIzquierda(columnIndex, backgroundColor),
         top: obtenerTopSticky(headerIndex),
         zIndex: 8,
-    });
+        ...(headerIndex === maxCantidadEventosDia ? styleHeaderDiasBase : {}),
+        ...extra,
+    }), [
+        maxCantidadEventosDia,
+        obtenerStyleStickyIzquierda,
+        obtenerTopSticky,
+        styleHeaderDiasBase,
+    ]);
 
-    const obtenerStyleHeaderDia = (
+    const obtenerStyleHeaderDia = useCallback((
         headerIndex: number,
         backgroundColor: string,
         extra: React.CSSProperties = {},
     ): React.CSSProperties => ({
-        ...styleCeldaDia,
+        ...(headerIndex === maxCantidadEventosDia
+            ? {
+                  ...styleCeldaDia,
+                  ...styleHeaderDiasBase,
+              }
+            : styleCeldaDia),
         backgroundColor,
         position: 'sticky',
         top: obtenerTopSticky(headerIndex),
         zIndex: 6,
         ...extra,
-    });
+    }), [
+        maxCantidadEventosDia,
+        obtenerTopSticky,
+        styleCeldaDia,
+        styleHeaderDiasBase,
+    ]);
+
+    const obtenerStyleTextoSticky = useCallback((
+        columnIndex: 1 | 2,
+    ): React.CSSProperties => ({
+        maxWidth: `calc(${STICKY_COLUMN_WIDTHS[columnIndex]} - 1rem)`,
+        width: `calc(${STICKY_COLUMN_WIDTHS[columnIndex]} - 1rem)`,
+    }), []);
+
+    const filasTabla = useMemo(
+        () =>
+            filasPlanificacion.map((fila) => (
+                <React.Fragment key={fila.rowKey}>
+                    <tr style={{ textAlign: 'center' }}>
+                        <td
+                            style={obtenerStyleStickyIzquierda(
+                                0,
+                                fila.rowBackgroundColor,
+                                {
+                                    textAlign: 'center',
+                                },
+                            )}>
+                            <Button
+                                size="sm"
+                                variant="primary"
+                                style={{
+                                    width: '2rem',
+                                    height: '2.2rem',
+                                    display: 'flex',
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                }}
+                                onClick={() => {
+                                    setObservacionModal(fila.observacionActual);
+                                    setPlatoModal(fila.plato);
+                                    setPlatoCodigoModal(fila.platoCodigo);
+                                    setPlatoPadreModal(fila.platoPadre);
+                                    setPlatoPadreCodigoModal(
+                                        fila.platoPadreCodigo,
+                                    );
+                                    setShow(true);
+                                }}>
+                                <ChatRightText />
+                            </Button>
+                        </td>
+                        <td
+                            style={obtenerStyleStickyIzquierda(
+                                1,
+                                fila.rowBackgroundColor,
+                                {
+                                    overflow: 'visible',
+                                    textOverflow: 'clip',
+                                },
+                            )}>
+                            <span
+                                className="planificacion-tooltip-target"
+                                style={obtenerStyleTextoSticky(1)}
+                                tabIndex={0}
+                                onMouseEnter={(event) => {
+                                    mostrarTooltipCompartido(
+                                        event,
+                                        fila.platoPadre,
+                                    );
+                                }}
+                                onFocus={(event) => {
+                                    mostrarTooltipCompartido(
+                                        event,
+                                        fila.platoPadre,
+                                    );
+                                }}
+                                onMouseLeave={ocultarTooltipCompartido}
+                                onBlur={ocultarTooltipCompartido}>
+                                {fila.platoPadre}
+                            </span>
+                        </td>
+                        <td
+                            style={obtenerStyleStickyIzquierda(
+                                2,
+                                fila.rowBackgroundColor,
+                                {
+                                    overflow: 'visible',
+                                    textOverflow: 'clip',
+                                },
+                            )}>
+                            <span
+                                className="planificacion-tooltip-target"
+                                style={obtenerStyleTextoSticky(2)}
+                                tabIndex={0}
+                                onMouseEnter={(event) => {
+                                    mostrarTooltipCompartido(event, fila.plato);
+                                }}
+                                onFocus={(event) => {
+                                    mostrarTooltipCompartido(event, fila.plato);
+                                }}
+                                onMouseLeave={ocultarTooltipCompartido}
+                                onBlur={ocultarTooltipCompartido}>
+                                {fila.plato}
+                            </span>
+                        </td>
+                        <td
+                            className={fila.claseColorTotal}
+                            style={obtenerStyleStickyIzquierda(
+                                3,
+                                fila.rowBackgroundColor,
+                                {
+                                    textAlign: 'center',
+                                },
+                            )}>
+                            <span
+                                draggable={RolProvider !== 'consultor'}
+                                onDragStart={(event) => {
+                                    iniciarDragCantidad(event, {
+                                        mode: 'set',
+                                        value: fila.totalNecesario,
+                                        platoCodigo: fila.platoCodigo,
+                                        platoPadreCodigo: fila.platoPadreCodigo,
+                                    });
+                                }}
+                                style={{
+                                    cursor:
+                                        RolProvider === 'consultor'
+                                            ? 'default'
+                                            : 'grab',
+                                    userSelect: 'none',
+                                }}
+                                title={
+                                    RolProvider === 'consultor'
+                                        ? undefined
+                                        : 'Arrastrá para pegar este total en una celda de la misma fila'
+                                }>
+                                {fila.totalNecesario.toFixed(2)}
+                            </span>
+                        </td>
+                        {fila.cells.map((celda) => {
+                            const badgeDerecho = celda.badgeDerecho;
+                            const estaEditando =
+                                celdaEditando === celda.cellKey;
+                            const mostrarPlaceholder =
+                                !badgeDerecho &&
+                                celda.valorInput === '' &&
+                                celda.totalConsumo > 0;
+                            const textoDisplay =
+                                celda.valorInput === ''
+                                    ? mostrarPlaceholder
+                                        ? celda.totalConsumo.toString()
+                                        : '\u00A0'
+                                    : String(celda.valorInput);
+                            const classNameDisplay = [
+                                'planificacion-celda-display',
+                                mostrarPlaceholder
+                                    ? 'planificacion-celda-display-placeholder'
+                                    : '',
+                                celda.updateCant
+                                    ? 'planificacion-celda-display-pending'
+                                    : '',
+                                celda.placeholderArrastrable
+                                    ? 'planificacion-celda-display-draggable'
+                                    : '',
+                            ]
+                                .filter(Boolean)
+                                .join(' ');
+
+                            return (
+                                <td
+                                    style={styleCeldaDia}
+                                    key={`${fila.rowKey}-${celda.fechaClave}`}>
+                                    <div
+                                        className={
+                                            badgeDerecho
+                                                ? 'planificacion-celda-con-badge'
+                                                : undefined
+                                        }>
+                                        {estaEditando ? (
+                                            <Form.Control
+                                                type="number"
+                                                autoFocus
+                                                disabled={
+                                                    RolProvider === 'consultor'
+                                                }
+                                                style={{
+                                                    width: '100%',
+                                                    color: celda.updateCant
+                                                        ? '#ff0000'
+                                                        : undefined,
+                                                }}
+                                                className="form-control form-control-sm input"
+                                                value={valorCeldaEditando}
+                                                placeholder={
+                                                    !badgeDerecho &&
+                                                    celda.totalConsumo
+                                                        ? celda.totalConsumo.toString()
+                                                        : ''
+                                                }
+                                                step={0.1}
+                                                min={0}
+                                                onDragOver={(event) => {
+                                                    handleDragOverInputCantidad(
+                                                        event,
+                                                        {
+                                                            platoCodigo:
+                                                                fila.platoCodigo,
+                                                            platoPadreCodigo:
+                                                                fila.platoPadreCodigo,
+                                                        },
+                                                    );
+                                                }}
+                                                onDrop={(event) => {
+                                                    handleDropInputCantidad(
+                                                        event,
+                                                        {
+                                                            plato: fila.plato,
+                                                            platoCodigo:
+                                                                fila.platoCodigo,
+                                                            platoPadre:
+                                                                fila.platoPadre,
+                                                            platoPadreCodigo:
+                                                                fila.platoPadreCodigo,
+                                                            fecha: celda.fechaClave,
+                                                            cantidadActual:
+                                                                valorCeldaEditando,
+                                                        },
+                                                    );
+                                                }}
+                                                onChange={(e) => {
+                                                    setValorCeldaEditando(
+                                                        e.target.value,
+                                                    );
+                                                }}
+                                                onBlur={() => {
+                                                    guardarEdicionCelda({
+                                                        celdaKey:
+                                                            celda.cellKey,
+                                                        fecha: celda.fechaClave,
+                                                        plato: fila.plato,
+                                                        platoCodigo:
+                                                            fila.platoCodigo,
+                                                        platoPadre:
+                                                            fila.platoPadre,
+                                                        platoPadreCodigo:
+                                                            fila.platoPadreCodigo,
+                                                    });
+                                                }}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        guardarEdicionCelda({
+                                                            celdaKey:
+                                                                celda.cellKey,
+                                                            fecha: celda.fechaClave,
+                                                            plato: fila.plato,
+                                                            platoCodigo:
+                                                                fila.platoCodigo,
+                                                            platoPadre:
+                                                                fila.platoPadre,
+                                                            platoPadreCodigo:
+                                                                fila.platoPadreCodigo,
+                                                        });
+                                                    }
+
+                                                    if (e.key === 'Escape') {
+                                                        cerrarEdicionCelda();
+                                                    }
+                                                }}
+                                            />
+                                        ) : RolProvider === 'consultor' ? (
+                                            <div
+                                                className={classNameDisplay}
+                                                onDragOver={(event) => {
+                                                    handleDragOverInputCantidad(
+                                                        event,
+                                                        {
+                                                            platoCodigo:
+                                                                fila.platoCodigo,
+                                                            platoPadreCodigo:
+                                                                fila.platoPadreCodigo,
+                                                        },
+                                                    );
+                                                }}
+                                                onDrop={(event) => {
+                                                    handleDropInputCantidad(
+                                                        event,
+                                                        {
+                                                            plato: fila.plato,
+                                                            platoCodigo:
+                                                                fila.platoCodigo,
+                                                            platoPadre:
+                                                                fila.platoPadre,
+                                                            platoPadreCodigo:
+                                                                fila.platoPadreCodigo,
+                                                            fecha: celda.fechaClave,
+                                                            cantidadActual:
+                                                                celda.valorInput,
+                                                        },
+                                                    );
+                                                }}>
+                                                {textoDisplay}
+                                            </div>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                className={classNameDisplay}
+                                                draggable={
+                                                    celda.placeholderArrastrable
+                                                }
+                                                onClick={() => {
+                                                    iniciarEdicionCelda(
+                                                        celda.cellKey,
+                                                        celda.valorInput,
+                                                    );
+                                                }}
+                                                onDragStart={(event) => {
+                                                    if (
+                                                        !celda.placeholderArrastrable
+                                                    ) {
+                                                        return;
+                                                    }
+
+                                                    iniciarDragCantidad(event, {
+                                                        mode: 'add',
+                                                        value: celda.totalConsumo,
+                                                        platoCodigo:
+                                                            fila.platoCodigo,
+                                                        platoPadreCodigo:
+                                                            fila.platoPadreCodigo,
+                                                    });
+                                                }}
+                                                onDragOver={(event) => {
+                                                    handleDragOverInputCantidad(
+                                                        event,
+                                                        {
+                                                            platoCodigo:
+                                                                fila.platoCodigo,
+                                                            platoPadreCodigo:
+                                                                fila.platoPadreCodigo,
+                                                        },
+                                                    );
+                                                }}
+                                                onDrop={(event) => {
+                                                    handleDropInputCantidad(
+                                                        event,
+                                                        {
+                                                            plato: fila.plato,
+                                                            platoCodigo:
+                                                                fila.platoCodigo,
+                                                            platoPadre:
+                                                                fila.platoPadre,
+                                                            platoPadreCodigo:
+                                                                fila.platoPadreCodigo,
+                                                            fecha: celda.fechaClave,
+                                                            cantidadActual:
+                                                                celda.valorInput,
+                                                        },
+                                                    );
+                                                }}
+                                                title={
+                                                    celda.placeholderArrastrable
+                                                        ? 'Arrastrá este valor para sumarlo en otra celda de la misma fila'
+                                                        : undefined
+                                                }>
+                                                {textoDisplay}
+                                            </button>
+                                        )}
+                                        {badgeDerecho && (
+                                            <span
+                                                draggable={
+                                                    badgeDerecho.draggable ===
+                                                    true
+                                                }
+                                                className={`${badgeDerecho.className}${
+                                                    badgeDerecho.draggable
+                                                        ? ' planificacion-badge-arrastrable'
+                                                        : ''
+                                                }`}
+                                                onDragStart={(event) => {
+                                                    const dragValue =
+                                                        badgeDerecho.value;
+
+                                                    if (
+                                                        badgeDerecho.draggable !==
+                                                            true ||
+                                                        dragValue ===
+                                                            undefined ||
+                                                        !Number.isFinite(
+                                                            dragValue,
+                                                        )
+                                                    ) {
+                                                        return;
+                                                    }
+
+                                                    iniciarDragCantidad(event, {
+                                                        mode: 'add',
+                                                        value: dragValue,
+                                                        platoCodigo:
+                                                            fila.platoCodigo,
+                                                        platoPadreCodigo:
+                                                            fila.platoPadreCodigo,
+                                                    });
+                                                }}
+                                                title={
+                                                    badgeDerecho.draggable
+                                                        ? 'Arrastrá este valor para sumarlo en otra celda de la misma fila'
+                                                        : badgeDerecho.title
+                                                }>
+                                                {badgeDerecho.texto}
+                                            </span>
+                                        )}
+                                    </div>
+                                </td>
+                            );
+                        })}
+                    </tr>
+                </React.Fragment>
+            )),
+        [
+            RolProvider,
+            celdaEditando,
+            cerrarEdicionCelda,
+            filasPlanificacion,
+            guardarEdicionCelda,
+            handleDragOverInputCantidad,
+            handleDropInputCantidad,
+            iniciarDragCantidad,
+            iniciarEdicionCelda,
+            mostrarTooltipCompartido,
+            obtenerStyleStickyIzquierda,
+            obtenerStyleTextoSticky,
+            ocultarTooltipCompartido,
+            styleCeldaDia,
+            valorCeldaEditando,
+        ],
+    );
 
     return (
         <>
@@ -1295,7 +1938,7 @@ export function TablaPlanificacion({
                         {Array.from({ length: maxCantidadEventosDia }).map(
                             (_, headerIndex) => (
                                 <tr key={`evento-header-${headerIndex}`}>
-                                    {stickyColumnWidths.map((_, columnIndex) => (
+                                    {STICKY_COLUMN_WIDTHS.map((_, columnIndex) => (
                                         <th
                                             key={`evento-header-empty-${headerIndex}-${columnIndex}`}
                                             style={obtenerStyleHeaderStickyIzquierda(
@@ -1340,7 +1983,7 @@ export function TablaPlanificacion({
                                                             return;
                                                         }
 
-                                                        setAdelantarEvento(
+                                                        abrirAdelantoEvento(
                                                             evento.id,
                                                         );
                                                     }}
@@ -1450,312 +2093,22 @@ export function TablaPlanificacion({
                             )}
                         </tr>
                     </thead>
-                    <tbody>
-                        {filasPlanificacion.map((fila) => (
-                            <React.Fragment key={fila.rowKey}>
-                                <tr style={{ textAlign: 'center' }}>
-                                    <td
-                                        style={obtenerStyleStickyIzquierda(
-                                            0,
-                                            fila.rowBackgroundColor,
-                                            {
-                                                textAlign: 'center',
-                                            },
-                                        )}>
-                                        <Button
-                                            size="sm"
-                                            variant="primary"
-                                            style={{
-                                                width: '2rem',
-                                                height: '2.2rem',
-                                                display: 'flex',
-                                                justifyContent: 'center',
-                                                alignItems: 'center',
-                                            }}
-                                            onClick={() => {
-                                                const observacionActual =
-                                                    observaciones.find(
-                                                        (o) =>
-                                                            o.platoCodigo ===
-                                                                fila.platoCodigo &&
-                                                            o.platoPadreCodigo ===
-                                                                fila.platoPadreCodigo,
-                                                    )?.observacion ||
-                                                    observacionModal;
-
-                                                if (observacionActual) {
-                                                    setObservacionModal(
-                                                        observacionActual,
-                                                    );
-                                                } else {
-                                                    setObservacionModal(
-                                                        produccionPersistidaPorFila.observacionPorFila.get(
-                                                            fila.rowKey,
-                                                        ) || '',
-                                                    );
-                                                }
-
-                                                setPlatoModal(fila.plato);
-                                                setPlatoCodigoModal(
-                                                    fila.platoCodigo,
-                                                );
-                                                setPlatoPadreModal(
-                                                    fila.platoPadre,
-                                                );
-                                                setPlatoPadreCodigoModal(
-                                                    fila.platoPadreCodigo,
-                                                );
-                                                setShow(true);
-                                            }}>
-                                            <ChatRightText />
-                                        </Button>
-                                    </td>
-                                    <td
-                                        style={obtenerStyleStickyIzquierda(
-                                            1,
-                                            fila.rowBackgroundColor,
-                                        )}>
-                                        <OverlayTrigger
-                                            overlay={
-                                                <Tooltip
-                                                    id={`${fila.plato}-${fila.platoPadre}`}>
-                                                    {fila.platoPadre}
-                                                </Tooltip>
-                                            }>
-                                            <span>{fila.platoPadre}</span>
-                                        </OverlayTrigger>
-                                    </td>
-                                    <td
-                                        style={obtenerStyleStickyIzquierda(
-                                            2,
-                                            fila.rowBackgroundColor,
-                                        )}>
-                                        <OverlayTrigger
-                                            overlay={
-                                                <Tooltip
-                                                    id={`${fila.platoPadre}-${fila.plato}`}>
-                                                    {fila.plato}
-                                                </Tooltip>
-                                            }>
-                                            <span>{fila.plato}</span>
-                                        </OverlayTrigger>
-                                    </td>
-                                    <td
-                                        className={fila.claseColorTotal}
-                                        style={obtenerStyleStickyIzquierda(
-                                            3,
-                                            fila.rowBackgroundColor,
-                                            {
-                                                textAlign: 'center',
-                                            },
-                                        )}>
-                                        <span
-                                            draggable={
-                                                RolProvider !== 'consultor'
-                                            }
-                                            onDragStart={(event) => {
-                                                iniciarDragCantidad(event, {
-                                                    mode: 'set',
-                                                    value: fila.totalNecesario,
-                                                    platoCodigo:
-                                                        fila.platoCodigo,
-                                                    platoPadreCodigo:
-                                                        fila.platoPadreCodigo,
-                                                });
-                                            }}
-                                            style={{
-                                                cursor:
-                                                    RolProvider === 'consultor'
-                                                        ? 'default'
-                                                        : 'grab',
-                                                userSelect: 'none',
-                                            }}
-                                            title={
-                                                RolProvider === 'consultor'
-                                                    ? undefined
-                                                    : 'Arrastrá para pegar este total en una celda de la misma fila'
-                                            }>
-                                            {fila.totalNecesario.toFixed(2)}
-                                        </span>
-                                    </td>
-                                    {fila.cells.map((celda) => {
-                                        const badgeDerecho = celda.badgeDerecho;
-
-                                        return (
-                                            <td
-                                                style={styleCeldaDia}
-                                                key={`${fila.rowKey}-${celda.fechaClave}`}>
-                                                <div
-                                                    className={
-                                                        badgeDerecho
-                                                            ? 'planificacion-celda-con-badge'
-                                                            : undefined
-                                                    }>
-                                                    <Form.Control
-                                                        type="number"
-                                                        disabled={
-                                                            RolProvider ===
-                                                            'consultor'
-                                                        }
-                                                        style={{
-                                                            width: '100%',
-                                                            color:
-                                                                celda.updateCant
-                                                                    ? '#ff0000'
-                                                                    : undefined,
-                                                            cursor:
-                                                                celda.placeholderArrastrable
-                                                                    ? 'grab'
-                                                                    : 'text',
-                                                        }}
-                                                        className="form-control form-control-sm input"
-                                                        value={celda.valorInput}
-                                                        placeholder={
-                                                            !badgeDerecho &&
-                                                            celda.totalConsumo
-                                                                ? celda.totalConsumo.toString()
-                                                                : ''
-                                                        }
-                                                        step={0.1}
-                                                        min={0}
-                                                        draggable={
-                                                            celda.placeholderArrastrable
-                                                        }
-                                                        onDragStart={(
-                                                            event,
-                                                        ) => {
-                                                            if (
-                                                                !celda.placeholderArrastrable
-                                                            ) {
-                                                                return;
-                                                            }
-
-                                                            iniciarDragCantidad(
-                                                                event,
-                                                                {
-                                                                    mode: 'add',
-                                                                    value: celda.totalConsumo,
-                                                                    platoCodigo:
-                                                                        fila.platoCodigo,
-                                                                    platoPadreCodigo:
-                                                                        fila.platoPadreCodigo,
-                                                                },
-                                                            );
-                                                        }}
-                                                        onDragOver={(
-                                                            event,
-                                                        ) => {
-                                                            handleDragOverInputCantidad(
-                                                                event,
-                                                                {
-                                                                    platoCodigo:
-                                                                        fila.platoCodigo,
-                                                                    platoPadreCodigo:
-                                                                        fila.platoPadreCodigo,
-                                                                },
-                                                            );
-                                                        }}
-                                                        onDrop={(event) => {
-                                                            handleDropInputCantidad(
-                                                                event,
-                                                                {
-                                                                    plato: fila.plato,
-                                                                    platoCodigo:
-                                                                        fila.platoCodigo,
-                                                                    platoPadre:
-                                                                        fila.platoPadre,
-                                                                    platoPadreCodigo:
-                                                                        fila.platoPadreCodigo,
-                                                                    fecha: celda.fechaClave,
-                                                                    cantidadActual:
-                                                                        celda.valorInput,
-                                                                },
-                                                            );
-                                                        }}
-                                                        title={
-                                                            celda.placeholderArrastrable
-                                                                ? 'Arrastrá este valor para sumarlo en otra celda de la misma fila'
-                                                                : undefined
-                                                        }
-                                                        onChange={(e) => {
-                                                            actualizarProduccionCelda(
-                                                                fila.plato,
-                                                                fila.platoCodigo,
-                                                                fila.platoPadre,
-                                                                fila.platoPadreCodigo,
-                                                                celda.fechaClave,
-                                                                e.target.value,
-                                                            );
-                                                        }}
-                                                    />
-                                                    {badgeDerecho && (
-                                                        <span
-                                                            draggable={
-                                                                badgeDerecho.draggable ===
-                                                                true
-                                                            }
-                                                            className={`${badgeDerecho.className}${
-                                                                badgeDerecho.draggable
-                                                                    ? ' planificacion-badge-arrastrable'
-                                                                    : ''
-                                                            }`}
-                                                            onDragStart={(
-                                                                event,
-                                                            ) => {
-                                                                const dragValue =
-                                                                    badgeDerecho.value;
-
-                                                                if (
-                                                                    badgeDerecho.draggable !==
-                                                                        true ||
-                                                                    dragValue ===
-                                                                        undefined ||
-                                                                    !Number.isFinite(
-                                                                        dragValue,
-                                                                    )
-                                                                ) {
-                                                                    return;
-                                                                }
-
-                                                                iniciarDragCantidad(
-                                                                    event,
-                                                                    {
-                                                                        mode: 'add',
-                                                                        value: dragValue,
-                                                                        platoCodigo:
-                                                                            fila.platoCodigo,
-                                                                        platoPadreCodigo:
-                                                                            fila.platoPadreCodigo,
-                                                                    },
-                                                                );
-                                                            }}
-                                                            title={
-                                                                badgeDerecho.draggable
-                                                                    ? 'Arrastrá este valor para sumarlo en otra celda de la misma fila'
-                                                                    : badgeDerecho.title
-                                                            }>
-                                                            {badgeDerecho.texto}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </td>
-                                        );
-                                    })}
-                                </tr>
-                                {platoExpandido === fila.plato && (
-                                    <PlatoDetalle
-                                        plato={fila.plato}
-                                        platoCodigo={fila.platoCodigo}
-                                        diasSemanaProp={diasSemana}
-                                        columnCount={
-                                            totalColumnasPlanificacion
-                                        }
-                                    />
-                                )}
-                            </React.Fragment>
-                        ))}
-                    </tbody>
+                    <tbody>{filasTabla}</tbody>
                 </Table>
+            </div>
+            <div
+                aria-hidden={!tooltipCompartido.visible}
+                className={`planificacion-tooltip-compartido${
+                    tooltipCompartido.visible
+                        ? ' planificacion-tooltip-compartido-visible'
+                        : ''
+                }`}
+                role="tooltip"
+                style={{
+                    left: `${tooltipCompartido.left}px`,
+                    top: `${tooltipCompartido.top}px`,
+                }}>
+                {tooltipCompartido.text}
             </div>
         </>
     );

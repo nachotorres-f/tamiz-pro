@@ -121,9 +121,95 @@ input[type='number'] {
     justify-content: space-between;
 }
 
-.planificacion-celda-con-badge > .form-control {
+.planificacion-celda-con-badge > .form-control,
+.planificacion-celda-con-badge > .planificacion-celda-display {
     flex: 0 0 calc(50% - 0.25rem);
     max-width: calc(50% - 0.25rem);
+}
+
+.planificacion-celda-display {
+    align-items: center;
+    appearance: none;
+    background-color: #fff;
+    background-clip: padding-box;
+    border: 1px solid #ced4da;
+    border-radius: 0.25rem;
+    color: #212529;
+    display: inline-flex;
+    font-size: 0.875rem;
+    justify-content: flex-start;
+    line-height: 1.5;
+    min-height: calc(1.5em + 0.5rem + 2px);
+    overflow: hidden;
+    padding: 0.25rem 0.5rem;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    width: 100%;
+}
+
+button.planificacion-celda-display {
+    cursor: text;
+}
+
+button.planificacion-celda-display:focus {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+    outline: 0;
+}
+
+.planificacion-celda-display-placeholder {
+    color: #00aa00;
+    font-style: italic;
+}
+
+.planificacion-celda-display-pending {
+    color: #ff0000;
+}
+
+.planificacion-celda-display-draggable {
+    cursor: grab !important;
+    user-select: none;
+}
+
+.planificacion-tooltip-target {
+    cursor: default;
+    display: block;
+    max-width: 100%;
+    min-width: 0;
+    outline: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    width: 100%;
+}
+
+.planificacion-tooltip-target:focus {
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.18);
+    border-radius: 0.25rem;
+}
+
+.planificacion-tooltip-compartido {
+    background: rgba(33, 37, 41, 0.96);
+    border-radius: 0.375rem;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.18);
+    color: #fff;
+    font-size: 0.75rem;
+    left: 0;
+    max-width: min(24rem, calc(100vw - 2rem));
+    opacity: 0;
+    padding: 0.35rem 0.55rem;
+    pointer-events: none;
+    position: fixed;
+    top: 0;
+    transform: translate(-50%, 0);
+    transition: opacity 120ms ease;
+    white-space: normal;
+    z-index: 1200;
+}
+
+.planificacion-tooltip-compartido-visible {
+    opacity: 1;
 }
 
 .planificacion-badge-anterior-ciclo,

@@ -9,7 +9,17 @@ export async function GET(req: NextRequest) {
 
     const comanda = await prisma.comanda.findUnique({
         where: { id },
-        include: { Plato: true },
+        select: {
+            Plato: {
+                orderBy: { nombre: 'asc' },
+                select: {
+                    cantidad: true,
+                    fecha: true,
+                    id: true,
+                    nombre: true,
+                },
+            },
+        },
     });
 
     return NextResponse.json(comanda);

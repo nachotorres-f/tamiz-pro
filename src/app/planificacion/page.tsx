@@ -231,7 +231,6 @@ export default function PlanificacionPage() {
     const [datosFiltrados, setDatosFiltrados] = useState<any[]>([]);
     const [filtro] = useState('');
     const [diaActivo, setDiaActivo] = useState('');
-    const [platoExpandido, setPlatoExpandido] = useState<string | null>(null);
     const [produccionUpdate, setProduccionUpdate] = React.useState<
         ProduccionChange[]
     >([]);
@@ -838,8 +837,6 @@ export default function PlanificacionPage() {
                     datos={datosFiltrados}
                     filtro={filtro}
                     diaActivo={diaActivo}
-                    platoExpandido={platoExpandido}
-                    setPlatoExpandido={setPlatoExpandido}
                     pageOcultos={false}
                     produccion={produccion}
                     setProduccion={setProduccion}
