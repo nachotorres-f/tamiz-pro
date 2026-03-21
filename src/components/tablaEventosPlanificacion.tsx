@@ -7,7 +7,7 @@ interface EventoPlanificacion {
     fecha: string;
     lugar: string;
     nombre: string;
-    salon: string;
+    cantidadInvitados: number;
     // agrega aquí otras propiedades si existen
 }
 
@@ -117,7 +117,7 @@ export default function TablaEventosPlanificacion({
                             {' - '}
                             {evento.lugar}
                             {' - '}
-                            {evento.salon}
+                            {evento.cantidadInvitados}
                         </li>
                     );
                 })

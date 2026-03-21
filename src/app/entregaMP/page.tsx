@@ -4,19 +4,25 @@
 import { NavegacionSemanal } from '@/components/navegacionSemanal';
 import { addDays, format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import React, {
+    useCallback,
+    useContext,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from 'react';
 import type { CellObject, CellStyle, WorkSheet } from 'xlsx-js-style';
 import {
-    Accordion,
     Button,
-    Col,
     Container,
     Dropdown,
     FloatingLabel,
     Form,
     Modal,
-    Row,
+    OverlayTrigger,
     Table,
+    Tooltip,
 } from 'react-bootstrap';
 import {
     ArrowReturnLeft,
@@ -60,6 +66,69 @@ const estiloFilaComentario: CellStyle = {
     },
 };
 
+function TextoEntregaMPTruncado({
+    texto,
+    tooltipId,
+}: {
+    texto: string;
+    tooltipId: string;
+}) {
+    const textoRef = useRef<HTMLSpanElement | null>(null);
+    const [mostrarTooltip, setMostrarTooltip] = useState(false);
+
+    useEffect(() => {
+        const elemento = textoRef.current;
+
+        if (!elemento) {
+            return;
+        }
+
+        const actualizarOverflow = () => {
+            setMostrarTooltip(elemento.scrollWidth > elemento.clientWidth + 1);
+        };
+
+        actualizarOverflow();
+
+        if (typeof ResizeObserver === 'undefined') {
+            window.addEventListener('resize', actualizarOverflow);
+
+            return () => {
+                window.removeEventListener('resize', actualizarOverflow);
+            };
+        }
+
+        const resizeObserver = new ResizeObserver(() => {
+            actualizarOverflow();
+        });
+
+        resizeObserver.observe(elemento);
+
+        return () => {
+            resizeObserver.disconnect();
+        };
+    }, [texto]);
+
+    const contenido = (
+        <span
+            ref={textoRef}
+            className="produccion-texto-truncado">
+            {texto}
+        </span>
+    );
+
+    if (!mostrarTooltip) {
+        return contenido;
+    }
+
+    return (
+        <OverlayTrigger
+            placement="top"
+            overlay={<Tooltip id={tooltipId}>{texto}</Tooltip>}>
+            {contenido}
+        </OverlayTrigger>
+    );
+}
+
 export default function ProduccionPreviaPage() {
     const salon = useContext(SalonContext);
     const RolProvider = useContext(RolContext);
@@ -69,7 +138,6 @@ export default function ProduccionPreviaPage() {
     const [diaActivo, setDiaActivo] = useState('');
     const [semanaBase, setSemanaBase] = useState(new Date());
     const [datosApi, setDatosApi] = useState<any[]>([]);
-    const [datos, setDatos] = useState<any[]>([]);
     const [showModal, setShowModal] = useState(false);
     const [loading, setLoading] = useState(false);
     const [fechaImprimir, setFechaImprimir] = useState<Date | null>(null);
@@ -77,13 +145,6 @@ export default function ProduccionPreviaPage() {
     const [showModalProduccion, setShowModalProduccion] = useState(false);
     const [observacionModal, setObservacionModal] = useState('');
     const [showModalObservacion, setShowModalObservacion] = useState(false);
-    const [paginado, setPaginado] = useState(false);
-    const [registrosPagina, setRegistrosPagina] = useState(30);
-    const [paginaActual, setPaginaActual] = useState(0);
-    const [totalPaginas, setTotalPaginas] = useState(0);
-    const [intervaloSegundos, setIntervaloSegundos] = useState(30);
-    const [intervaloPaginado, setIntervaloPaginado] =
-        useState<ReturnType<typeof setInterval>>();
     const [platoModalProduccion, setPlatoModalProduccion] = useState({
         plato: '',
         platoCodigo: '',
@@ -105,10 +166,7 @@ export default function ProduccionPreviaPage() {
         )
             .then((res) => res.json())
             .then((res) => res.data)
-            .then((data) => {
-                setDatosApi(data);
-                setDatos(data);
-            })
+            .then(setDatosApi)
             .finally(() => {
                 setLoading(false);
             });
@@ -158,28 +216,69 @@ export default function ProduccionPreviaPage() {
         }
     }
 
-    const filterDias = (dia: Date) => {
-        if (diaActivo && format(addDays(dia, -1), 'yyyy-MM-dd') === diaActivo) {
+    const filterDias = useCallback(
+        (dia: Date) => {
+            if (
+                diaActivo &&
+                format(addDays(dia, -1), 'yyyy-MM-dd') === diaActivo
+            ) {
+                return true;
+            }
+
+            if (diaActivo && format(dia, 'yyyy-MM-dd') !== diaActivo) {
+                return false;
+            }
+
             return true;
-        }
+        },
+        [diaActivo],
+    );
 
-        if (diaActivo && format(dia, 'yyyy-MM-dd') !== diaActivo) {
-            return false;
-        }
-
-        return true;
-    };
-
-    const generarPDF = (modo: 'unico' | 'separado') => {
-        toast.info('Imprimiendo recetas', {
+    const imprimirRecetas = async (
+        listaPlatos: string[],
+        fecha: Date,
+        modo: 'unico' | 'separado',
+        mensajeCarga: string,
+        mensajeExito: string,
+    ) => {
+        const toastId = toast.loading(mensajeCarga, {
             position: 'bottom-right',
+            type: 'info',
             theme: 'colored',
             transition: Slide,
         });
 
-        generarPDFReceta([], fechaImprimir || new Date(), salon, modo, true);
+        try {
+            await generarPDFReceta(listaPlatos, fecha, salon, modo, true);
+            toast.update(toastId, {
+                render: mensajeExito,
+                type: 'success',
+                isLoading: false,
+                autoClose: 3000,
+                closeOnClick: true,
+                draggable: true,
+            });
+        } catch {
+            toast.update(toastId, {
+                render: 'Error al imprimir recetas',
+                type: 'error',
+                isLoading: false,
+                autoClose: 5000,
+                closeOnClick: true,
+                draggable: true,
+            });
+        }
+    };
 
+    const generarPDF = async (modo: 'unico' | 'separado') => {
         handleClose();
+        await imprimirRecetas(
+            [],
+            fechaImprimir || new Date(),
+            modo,
+            'Imprimiendo recetas',
+            'Recetas impresas',
+        );
     };
 
     const handleClose = () => setShowModal(false);
@@ -210,7 +309,7 @@ export default function ProduccionPreviaPage() {
 
             return produccion?.cantidad > 0;
         },
-        [diaActivo]
+        [diaActivo],
     );
 
     const obtenerProduccionPorDia = (dato: any, dia: Date) => {
@@ -284,10 +383,7 @@ export default function ProduccionPreviaPage() {
                 )
                     .then((res) => res.json())
                     .then((res) => res.data)
-                    .then((data) => {
-                        setDatosApi(data);
-                        setDatos(data);
-                    })
+                    .then(setDatosApi)
                     .finally(() => {
                         setLoading(false);
                     });
@@ -336,10 +432,7 @@ export default function ProduccionPreviaPage() {
                 )
                     .then((res) => res.json())
                     .then((res) => res.data)
-                    .then((data) => {
-                        setDatosApi(data);
-                        setDatos(data);
-                    })
+                    .then(setDatosApi)
                     .finally(() => {
                         setLoading(false);
                     });
@@ -354,61 +447,28 @@ export default function ProduccionPreviaPage() {
             });
     };
 
-    const tooglePaginado = () => {
-        if (paginado) {
-            setPaginado(false);
-            clearInterval(intervaloPaginado);
-            setDatos(datosApi);
-            return;
-        }
-
-        const totalPags = Math.ceil(datosApi.length / registrosPagina);
-
-        setPaginado(true);
-        setTotalPaginas(totalPags);
-        setPaginaActual(0);
-    };
-
-    useEffect(() => {
-        if (!paginado) return;
-        if (totalPaginas === 0) return;
-
-        const intervalo = setInterval(() => {
-            setPaginaActual((prevPagina) => {
-                const nuevaPagina = prevPagina + 1;
-                if (nuevaPagina >= totalPaginas) {
-                    return 0;
-                }
-                return nuevaPagina;
-            });
-        }, intervaloSegundos * 1000);
-
-        setIntervaloPaginado(intervalo);
-
-        return () => clearInterval(intervalo);
-    }, [paginado, totalPaginas, intervaloSegundos]);
-
-    useEffect(() => {
-        if (!paginado) return;
-
-        const inicio = paginaActual * registrosPagina;
-        const fin = inicio + registrosPagina;
-        const datosPaginados = datosApi
-            .filter(filterPlatosPorDia)
-            .slice(inicio, fin);
-
-        setDatos(datosPaginados);
-    }, [paginado, paginaActual, registrosPagina, datosApi, filterPlatosPorDia]);
-
-    useEffect(() => {
-        if (!paginado) return;
-
-        const totalPags = Math.ceil(
-            datosApi.filter(filterPlatosPorDia).length / registrosPagina
-        );
-        setTotalPaginas(totalPags);
-        setPaginaActual(0);
-    }, [diaActivo, paginado, registrosPagina, datosApi, filterPlatosPorDia]);
+    const diasVisibles = useMemo(
+        () => diasSemana.filter(filterDias),
+        [diasSemana, filterDias],
+    );
+    const datosVisibles = useMemo(
+        () =>
+            datosApi ? datosApi.filter((dato) => filterPlatosPorDia(dato)) : [],
+        [datosApi, filterPlatosPorDia],
+    );
+    const diasHeaderVisibles = useMemo(
+        () =>
+            diasVisibles.map((dia) => ({
+                clave: format(dia, 'yyyy-MM-dd'),
+                dia,
+                etiqueta: format(dia, 'EEE, dd-MM', { locale: es }),
+                mostrarAcciones: datosVisibles.some((dato) => {
+                    const produccion = obtenerProduccionPorDia(dato, dia);
+                    return Number(produccion?.cantidad ?? 0) > 0;
+                }),
+            })),
+        [datosVisibles, diasVisibles],
+    );
 
     if (loading) {
         return (
@@ -434,15 +494,10 @@ export default function ProduccionPreviaPage() {
         );
     }
 
-    const diasVisibles = diasSemana.filter(filterDias);
-    const datosVisibles = datosApi
-        ? datosApi.filter((dato) => filterPlatosPorDia(dato))
-        : [];
-
     const calcularAnchoColumna = (
         filas: Array<Array<string | number>>,
         indiceColumna: number,
-        padding = 2
+        padding = 2,
     ) => {
         const maximoCaracteres = filas.reduce((maximo, fila) => {
             const valor = fila[indiceColumna] ?? '';
@@ -797,87 +852,6 @@ export default function ProduccionPreviaPage() {
 
                 <ToastContainer />
 
-                <Container>
-                    <Row>
-                        <Col>
-                            <Accordion className="mb-5">
-                                <Accordion.Item eventKey="0">
-                                    <Accordion.Header>
-                                        Paginar platos
-                                    </Accordion.Header>
-                                    <Accordion.Body>
-                                        <Container>
-                                            <Row>
-                                                <Col>
-                                                    <Form.Group>
-                                                        <Form.Label>
-                                                            Cantidad de platos
-                                                        </Form.Label>
-                                                        <Form.Control
-                                                            type="text"
-                                                            step="1"
-                                                            min={1}
-                                                            placeholder="Ingresa la cantidad de platos"
-                                                            value={
-                                                                registrosPagina
-                                                            }
-                                                            disabled={paginado}
-                                                            onChange={(e) =>
-                                                                setRegistrosPagina(
-                                                                    Number(
-                                                                        e.target
-                                                                            .value
-                                                                    )
-                                                                )
-                                                            }></Form.Control>
-                                                    </Form.Group>
-                                                </Col>
-                                                <Col>
-                                                    <Form.Group>
-                                                        <Form.Label>
-                                                            Intervalo (segundos)
-                                                        </Form.Label>
-                                                        <Form.Control
-                                                            type="text"
-                                                            step="any"
-                                                            placeholder="Ingresa el intervalo en segundos"
-                                                            value={
-                                                                intervaloSegundos
-                                                            }
-                                                            disabled={paginado}
-                                                            onChange={(e) =>
-                                                                setIntervaloSegundos(
-                                                                    Number(
-                                                                        e.target
-                                                                            .value
-                                                                    )
-                                                                )
-                                                            }></Form.Control>
-                                                    </Form.Group>
-                                                </Col>
-                                                <Col>
-                                                    <Button
-                                                        style={{
-                                                            marginTop: '2rem',
-                                                        }}
-                                                        className="d-block mx-auto"
-                                                        onClick={() =>
-                                                            tooglePaginado()
-                                                        }>
-                                                        {paginado
-                                                            ? 'Detener'
-                                                            : 'Iniciar'}
-                                                    </Button>
-                                                </Col>
-                                            </Row>
-                                        </Container>
-                                    </Accordion.Body>
-                                </Accordion.Item>
-                            </Accordion>
-                        </Col>
-                    </Row>
-                </Container>
-
                 <Modal
                     show={showModal}
                     onHide={handleClose}>
@@ -891,14 +865,14 @@ export default function ProduccionPreviaPage() {
                         <Button
                             variant="primary"
                             onClick={() => {
-                                generarPDF('unico');
+                                void generarPDF('unico');
                             }}>
                             Imprimir juntas
                         </Button>
                         <Button
                             variant="primary"
                             onClick={() => {
-                                generarPDF('separado');
+                                void generarPDF('separado');
                             }}>
                             Imprimir separadas
                         </Button>
@@ -955,20 +929,14 @@ export default function ProduccionPreviaPage() {
                         <Button
                             variant="danger"
                             onClick={() => {
-                                generarPDFReceta(
+                                handleCloseModalProduccion();
+                                void imprimirRecetas(
                                     [platoModalProduccion.platoCodigo],
                                     addDays(platoModalProduccion.fecha, 2),
-                                    salon,
                                     'separado',
-                                    true
+                                    'Imprimiendo receta',
+                                    'Receta impresa',
                                 );
-
-                                toast.info('Imprimiendo receta', {
-                                    position: 'bottom-right',
-                                    theme: 'colored',
-                                    transition: Slide,
-                                });
-                                handleCloseModalProduccion();
                             }}>
                             <FiletypePdf /> Imprimir receta
                         </Button>
@@ -1024,23 +992,27 @@ export default function ProduccionPreviaPage() {
                     </Modal.Footer>
                 </Modal>
 
-                <NavegacionSemanal
-                    semanaBase={semanaBase}
-                    setSemanaBase={setSemanaBase}
-                />
+                <div className="d-flex flex-column flex-md-row justify-content-between align-items-stretch align-items-md-center gap-2 mt-3 mb-3">
+                    <NavegacionSemanal
+                        semanaBase={semanaBase}
+                        setSemanaBase={setSemanaBase}
+                        justifyContent="start"
+                        className="mb-0"
+                    />
 
-                <div className="d-flex justify-content-center mt-3">
-                    <Button
-                        className="btn-success"
-                        disabled={
-                            diasVisibles.length === 0 ||
-                            datosVisibles.length === 0
-                        }
-                        onClick={() => {
-                            void exportarExcel();
-                        }}>
-                        Exportar a Excel
-                    </Button>
+                    <div className="d-flex justify-content-md-end">
+                        <Button
+                            className="btn-success"
+                            disabled={
+                                diasVisibles.length === 0 ||
+                                datosVisibles.length === 0
+                            }
+                            onClick={() => {
+                                void exportarExcel();
+                            }}>
+                            Exportar a Excel
+                        </Button>
+                    </div>
                 </div>
             </Container>
 
@@ -1048,6 +1020,7 @@ export default function ProduccionPreviaPage() {
                 ref={ref}
                 className="mt-3 mx-auto"
                 style={{
+                    overflowX: 'auto',
                     overflowY: 'auto',
                     height: '100vh',
                     width: '100%',
@@ -1055,187 +1028,191 @@ export default function ProduccionPreviaPage() {
                 <Table
                     bordered
                     striped
+                    style={{ width: '100%' }}
                     id="tabla-produccion">
                     <thead className="table-dark sticky-top">
                         <tr style={{ textAlign: 'center' }}>
-                            <th>
-                                <Button onClick={handleFullscreen}>
+                            <th className="produccion-columna-control produccion-header-cell">
+                                <Button
+                                    size="sm"
+                                    className="produccion-header-icon-button"
+                                    variant="outline-light"
+                                    title={
+                                        isFullscreen
+                                            ? 'Salir de pantalla completa'
+                                            : 'Ver en pantalla completa'
+                                    }
+                                    aria-label={
+                                        isFullscreen
+                                            ? 'Salir de pantalla completa'
+                                            : 'Ver en pantalla completa'
+                                    }
+                                    onClick={handleFullscreen}>
                                     {isFullscreen ? (
                                         <FullscreenExit />
                                     ) : (
                                         <Fullscreen />
-                                    )}{' '}
-                                    Pantalla Completa
+                                    )}
                                 </Button>
                             </th>
-                            <th>
-                                {paginado
-                                    ? `Pagina: ${
-                                          paginaActual + 1
-                                      } / ${totalPaginas}`
-                                    : 'Todos los platos'}
+                            <th className="produccion-header-cell">Plato</th>
+                            <th className="produccion-header-cell">
+                                Elaboracion
                             </th>
-                            {[0, 1, 2, 3, 4, 5, 6]
-                                .filter(
-                                    (i) =>
-                                        (diaActivo !== '' &&
-                                            (diaActivo ===
-                                                format(
-                                                    diasSemana[i],
-                                                    'yyyy-MM-dd'
-                                                ) ||
-                                                (i > 0 &&
-                                                    diaActivo ===
-                                                        format(
-                                                            diasSemana[i - 1],
-                                                            'yyyy-MM-dd'
-                                                        )))) ||
-                                        diaActivo === ''
-                                )
-                                .map((i) => {
-                                    return (
-                                        <th key={i}>
-                                            <Dropdown className="btn btn-sm">
-                                                <Dropdown.Toggle
-                                                    variant="primary"
-                                                    id="dropdown-basic"></Dropdown.Toggle>
-                                                <Dropdown.Menu>
-                                                    <Dropdown.Item
-                                                        onClick={() => {
-                                                            setFechaImprimir(
-                                                                addDays(
-                                                                    diasSemana[
-                                                                        i
-                                                                    ],
-                                                                    2
-                                                                )
-                                                            );
-                                                            setShowModal(true);
-                                                        }}>
-                                                        <FiletypePdf className="text-danger" />{' '}
-                                                        Imprimir
-                                                    </Dropdown.Item>
+                            {diasHeaderVisibles.map(
+                                ({ clave, dia, etiqueta, mostrarAcciones }) => (
+                                    <th
+                                        key={clave}
+                                        className="produccion-header-cell produccion-header-cell-dia">
+                                        <div className="produccion-header-dia">
+                                            <span className="produccion-header-dia-label">
+                                                {etiqueta}
+                                            </span>
+                                            {mostrarAcciones && (
+                                                <Dropdown align="end">
+                                                    <Dropdown.Toggle
+                                                        size="sm"
+                                                        variant="outline-light"
+                                                        id={`entrega-mp-dia-menu-${clave}`}
+                                                        className="produccion-header-dia-toggle"></Dropdown.Toggle>
+                                                    <Dropdown.Menu>
+                                                        <Dropdown.Item
+                                                            onClick={() => {
+                                                                setFechaImprimir(
+                                                                    addDays(
+                                                                        dia,
+                                                                        2,
+                                                                    ),
+                                                                );
+                                                                setShowModal(
+                                                                    true,
+                                                                );
+                                                            }}>
+                                                            <FiletypePdf className="text-danger" />{' '}
+                                                            Imprimir
+                                                        </Dropdown.Item>
 
-                                                    <Dropdown.Item
-                                                        onClick={() => {
-                                                            setDiaActivo(
-                                                                diaActivo
-                                                                    ? ''
-                                                                    : format(
-                                                                          diasSemana[
-                                                                              i
-                                                                          ],
-                                                                          'yyyy-MM-dd'
-                                                                      )
-                                                            );
-                                                        }}>
-                                                        <EyeFill />{' '}
-                                                        {diaActivo
-                                                            ? 'Ver todos'
-                                                            : 'Ver dia'}
-                                                    </Dropdown.Item>
-                                                </Dropdown.Menu>
-                                            </Dropdown>
-                                        </th>
-                                    );
-                                })}
-                        </tr>
-                        <tr style={{ textAlign: 'center' }}>
-                            <th>Plato</th>
-                            <th>Elaboracion</th>
-                            {diasVisibles.map((dia, idx) => (
-                                <th key={idx}>
-                                    {format(dia, 'EEE, dd-MM', { locale: es })}
-                                </th>
-                            ))}
+                                                        <Dropdown.Item
+                                                            onClick={() => {
+                                                                setDiaActivo(
+                                                                    diaActivo
+                                                                        ? ''
+                                                                        : clave,
+                                                                );
+                                                            }}>
+                                                            <EyeFill />{' '}
+                                                            {diaActivo
+                                                                ? 'Ver todos'
+                                                                : 'Ver dia'}
+                                                        </Dropdown.Item>
+                                                    </Dropdown.Menu>
+                                                </Dropdown>
+                                            )}
+                                        </div>
+                                    </th>
+                                ),
+                            )}
                         </tr>
                     </thead>
                     <tbody>
-                        {datos &&
-                            datos
-                                .filter((dato) => filterPlatosPorDia(dato))
-                                .map((dato, indexDato) => (
-                                    <React.Fragment
-                                        key={
-                                            (dato.platoCodigo || dato.plato) +
-                                            '|' +
-                                            (dato.platoPadreCodigo ||
-                                                dato.platoPadre) +
-                                            '|' +
-                                            indexDato
-                                        }>
-                                        <tr>
-                                            <td>{dato.platoPadre}</td>
-                                            <td>{dato.plato}</td>
+                        {datosVisibles.map((dato, indexDato) => (
+                            <React.Fragment
+                                key={
+                                    (dato.platoCodigo || dato.plato) +
+                                    '|' +
+                                    (dato.platoPadreCodigo || dato.platoPadre) +
+                                    '|' +
+                                    indexDato
+                                }>
+                                <tr>
+                                    <td className="produccion-columna-control"></td>
+                                    <td className="produccion-columna-texto">
+                                        <TextoEntregaMPTruncado
+                                            texto={dato.platoPadre || ''}
+                                            tooltipId={`entrega-mp-plato-padre-${indexDato}`}
+                                        />
+                                    </td>
+                                    <td className="produccion-columna-texto">
+                                        <TextoEntregaMPTruncado
+                                            texto={dato.plato || ''}
+                                            tooltipId={`entrega-mp-plato-${indexDato}`}
+                                        />
+                                    </td>
 
-                                            {diasVisibles.map((dia, i) => {
-                                                    const produccion =
-                                                        obtenerProduccionPorDia(
-                                                            dato,
-                                                            dia
+                                    {diasHeaderVisibles.map(
+                                        ({ clave, dia }) => {
+                                            const produccion =
+                                                obtenerProduccionPorDia(
+                                                    dato,
+                                                    dia,
+                                                );
+                                            const cantidad = produccion
+                                                ? produccion.cantidad
+                                                : 0;
+
+                                            return (
+                                                <td
+                                                    key={clave}
+                                                    className={
+                                                        cantidad > 0
+                                                            ? 'link-pdf'
+                                                            : ''
+                                                    }
+                                                    onClick={() => {
+                                                        if (
+                                                            !produccion ||
+                                                            cantidad <= 0
+                                                        ) {
+                                                            return;
+                                                        }
+
+                                                        setPlatoModalProduccion(
+                                                            {
+                                                                plato: dato.plato,
+                                                                platoCodigo:
+                                                                    dato.platoCodigo,
+                                                                platoPadre:
+                                                                    dato.platoPadre,
+                                                                platoPadreCodigo:
+                                                                    dato.platoPadreCodigo,
+                                                                cantidad,
+                                                                fecha: produccion.fecha,
+                                                                comentario:
+                                                                    produccion.comentario
+                                                                        ? dato.comentario
+                                                                        : '',
+                                                            },
                                                         );
-                                                    const cantidad = produccion
-                                                        ? produccion.cantidad
-                                                        : 0;
-                                                    return (
-                                                        <td
-                                                            key={i}
-                                                            className={
-                                                                cantidad > 0
-                                                                    ? 'link-pdf'
-                                                                    : ''
-                                                            }
-                                                            onClick={() => {
-                                                                if (
-                                                                    !produccion ||
-                                                                    cantidad <= 0
-                                                                ) {
-                                                                    return;
-                                                                }
-
-                                                                setPlatoModalProduccion(
-                                                                    {
-                                                                        plato: dato.plato,
-                                                                        platoCodigo:
-                                                                            dato.platoCodigo,
-                                                                        platoPadre:
-                                                                            dato.platoPadre,
-                                                                        platoPadreCodigo:
-                                                                            dato.platoPadreCodigo,
-                                                                        cantidad,
-                                                                        fecha: produccion.fecha,
-                                                                        comentario:
-                                                                            produccion.comentario
-                                                                                ? dato.comentario
-                                                                                : '',
-                                                                    }
-                                                                );
-                                                                setShowModalProduccion(
-                                                                    true
-                                                                );
-                                                            }}>
-                                                            {cantidad || ''}
-                                                        </td>
-                                                    );
-                                                })}
-                                        </tr>
-                                        {dato.comentario &&
-                                            dato.comentario.replace(
-                                                '\n',
-                                                ''
-                                            ) !== '' && (
-                                                <tr className="fst-italic fs-6 text-secondary">
-                                                    <td className="bg-warning-subtle"></td>
-                                                    <td className="bg-warning-subtle">
-                                                        {dato.comentario}
-                                                    </td>
-                                                    <td
-                                                        className="bg-warning-subtle"
-                                                        colSpan={999}></td>
-                                                </tr>
+                                                        setShowModalProduccion(
+                                                            true,
+                                                        );
+                                                    }}>
+                                                    {cantidad || ''}
+                                                </td>
+                                            );
+                                        },
+                                    )}
+                                </tr>
+                                {dato.comentario &&
+                                    dato.comentario.replace('\n', '') !==
+                                        '' && (
+                                        <tr className="fst-italic fs-6 text-secondary">
+                                            <td className="bg-warning-subtle produccion-columna-control"></td>
+                                            <td className="bg-warning-subtle"></td>
+                                            <td className="bg-warning-subtle">
+                                                {dato.comentario}
+                                            </td>
+                                            {diasHeaderVisibles.length > 0 && (
+                                                <td
+                                                    className="bg-warning-subtle"
+                                                    colSpan={
+                                                        diasHeaderVisibles.length
+                                                    }></td>
                                             )}
-                                    </React.Fragment>
-                                ))}
+                                        </tr>
+                                    )}
+                            </React.Fragment>
+                        ))}
                     </tbody>
                 </Table>
             </div>

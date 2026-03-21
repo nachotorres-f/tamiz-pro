@@ -44,9 +44,16 @@ export async function GET(req: NextRequest) {
         },
     });
 
+    const eventosConCantidadInvitados = eventos.map((evento) => ({
+        ...evento,
+        cantidadInvitados:
+            Number(evento.cantidadMayores ?? 0) +
+            Number(evento.cantidadMenores ?? 0),
+    }));
+
     const res = NextResponse.json({
-        eventos,
-        maxRepeticion: maxRepeticionesPorDia(eventos),
+        eventos: eventosConCantidadInvitados,
+        maxRepeticion: maxRepeticionesPorDia(eventosConCantidadInvitados),
     });
     return res;
 }

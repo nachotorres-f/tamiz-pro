@@ -24,6 +24,7 @@ import {
     ChatRightText,
     FullscreenExit,
 } from 'react-bootstrap-icons';
+import { Slide, toast } from 'react-toastify';
 import type {
     EventoPlanificacion,
     ObservacionPlanificacion,
@@ -76,17 +77,27 @@ function sumarCantidad(items: Array<{ cantidad?: number | string | null }>) {
     );
 }
 
+function construirValorFiltro(codigo: string, nombre: string) {
+    return `${codigo}|||${nombre}`;
+}
+
+function esperarSiguientePintado() {
+    return new Promise<void>((resolve) => {
+        window.requestAnimationFrame(() => {
+            window.setTimeout(resolve, 0);
+        });
+    });
+}
+
 const HEIGHT_TD = '3rem';
 const HEIGHT_HEADER_DIAS = '2.25rem';
 const STICKY_COLUMN_WIDTHS = ['3.5rem', '15rem', '15rem', '7rem'] as const;
 const ANCHO_DIA = '15rem';
 
 export function TablaPlanificacion({
-    pageOcultos,
     platosUnicos,
     diasSemana,
     datos,
-    filtro,
     diaActivo,
     produccion,
     produccionUpdate,
@@ -100,7 +111,6 @@ export function TablaPlanificacion({
 // anchoPlato,
 // anchoTotal,
 {
-    pageOcultos: boolean;
     platosUnicos: {
         plato: string;
         platoCodigo: string;
@@ -109,7 +119,6 @@ export function TablaPlanificacion({
     }[];
     diasSemana: Date[];
     datos: any[];
-    filtro: string;
     diaActivo: string;
     produccion: ProduccionPlanificacion[];
     produccionUpdate: ProduccionChange[];
@@ -137,12 +146,14 @@ export function TablaPlanificacion({
 
     const RolProvider = useContext(RolContext);
 
-    const [ocultos, setOcultos] = React.useState<Set<string>>(new Set());
     const [show, setShow] = useState(false);
     const [platoModal, setPlatoModal] = useState('');
     const [platoCodigoModal, setPlatoCodigoModal] = useState('');
     const [platoPadreModal, setPlatoPadreModal] = useState('');
     const [platoPadreCodigoModal, setPlatoPadreCodigoModal] = useState('');
+    const [filtroPlato, setFiltroPlato] = useState('');
+    const [filtroElaboracion, setFiltroElaboracion] = useState('');
+    const [limpiandoFiltros, setLimpiandoFiltros] = useState(false);
     const [observacionModal, setObservacionModal] = useState('');
     const [adelantarEvento, setAdelantarEvento] = useState(0);
     const [platosAdelantados, setPlatosAdelantados] = useState<
@@ -175,36 +186,54 @@ export function TablaPlanificacion({
     const solicitudesAdelantoPendientesRef = useRef<Promise<boolean>[]>([]);
     const timerRefrescoPlanificacionRef = useRef<number | null>(null);
     const contenedorTablasRef = useRef<HTMLDivElement | null>(null);
-    const cachePlatosAdelantadosRef = useRef<
-        Map<number, PlatoAdelantado[]>
-    >(new Map());
-    //const [primeraCargaModal, setPrimeraCargaModal] = useState(true);
-
-    useEffect(() => {
-        fetch('/api/ocultos')
-            .then((res) => res.json())
-            .then((ocultosDB) => setOcultos(new Set(ocultosDB)));
-    }, []);
-
-    // const ocultarPlato = async (plato: string) => {
-    //     await fetch('/api/ocultos', {
-    //         method: 'POST',
-    //         headers: { 'Content-Type': 'application/json' },
-    //         body: JSON.stringify({ plato }),
-    //     });
-    //     setOcultos(new Set([...ocultos, plato]));
-    // };
-
-    // const mostrarPlato = async (plato: string) => {
-    //     await fetch(`/api/ocultos?plato=${encodeURIComponent(plato)}`, {
-    //         method: 'DELETE',
-    //     });
-    //     const nuevos = new Set(ocultos);
-    //     nuevos.delete(plato);
-    //     setOcultos(nuevos);
-    // };
+    const cachePlatosAdelantadosRef = useRef<Map<number, PlatoAdelantado[]>>(
+        new Map(),
+    );
 
     const handleClose = useCallback(() => setShow(false), []);
+    const handleLimpiarFiltros = useCallback(async () => {
+        if (!filtroPlato && !filtroElaboracion) {
+            return;
+        }
+
+        const toastId = toast.loading('Limpiando filtros', {
+            position: 'bottom-right',
+            type: 'info',
+            theme: 'colored',
+            transition: Slide,
+        });
+
+        setLimpiandoFiltros(true);
+
+        try {
+            await esperarSiguientePintado();
+
+            setFiltroPlato('');
+            setFiltroElaboracion('');
+
+            await esperarSiguientePintado();
+
+            toast.update(toastId, {
+                render: 'Filtros limpiados',
+                type: 'success',
+                isLoading: false,
+                autoClose: 2500,
+                closeOnClick: true,
+                draggable: true,
+            });
+        } catch {
+            toast.update(toastId, {
+                render: 'Error al limpiar filtros',
+                type: 'error',
+                isLoading: false,
+                autoClose: 4000,
+                closeOnClick: true,
+                draggable: true,
+            });
+        } finally {
+            setLimpiandoFiltros(false);
+        }
+    }, [filtroElaboracion, filtroPlato]);
 
     const ocultarTooltipCompartido = useCallback(() => {
         setTooltipCompartido((prev) =>
@@ -212,26 +241,29 @@ export function TablaPlanificacion({
         );
     }, []);
 
-    const mostrarTooltipCompartido = useCallback((
-        event:
-            | React.MouseEvent<HTMLElement>
-            | React.FocusEvent<HTMLElement>,
-        text: string,
-    ) => {
-        if (!text.trim()) {
-            ocultarTooltipCompartido();
-            return;
-        }
+    const mostrarTooltipCompartido = useCallback(
+        (
+            event:
+                | React.MouseEvent<HTMLElement>
+                | React.FocusEvent<HTMLElement>,
+            text: string,
+        ) => {
+            if (!text.trim()) {
+                ocultarTooltipCompartido();
+                return;
+            }
 
-        const rect = event.currentTarget.getBoundingClientRect();
+            const rect = event.currentTarget.getBoundingClientRect();
 
-        setTooltipCompartido({
-            left: rect.left + rect.width / 2,
-            text,
-            top: rect.bottom + 8,
-            visible: true,
-        });
-    }, [ocultarTooltipCompartido]);
+            setTooltipCompartido({
+                left: rect.left + rect.width / 2,
+                text,
+                top: rect.bottom + 8,
+                visible: true,
+            });
+        },
+        [ocultarTooltipCompartido],
+    );
 
     const dispararActualizacionPlanificacion = (inmediato = false) => {
         if (timerRefrescoPlanificacionRef.current !== null) {
@@ -290,10 +322,7 @@ export function TablaPlanificacion({
         });
 
         return () => {
-            contenedor.removeEventListener(
-                'scroll',
-                ocultarTooltipCompartido,
-            );
+            contenedor.removeEventListener('scroll', ocultarTooltipCompartido);
         };
     }, [ocultarTooltipCompartido]);
 
@@ -407,9 +436,7 @@ export function TablaPlanificacion({
                 item.id === platoId
                     ? {
                           ...item,
-                          fecha: adelantar
-                              ? new Date().toISOString()
-                              : null,
+                          fecha: adelantar ? new Date().toISOString() : null,
                       }
                     : item,
             ),
@@ -520,114 +547,129 @@ export function TablaPlanificacion({
         }
     };
 
-    const actualizarProduccionCelda = useCallback((
-        plato: string,
-        platoCodigo: string,
-        platoPadre: string,
-        platoPadreCodigo: string,
-        fecha: string,
-        valorInput: string,
-    ) => {
-        setProduccionUpdate((prevProduccion) => {
-            const nuevaProduccion = [...prevProduccion];
-            const index = nuevaProduccion.findIndex(
-                (p) =>
-                    p.platoCodigo === platoCodigo &&
-                    p.platoPadreCodigo === platoPadreCodigo &&
-                    p.fecha === fecha,
-            );
+    const actualizarProduccionCelda = useCallback(
+        (
+            plato: string,
+            platoCodigo: string,
+            platoPadre: string,
+            platoPadreCodigo: string,
+            fecha: string,
+            valorInput: string,
+        ) => {
+            setProduccionUpdate((prevProduccion) => {
+                const nuevaProduccion = [...prevProduccion];
+                const index = nuevaProduccion.findIndex(
+                    (p) =>
+                        p.platoCodigo === platoCodigo &&
+                        p.platoPadreCodigo === platoPadreCodigo &&
+                        p.fecha === fecha,
+                );
 
-            if (valorInput === '') {
-                const valorEliminado: ProduccionChange = {
+                if (valorInput === '') {
+                    const valorEliminado: ProduccionChange = {
+                        plato,
+                        platoCodigo,
+                        platoPadre,
+                        platoPadreCodigo,
+                        fecha,
+                        cantidad: null,
+                        eliminar: true as const,
+                    };
+
+                    if (index > -1) {
+                        nuevaProduccion[index] = valorEliminado;
+                    } else {
+                        nuevaProduccion.push(valorEliminado);
+                    }
+
+                    return nuevaProduccion;
+                }
+
+                const cantidad = Number.parseFloat(
+                    valorInput.replace(',', '.'),
+                );
+
+                if (!Number.isFinite(cantidad)) {
+                    return prevProduccion;
+                }
+
+                const valorActualizado: ProduccionChange = {
                     plato,
                     platoCodigo,
                     platoPadre,
                     platoPadreCodigo,
                     fecha,
-                    cantidad: null,
-                    eliminar: true as const,
+                    cantidad: Number(cantidad.toFixed(2)),
+                    eliminar: false as const,
                 };
 
                 if (index > -1) {
-                    nuevaProduccion[index] = valorEliminado;
+                    nuevaProduccion[index] = valorActualizado;
                 } else {
-                    nuevaProduccion.push(valorEliminado);
+                    nuevaProduccion.push(valorActualizado);
                 }
 
                 return nuevaProduccion;
+            });
+        },
+        [setProduccionUpdate],
+    );
+
+    const iniciarEdicionCelda = useCallback(
+        (celdaKey: string, valorActual: number | string) => {
+            if (RolProvider === 'consultor') {
+                return;
             }
 
-            const cantidad = Number.parseFloat(valorInput.replace(',', '.'));
-
-            if (!Number.isFinite(cantidad)) {
-                return prevProduccion;
-            }
-
-            const valorActualizado: ProduccionChange = {
-                plato,
-                platoCodigo,
-                platoPadre,
-                platoPadreCodigo,
-                fecha,
-                cantidad: Number(cantidad.toFixed(2)),
-                eliminar: false as const,
-            };
-
-            if (index > -1) {
-                nuevaProduccion[index] = valorActualizado;
-            } else {
-                nuevaProduccion.push(valorActualizado);
-            }
-
-            return nuevaProduccion;
-        });
-    }, [setProduccionUpdate]);
-
-    const iniciarEdicionCelda = useCallback((
-        celdaKey: string,
-        valorActual: number | string,
-    ) => {
-        if (RolProvider === 'consultor') {
-            return;
-        }
-
-        setCeldaEditando(celdaKey);
-        setValorCeldaEditando(valorActual === '' ? '' : String(valorActual));
-    }, [RolProvider]);
+            setCeldaEditando(celdaKey);
+            setValorCeldaEditando(
+                valorActual === '' ? '' : String(valorActual),
+            );
+        },
+        [RolProvider],
+    );
 
     const cerrarEdicionCelda = useCallback(() => {
         setCeldaEditando(null);
         setValorCeldaEditando('');
     }, []);
 
-    const guardarEdicionCelda = useCallback(({
-        celdaKey,
-        fecha,
-        plato,
-        platoCodigo,
-        platoPadre,
-        platoPadreCodigo,
-    }: {
-        celdaKey: string;
-        fecha: string;
-        plato: string;
-        platoCodigo: string;
-        platoPadre: string;
-        platoPadreCodigo: string;
-    }) => {
-        actualizarProduccionCelda(
+    const guardarEdicionCelda = useCallback(
+        ({
+            celdaKey,
+            fecha,
             plato,
             platoCodigo,
             platoPadre,
             platoPadreCodigo,
-            fecha,
-            valorCeldaEditando,
-        );
+        }: {
+            celdaKey: string;
+            fecha: string;
+            plato: string;
+            platoCodigo: string;
+            platoPadre: string;
+            platoPadreCodigo: string;
+        }) => {
+            actualizarProduccionCelda(
+                plato,
+                platoCodigo,
+                platoPadre,
+                platoPadreCodigo,
+                fecha,
+                valorCeldaEditando,
+            );
 
-        if (celdaEditando === celdaKey) {
-            cerrarEdicionCelda();
-        }
-    }, [actualizarProduccionCelda, celdaEditando, cerrarEdicionCelda, valorCeldaEditando]);
+            if (celdaEditando === celdaKey) {
+                cerrarEdicionCelda();
+            }
+        },
+        [
+            actualizarProduccionCelda,
+            celdaEditando,
+            cerrarEdicionCelda,
+            valorCeldaEditando,
+        ],
+    );
 
     type DragCantidadPayload = {
         mode: 'set' | 'add';
@@ -638,171 +680,184 @@ export function TablaPlanificacion({
 
     const DRAG_CANTIDAD_MIME = 'application/x-tamiz-planificacion-cantidad';
 
-    const iniciarDragCantidad = useCallback((
-        event: React.DragEvent<HTMLElement>,
-        payload: DragCantidadPayload,
-    ) => {
-        if (!Number.isFinite(payload.value)) {
-            return;
-        }
+    const iniciarDragCantidad = useCallback(
+        (event: React.DragEvent<HTMLElement>, payload: DragCantidadPayload) => {
+            if (!Number.isFinite(payload.value)) {
+                return;
+            }
 
-        const value = Number(payload.value.toFixed(2));
-        const payloadNormalizado: DragCantidadPayload = {
-            mode: payload.mode,
-            value,
-            platoCodigo: payload.platoCodigo,
-            platoPadreCodigo: payload.platoPadreCodigo,
-        };
+            const value = Number(payload.value.toFixed(2));
+            const payloadNormalizado: DragCantidadPayload = {
+                mode: payload.mode,
+                value,
+                platoCodigo: payload.platoCodigo,
+                platoPadreCodigo: payload.platoPadreCodigo,
+            };
 
-        event.dataTransfer.setData(
-            DRAG_CANTIDAD_MIME,
-            JSON.stringify(payloadNormalizado),
-        );
-        event.dataTransfer.setData('text/plain', String(value));
-        event.dataTransfer.effectAllowed = 'copy';
-    }, []);
-
-    const obtenerDragCantidad = useCallback((
-        dataTransfer: DataTransfer,
-    ): DragCantidadPayload | null => {
-        const dataCustom = dataTransfer.getData(DRAG_CANTIDAD_MIME);
-
-        if (dataCustom) {
-            try {
-                const payload = JSON.parse(dataCustom) as Partial<DragCantidadPayload>;
-                const mode = payload.mode;
-                const value = Number(payload.value);
-                const platoCodigo = String(payload.platoCodigo || '');
-                const platoPadreCodigo = String(payload.platoPadreCodigo || '');
-
-                if (
-                    (mode === 'set' || mode === 'add') &&
-                    Number.isFinite(value) &&
-                    platoCodigo &&
-                    platoPadreCodigo
-                ) {
-                    return {
-                        mode,
-                        value,
-                        platoCodigo,
-                        platoPadreCodigo,
-                    };
-                }
-            } catch {}
-        }
-
-        return null;
-    }, []);
-
-    const esMismaFilaDrag = useCallback((
-        payload: DragCantidadPayload,
-        {
-            platoCodigo,
-            platoPadreCodigo,
-        }: {
-            platoCodigo: string;
-            platoPadreCodigo: string;
+            event.dataTransfer.setData(
+                DRAG_CANTIDAD_MIME,
+                JSON.stringify(payloadNormalizado),
+            );
+            event.dataTransfer.setData('text/plain', String(value));
+            event.dataTransfer.effectAllowed = 'copy';
         },
-    ) =>
-        payload.platoCodigo === platoCodigo &&
-        payload.platoPadreCodigo === platoPadreCodigo,
-    []);
+        [],
+    );
 
-    const handleDragOverInputCantidad = useCallback((
-        event: React.DragEvent<HTMLElement>,
-        {
-            platoCodigo,
-            platoPadreCodigo,
-        }: {
-            platoCodigo: string;
-            platoPadreCodigo: string;
+    const obtenerDragCantidad = useCallback(
+        (dataTransfer: DataTransfer): DragCantidadPayload | null => {
+            const dataCustom = dataTransfer.getData(DRAG_CANTIDAD_MIME);
+
+            if (dataCustom) {
+                try {
+                    const payload = JSON.parse(
+                        dataCustom,
+                    ) as Partial<DragCantidadPayload>;
+                    const mode = payload.mode;
+                    const value = Number(payload.value);
+                    const platoCodigo = String(payload.platoCodigo || '');
+                    const platoPadreCodigo = String(
+                        payload.platoPadreCodigo || '',
+                    );
+
+                    if (
+                        (mode === 'set' || mode === 'add') &&
+                        Number.isFinite(value) &&
+                        platoCodigo &&
+                        platoPadreCodigo
+                    ) {
+                        return {
+                            mode,
+                            value,
+                            platoCodigo,
+                            platoPadreCodigo,
+                        };
+                    }
+                } catch {}
+            }
+
+            return null;
         },
-    ) => {
-        if (RolProvider === 'consultor') {
-            return;
-        }
+        [],
+    );
 
-        const tipos = Array.from(event.dataTransfer.types || []);
-        const esDragCompatible = tipos.includes(DRAG_CANTIDAD_MIME);
-
-        if (!esDragCompatible) {
-            return;
-        }
-
-        const payload = obtenerDragCantidad(event.dataTransfer);
-        if (
-            payload &&
-            !esMismaFilaDrag(payload, {
+    const esMismaFilaDrag = useCallback(
+        (
+            payload: DragCantidadPayload,
+            {
                 platoCodigo,
                 platoPadreCodigo,
-            })
-        ) {
-            return;
-        }
+            }: {
+                platoCodigo: string;
+                platoPadreCodigo: string;
+            },
+        ) =>
+            payload.platoCodigo === platoCodigo &&
+            payload.platoPadreCodigo === platoPadreCodigo,
+        [],
+    );
 
-        event.preventDefault();
-        event.dataTransfer.dropEffect = 'copy';
-    }, [RolProvider, esMismaFilaDrag, obtenerDragCantidad]);
-
-    const handleDropInputCantidad = useCallback((
-        event: React.DragEvent<HTMLElement>,
-        {
-            plato,
-            platoCodigo,
-            platoPadre,
-            platoPadreCodigo,
-            fecha,
-            cantidadActual,
-        }: {
-            plato: string;
-            platoCodigo: string;
-            platoPadre: string;
-            platoPadreCodigo: string;
-            fecha: string;
-            cantidadActual: number | string;
-        },
-    ) => {
-        if (RolProvider === 'consultor') {
-            return;
-        }
-
-        const payload = obtenerDragCantidad(event.dataTransfer);
-
-        if (!payload) {
-            return;
-        }
-
-        event.preventDefault();
-        if (
-            !esMismaFilaDrag(payload, {
+    const handleDragOverInputCantidad = useCallback(
+        (
+            event: React.DragEvent<HTMLElement>,
+            {
                 platoCodigo,
                 platoPadreCodigo,
-            })
-        ) {
-            return;
-        }
+            }: {
+                platoCodigo: string;
+                platoPadreCodigo: string;
+            },
+        ) => {
+            if (RolProvider === 'consultor') {
+                return;
+            }
 
-        const actual = Number(cantidadActual);
-        const actualValido = Number.isFinite(actual) ? actual : null;
-        const nuevoValor =
-            payload.mode === 'add'
-                ? Number(((actualValido ?? 0) + payload.value).toFixed(2))
-                : Number(payload.value.toFixed(2));
+            const tipos = Array.from(event.dataTransfer.types || []);
+            const esDragCompatible = tipos.includes(DRAG_CANTIDAD_MIME);
 
-        actualizarProduccionCelda(
-            plato,
-            platoCodigo,
-            platoPadre,
-            platoPadreCodigo,
-            fecha,
-            nuevoValor.toString(),
-        );
-    }, [
-        RolProvider,
-        actualizarProduccionCelda,
-        esMismaFilaDrag,
-        obtenerDragCantidad,
-    ]);
+            if (!esDragCompatible) {
+                return;
+            }
+
+            const payload = obtenerDragCantidad(event.dataTransfer);
+            if (
+                payload &&
+                !esMismaFilaDrag(payload, {
+                    platoCodigo,
+                    platoPadreCodigo,
+                })
+            ) {
+                return;
+            }
+
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'copy';
+        },
+        [RolProvider, esMismaFilaDrag, obtenerDragCantidad],
+    );
+
+    const handleDropInputCantidad = useCallback(
+        (
+            event: React.DragEvent<HTMLElement>,
+            {
+                plato,
+                platoCodigo,
+                platoPadre,
+                platoPadreCodigo,
+                fecha,
+                cantidadActual,
+            }: {
+                plato: string;
+                platoCodigo: string;
+                platoPadre: string;
+                platoPadreCodigo: string;
+                fecha: string;
+                cantidadActual: number | string;
+            },
+        ) => {
+            if (RolProvider === 'consultor') {
+                return;
+            }
+
+            const payload = obtenerDragCantidad(event.dataTransfer);
+
+            if (!payload) {
+                return;
+            }
+
+            event.preventDefault();
+            if (
+                !esMismaFilaDrag(payload, {
+                    platoCodigo,
+                    platoPadreCodigo,
+                })
+            ) {
+                return;
+            }
+
+            const actual = Number(cantidadActual);
+            const actualValido = Number.isFinite(actual) ? actual : null;
+            const nuevoValor =
+                payload.mode === 'add'
+                    ? Number(((actualValido ?? 0) + payload.value).toFixed(2))
+                    : Number(payload.value.toFixed(2));
+
+            actualizarProduccionCelda(
+                plato,
+                platoCodigo,
+                platoPadre,
+                platoPadreCodigo,
+                fecha,
+                nuevoValor.toString(),
+            );
+        },
+        [
+            RolProvider,
+            actualizarProduccionCelda,
+            esMismaFilaDrag,
+            obtenerDragCantidad,
+        ],
+    );
 
     const construirClaveFila = (
         platoCodigo: string,
@@ -823,8 +878,7 @@ export function TablaPlanificacion({
                 }))
                 .filter(
                     ({ dia }) =>
-                        !diaActivo ||
-                        format(dia, 'yyyy-MM-dd') === diaActivo,
+                        !diaActivo || format(dia, 'yyyy-MM-dd') === diaActivo,
                 ),
         [diaActivo, diasSemana],
     );
@@ -837,24 +891,84 @@ export function TablaPlanificacion({
         [diasSemana],
     );
 
+    const opcionesPlato = useMemo(
+        () =>
+            Array.from(
+                new Map(
+                    platosUnicos.map((item) => [
+                        construirValorFiltro(
+                            item.platoPadreCodigo,
+                            item.platoPadre,
+                        ),
+                        {
+                            label: item.platoPadre,
+                            value: construirValorFiltro(
+                                item.platoPadreCodigo,
+                                item.platoPadre,
+                            ),
+                        },
+                    ]),
+                ).values(),
+            ).sort((a, b) => a.label.localeCompare(b.label, 'es')),
+        [platosUnicos],
+    );
+
+    const opcionesElaboracion = useMemo(
+        () =>
+            Array.from(
+                new Map(
+                    platosUnicos
+                        .filter(
+                            (item) =>
+                                !filtroPlato ||
+                                construirValorFiltro(
+                                    item.platoPadreCodigo,
+                                    item.platoPadre,
+                                ) === filtroPlato,
+                        )
+                        .map((item) => [
+                            construirValorFiltro(item.platoCodigo, item.plato),
+                            {
+                                label: item.plato,
+                                value: construirValorFiltro(
+                                    item.platoCodigo,
+                                    item.plato,
+                                ),
+                            },
+                        ]),
+                ).values(),
+            ).sort((a, b) => a.label.localeCompare(b.label, 'es')),
+        [filtroPlato, platosUnicos],
+    );
+
+    useEffect(() => {
+        if (
+            filtroElaboracion &&
+            !opcionesElaboracion.some(
+                (opcion) => opcion.value === filtroElaboracion,
+            )
+        ) {
+            setFiltroElaboracion('');
+        }
+    }, [filtroElaboracion, opcionesElaboracion]);
+
     const platosFiltrados = useMemo(
         () =>
-            platosUnicos.filter(({ plato }) => {
-                if (pageOcultos) {
-                    return ocultos.has(plato);
-                }
+            platosUnicos.filter((item) => {
+                const coincidePlato =
+                    !filtroPlato ||
+                    construirValorFiltro(
+                        item.platoPadreCodigo,
+                        item.platoPadre,
+                    ) === filtroPlato;
+                    const coincideElaboracion =
+                        !filtroElaboracion ||
+                        construirValorFiltro(item.platoCodigo, item.plato) ===
+                            filtroElaboracion;
 
-                if (ocultos.has(plato)) {
-                    return false;
-                }
-
-                if (!filtro) {
-                    return true;
-                }
-
-                return plato.toLowerCase().includes(filtro.toLowerCase());
+                return coincidePlato && coincideElaboracion;
             }),
-        [filtro, ocultos, pageOcultos, platosUnicos],
+        [filtroElaboracion, filtroPlato, platosUnicos],
     );
 
     const consumoPorCelda = useMemo(() => {
@@ -903,10 +1017,7 @@ export function TablaPlanificacion({
             registrosFila.push(item);
             registrosPorFila.set(filaKey, registrosFila);
 
-            if (
-                item.observacion &&
-                !observacionPorFila.has(filaKey)
-            ) {
+            if (item.observacion && !observacionPorFila.has(filaKey)) {
                 observacionPorFila.set(filaKey, item.observacion);
             }
         }
@@ -998,12 +1109,7 @@ export function TablaPlanificacion({
         () =>
             platosFiltrados.map(
                 (
-                    {
-                        plato,
-                        platoCodigo,
-                        platoPadre,
-                        platoPadreCodigo,
-                    },
+                    { plato, platoCodigo, platoPadre, platoPadreCodigo },
                     rowIndex,
                 ) => {
                     const rowKey = construirClaveFila(
@@ -1089,8 +1195,7 @@ export function TablaPlanificacion({
                                 cantidadPersistida > 0 &&
                                 cantidadAnteriorACiclo > 0 &&
                                 Math.abs(
-                                    cantidadPersistida -
-                                        cantidadAnteriorACiclo,
+                                    cantidadPersistida - cantidadAnteriorACiclo,
                                 ) < 0.01;
 
                             const totalConsumo =
@@ -1175,6 +1280,8 @@ export function TablaPlanificacion({
     const todosAdelantados =
         platosAdelantados.length > 0 &&
         platosAdelantados.every((plato) => !!plato.fecha);
+    const cantidadFilasCabeceraSuperior = Math.max(maxCantidadEventosDia, 1);
+    const indiceFilaTitulos = cantidadFilasCabeceraSuperior;
 
     const stickyColumnLefts = useMemo(
         () =>
@@ -1225,69 +1332,79 @@ export function TablaPlanificacion({
         [],
     );
 
-    const obtenerStyleStickyIzquierda = useCallback((
-        columnIndex: number,
-        backgroundColor: string,
-        extra: React.CSSProperties = {},
-    ): React.CSSProperties => ({
-        ...styleCeldaBase,
-        backgroundColor,
-        left: stickyColumnLefts[columnIndex],
-        maxWidth: STICKY_COLUMN_WIDTHS[columnIndex],
-        minWidth: STICKY_COLUMN_WIDTHS[columnIndex],
-        position: 'sticky',
-        width: STICKY_COLUMN_WIDTHS[columnIndex],
-        zIndex: 3,
-        ...extra,
-    }), [stickyColumnLefts, styleCeldaBase]);
+    const obtenerStyleStickyIzquierda = useCallback(
+        (
+            columnIndex: number,
+            backgroundColor: string,
+            extra: React.CSSProperties = {},
+        ): React.CSSProperties => ({
+            ...styleCeldaBase,
+            backgroundColor,
+            left: stickyColumnLefts[columnIndex],
+            maxWidth: STICKY_COLUMN_WIDTHS[columnIndex],
+            minWidth: STICKY_COLUMN_WIDTHS[columnIndex],
+            position: 'sticky',
+            width: STICKY_COLUMN_WIDTHS[columnIndex],
+            zIndex: 3,
+            ...extra,
+        }),
+        [stickyColumnLefts, styleCeldaBase],
+    );
 
-    const obtenerStyleHeaderStickyIzquierda = useCallback((
-        columnIndex: number,
-        headerIndex: number,
-        backgroundColor: string,
-        extra: React.CSSProperties = {},
-    ): React.CSSProperties => ({
-        ...obtenerStyleStickyIzquierda(columnIndex, backgroundColor),
-        top: obtenerTopSticky(headerIndex),
-        zIndex: 8,
-        ...(headerIndex === maxCantidadEventosDia ? styleHeaderDiasBase : {}),
-        ...extra,
-    }), [
-        maxCantidadEventosDia,
-        obtenerStyleStickyIzquierda,
-        obtenerTopSticky,
-        styleHeaderDiasBase,
-    ]);
+    const obtenerStyleHeaderStickyIzquierda = useCallback(
+        (
+            columnIndex: number,
+            headerIndex: number,
+            backgroundColor: string,
+            extra: React.CSSProperties = {},
+        ): React.CSSProperties => ({
+            ...obtenerStyleStickyIzquierda(columnIndex, backgroundColor),
+            top: obtenerTopSticky(headerIndex),
+            zIndex: 8,
+            ...(headerIndex === indiceFilaTitulos ? styleHeaderDiasBase : {}),
+            ...extra,
+        }),
+        [
+            indiceFilaTitulos,
+            obtenerStyleStickyIzquierda,
+            obtenerTopSticky,
+            styleHeaderDiasBase,
+        ],
+    );
 
-    const obtenerStyleHeaderDia = useCallback((
-        headerIndex: number,
-        backgroundColor: string,
-        extra: React.CSSProperties = {},
-    ): React.CSSProperties => ({
-        ...(headerIndex === maxCantidadEventosDia
-            ? {
-                  ...styleCeldaDia,
-                  ...styleHeaderDiasBase,
-              }
-            : styleCeldaDia),
-        backgroundColor,
-        position: 'sticky',
-        top: obtenerTopSticky(headerIndex),
-        zIndex: 6,
-        ...extra,
-    }), [
-        maxCantidadEventosDia,
-        obtenerTopSticky,
-        styleCeldaDia,
-        styleHeaderDiasBase,
-    ]);
+    const obtenerStyleHeaderDia = useCallback(
+        (
+            headerIndex: number,
+            backgroundColor: string,
+            extra: React.CSSProperties = {},
+        ): React.CSSProperties => ({
+            ...(headerIndex === indiceFilaTitulos
+                ? {
+                      ...styleCeldaDia,
+                      ...styleHeaderDiasBase,
+                  }
+                : styleCeldaDia),
+            backgroundColor,
+            position: 'sticky',
+            top: obtenerTopSticky(headerIndex),
+            zIndex: 6,
+            ...extra,
+        }),
+        [
+            indiceFilaTitulos,
+            obtenerTopSticky,
+            styleCeldaDia,
+            styleHeaderDiasBase,
+        ],
+    );
 
-    const obtenerStyleTextoSticky = useCallback((
-        columnIndex: 1 | 2,
-    ): React.CSSProperties => ({
-        maxWidth: `calc(${STICKY_COLUMN_WIDTHS[columnIndex]} - 1rem)`,
-        width: `calc(${STICKY_COLUMN_WIDTHS[columnIndex]} - 1rem)`,
-    }), []);
+    const obtenerStyleTextoSticky = useCallback(
+        (columnIndex: 1 | 2): React.CSSProperties => ({
+            maxWidth: `calc(${STICKY_COLUMN_WIDTHS[columnIndex]} - 1rem)`,
+            width: `calc(${STICKY_COLUMN_WIDTHS[columnIndex]} - 1rem)`,
+        }),
+        [],
+    );
 
     const filasTabla = useMemo(
         () =>
@@ -1304,13 +1421,10 @@ export function TablaPlanificacion({
                             )}>
                             <Button
                                 size="sm"
-                                variant="primary"
+                                variant="outline-primary"
                                 style={{
                                     width: '2rem',
                                     height: '2.2rem',
-                                    display: 'flex',
-                                    justifyContent: 'center',
-                                    alignItems: 'center',
                                 }}
                                 onClick={() => {
                                     setObservacionModal(fila.observacionActual);
@@ -1510,8 +1624,7 @@ export function TablaPlanificacion({
                                                 }}
                                                 onBlur={() => {
                                                     guardarEdicionCelda({
-                                                        celdaKey:
-                                                            celda.cellKey,
+                                                        celdaKey: celda.cellKey,
                                                         fecha: celda.fechaClave,
                                                         plato: fila.plato,
                                                         platoCodigo:
@@ -1935,87 +2048,186 @@ export function TablaPlanificacion({
                     size="sm"
                     striped>
                     <thead>
-                        {Array.from({ length: maxCantidadEventosDia }).map(
-                            (_, headerIndex) => (
-                                <tr key={`evento-header-${headerIndex}`}>
-                                    {STICKY_COLUMN_WIDTHS.map((_, columnIndex) => (
+                        {Array.from({
+                            length: cantidadFilasCabeceraSuperior,
+                        }).map((_, headerIndex) => (
+                            <tr key={`evento-header-${headerIndex}`}>
+                                {STICKY_COLUMN_WIDTHS.map((_, columnIndex) => {
+                                    const esFilaFiltros =
+                                        headerIndex ===
+                                        cantidadFilasCabeceraSuperior - 1;
+                                    const key = `evento-header-empty-${headerIndex}-${columnIndex}`;
+                                    const style =
+                                        obtenerStyleHeaderStickyIzquierda(
+                                            columnIndex,
+                                            headerIndex,
+                                            '#ffffff',
+                                            {
+                                                border: 'none',
+                                            },
+                                        );
+
+                                    if (
+                                        esFilaFiltros &&
+                                        (columnIndex === 1 || columnIndex === 2)
+                                    ) {
+                                        return (
+                                            <th
+                                                key={key}
+                                                className="planificacion-header-filtro-cell"
+                                                style={style}>
+                                                <Form.Select
+                                                    size="sm"
+                                                    disabled={limpiandoFiltros}
+                                                    value={
+                                                        columnIndex === 1
+                                                            ? filtroPlato
+                                                            : filtroElaboracion
+                                                    }
+                                                    onChange={(event) => {
+                                                        const { value } =
+                                                            event.target;
+
+                                                        if (columnIndex === 1) {
+                                                            setFiltroPlato(
+                                                                value,
+                                                            );
+                                                            return;
+                                                        }
+
+                                                        setFiltroElaboracion(
+                                                            value,
+                                                        );
+                                                    }}
+                                                    aria-label={
+                                                        columnIndex === 1
+                                                            ? 'Seleccionar plato'
+                                                            : 'Seleccionar elaboración'
+                                                    }
+                                                    className="planificacion-header-filtro"
+                                                >
+                                                    <option
+                                                        value=""
+                                                        disabled
+                                                        hidden>
+                                                        {columnIndex === 1
+                                                            ? 'Seleccionar plato'
+                                                            : 'Seleccionar elaboración'}
+                                                    </option>
+                                                    {(columnIndex === 1
+                                                        ? opcionesPlato
+                                                        : opcionesElaboracion
+                                                    ).map((opcion) => (
+                                                        <option
+                                                            key={opcion.value}
+                                                            value={
+                                                                opcion.value
+                                                            }>
+                                                            {opcion.label}
+                                                        </option>
+                                                    ))}
+                                                </Form.Select>
+                                            </th>
+                                        );
+                                    }
+
+                                    if (esFilaFiltros && columnIndex === 3) {
+                                        return (
+                                            <th
+                                                key={key}
+                                                className="planificacion-header-filtro-cell"
+                                                style={style}>
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline-secondary"
+                                                    onClick={
+                                                        handleLimpiarFiltros
+                                                    }
+                                                    disabled={
+                                                        limpiandoFiltros ||
+                                                        (!filtroPlato &&
+                                                            !filtroElaboracion)
+                                                    }>
+                                                    Limpiar
+                                                </Button>
+                                            </th>
+                                        );
+                                    }
+
+                                    return (
                                         <th
-                                            key={`evento-header-empty-${headerIndex}-${columnIndex}`}
-                                            style={obtenerStyleHeaderStickyIzquierda(
-                                                columnIndex,
-                                                headerIndex,
-                                                '#ffffff',
-                                                {
-                                                    border: 'none',
-                                                },
-                                            )}>
+                                            key={key}
+                                            style={style}>
                                             &nbsp;
                                         </th>
-                                    ))}
-                                    {diasVisibles.map(
-                                        ({ fechaClave, indexOriginal }) => {
-                                            const eventosDia =
-                                                eventosPorFecha.get(fechaClave) ??
-                                                [];
+                                    );
+                                })}
+                                {diasVisibles.map(
+                                    ({ fechaClave, indexOriginal }) => {
+                                        const eventosDia =
+                                            eventosPorFecha.get(fechaClave) ??
+                                            [];
+                                        let evento = null;
+
+                                        if (maxCantidadEventosDia > 0) {
                                             const offset =
                                                 maxCantidadEventosDia -
                                                 eventosDia.length;
                                             const eventoIndex =
                                                 headerIndex - offset;
-                                            const evento =
+
+                                            evento =
                                                 eventoIndex >= 0
-                                                    ? eventosDia[eventoIndex]
+                                                    ? (eventosDia[
+                                                          eventoIndex
+                                                      ] ?? null)
                                                     : null;
+                                        }
 
-                                            return (
-                                                <th
-                                                    className={
-                                                        evento
-                                                            ? 'link-pdf'
-                                                            : undefined
+                                        return (
+                                            <th
+                                                className={
+                                                    evento
+                                                        ? 'link-pdf'
+                                                        : undefined
+                                                }
+                                                onClick={() => {
+                                                    if (
+                                                        !evento ||
+                                                        RolProvider ===
+                                                            'consultor'
+                                                    ) {
+                                                        return;
                                                     }
-                                                    onClick={() => {
-                                                        if (
-                                                            !evento ||
-                                                            RolProvider ===
-                                                                'consultor'
-                                                        ) {
-                                                            return;
-                                                        }
 
-                                                        abrirAdelantoEvento(
-                                                            evento.id,
-                                                        );
-                                                    }}
-                                                    key={`evento-header-${indexOriginal}-${headerIndex}`}
-                                                    style={obtenerStyleHeaderDia(
-                                                        headerIndex,
-                                                        '#ffffff',
-                                                        {
-                                                            border: 'none',
-                                                            fontWeight:
-                                                                'normal',
-                                                        },
-                                                    )}>
-                                                    {evento
-                                                        ? `${abreviar(evento.lugar)} - ${evento.salon}`
-                                                        : '\u00A0'}
-                                                </th>
-                                            );
-                                        },
-                                    )}
-                                </tr>
-                            ),
-                        )}
+                                                    abrirAdelantoEvento(
+                                                        evento.id,
+                                                    );
+                                                }}
+                                                key={`evento-header-${indexOriginal}-${headerIndex}`}
+                                                style={obtenerStyleHeaderDia(
+                                                    headerIndex,
+                                                    '#ffffff',
+                                                    {
+                                                        border: 'none',
+                                                        fontWeight: 'normal',
+                                                    },
+                                                )}>
+                                                {evento
+                                                    ? `${abreviar(evento.lugar)} - ${evento.cantidadInvitados}`
+                                                    : '\u00A0'}
+                                            </th>
+                                        );
+                                    },
+                                )}
+                            </tr>
+                        ))}
                         <tr style={{ textAlign: 'center' }}>
                             <th
                                 style={obtenerStyleHeaderStickyIzquierda(
                                     0,
-                                    maxCantidadEventosDia,
+                                    indiceFilaTitulos,
                                     '#BDBDBD',
-                                    {
-                                        textAlign: 'center',
-                                    },
                                 )}>
                                 <Button
                                     size="sm"
@@ -2034,7 +2246,7 @@ export function TablaPlanificacion({
                                             : 'Ver en pantalla completa'
                                     }
                                     style={{
-                                        width: '1.5rem',
+                                        width: '2rem',
                                         height: '1.5rem',
                                         display: 'inline-flex',
                                         justifyContent: 'center',
@@ -2052,7 +2264,7 @@ export function TablaPlanificacion({
                             <th
                                 style={obtenerStyleHeaderStickyIzquierda(
                                     1,
-                                    maxCantidadEventosDia,
+                                    indiceFilaTitulos,
                                     '#BDBDBD',
                                 )}>
                                 Plato
@@ -2060,7 +2272,7 @@ export function TablaPlanificacion({
                             <th
                                 style={obtenerStyleHeaderStickyIzquierda(
                                     2,
-                                    maxCantidadEventosDia,
+                                    indiceFilaTitulos,
                                     '#BDBDBD',
                                 )}>
                                 Elaboracion
@@ -2068,7 +2280,7 @@ export function TablaPlanificacion({
                             <th
                                 style={obtenerStyleHeaderStickyIzquierda(
                                     3,
-                                    maxCantidadEventosDia,
+                                    indiceFilaTitulos,
                                     '#BDBDBD',
                                 )}>
                                 Total
@@ -2078,7 +2290,7 @@ export function TablaPlanificacion({
                                     <th
                                         key={fechaClave}
                                         style={obtenerStyleHeaderDia(
-                                            maxCantidadEventosDia,
+                                            indiceFilaTitulos,
                                             indexOriginal < 11
                                                 ? 'rgb(255, 255, 0)'
                                                 : '#BDBDBD',

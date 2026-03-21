@@ -4,6 +4,7 @@
 import {
     useContext,
     useEffect,
+    useMemo,
     useRef,
     //  useRef,
     useState,
@@ -31,6 +32,7 @@ import { Loading } from '@/components/loading';
 
 export interface EventoPlanificacion {
     id: number;
+    cantidadInvitados: number;
     fecha: string;
     lugar: string;
     nombre: string;
@@ -229,7 +231,6 @@ export default function PlanificacionPage() {
     const [maxCantidadEventosDia, setMaxCantidadEventosDia] = useState(0);
     const [produccion, setProduccion] = useState<ProduccionPlanificacion[]>([]);
     const [datosFiltrados, setDatosFiltrados] = useState<any[]>([]);
-    const [filtro] = useState('');
     const [diaActivo, setDiaActivo] = useState('');
     const [produccionUpdate, setProduccionUpdate] = React.useState<
         ProduccionChange[]
@@ -595,19 +596,22 @@ export default function PlanificacionPage() {
         [],
     );
 
-    const platosUnicos = [
-        ...new Map(
-            datosFiltrados.map((d) => [
-                `${d.platoCodigo}-${d.platoPadreCodigo}`,
-                {
-                    plato: d.plato,
-                    platoCodigo: d.platoCodigo,
-                    platoPadre: d.platoPadre,
-                    platoPadreCodigo: d.platoPadreCodigo,
-                },
-            ]),
-        ).values(),
-    ];
+    const platosUnicos = useMemo(
+        () => [
+            ...new Map(
+                datosFiltrados.map((d) => [
+                    `${d.platoCodigo}-${d.platoPadreCodigo}`,
+                    {
+                        plato: d.plato,
+                        platoCodigo: d.platoCodigo,
+                        platoPadre: d.platoPadre,
+                        platoPadreCodigo: d.platoPadreCodigo,
+                    },
+                ]),
+            ).values(),
+        ],
+        [datosFiltrados],
+    );
 
     const inicioSemana = startOfWeek(semanaBase, { weekStartsOn: 1 });
     const finSemana = addDays(inicioSemana, 6);
@@ -715,7 +719,7 @@ export default function PlanificacionPage() {
                                                     e.target.checked,
                                                 )
                                             }
-                                            label={`${format(new Date(comanda.fecha), 'dd/MM/yyyy')} - ${comanda.lugar} - ${comanda.salon} - ${comanda.nombre}`}
+                                            label={`${format(new Date(comanda.fecha), 'dd/MM/yyyy')} - ${comanda.lugar} - ${comanda.cantidadInvitados} - ${comanda.nombre}`}
                                         />
                                     );
                                 })}
@@ -723,23 +727,6 @@ export default function PlanificacionPage() {
                         )}
                     </div>
                 </Container>
-
-                {/* <Form.Group>
-                <Row>
-                    <Col>
-                        <FiltroPlatos
-                            filtro={filtro}
-                            setFiltro={setFiltro}
-                        />
-                    </Col>
-                    <Col>
-                        <SelectorDias
-                            diasSemana={diasSemana}
-                            setDiaActivo={setDiaActivo}
-                        />
-                    </Col>
-                </Row>
-            </Form.Group> */}
 
                 {/* EVENTOS */}
 
@@ -835,9 +822,7 @@ export default function PlanificacionPage() {
                     platosUnicos={platosUnicos}
                     diasSemana={diasSemana}
                     datos={datosFiltrados}
-                    filtro={filtro}
                     diaActivo={diaActivo}
-                    pageOcultos={false}
                     produccion={produccion}
                     setProduccion={setProduccion}
                     produccionUpdate={produccionUpdate}
