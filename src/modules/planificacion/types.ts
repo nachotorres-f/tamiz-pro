@@ -66,7 +66,6 @@ export interface ObservacionPlanificacion extends PlanificacionFilaBase {
 }
 
 export interface PlanificacionResponse {
-    planifacion: PlanificacionIngrediente[];
     planificacion: PlanificacionIngrediente[];
     produccion: ProduccionPlanificacion[];
 }

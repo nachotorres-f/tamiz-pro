@@ -66,7 +66,6 @@ export interface ResultadoEventosPlanificacion {
 }
 
 export interface ResultadoObtenerPlanificacion {
-    planifacion: PlanificacionIngrediente[];
     planificacion: PlanificacionIngrediente[];
     produccion: Record<string, unknown>[];
 }

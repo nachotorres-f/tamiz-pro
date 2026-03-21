@@ -98,7 +98,6 @@ export async function obtenerPlanificacion(
     ]);
 
     return {
-        planifacion: ingredientes,
         planificacion: ingredientes,
         produccion,
         resumen: {

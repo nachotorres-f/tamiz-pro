@@ -48,12 +48,9 @@ export async function fetchPlanificacion(params: {
     );
     const planificacion = Array.isArray(data.planificacion)
         ? data.planificacion
-        : Array.isArray(data.planifacion)
-          ? data.planifacion
-          : [];
+        : [];
 
     return {
-        planifacion: planificacion,
         planificacion,
         produccion: Array.isArray(data.produccion) ? data.produccion : [],
     };

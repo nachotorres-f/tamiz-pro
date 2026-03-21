@@ -33,7 +33,6 @@ export async function GET(req: NextRequest) {
         });
 
         return NextResponse.json({
-            planifacion: resultado.planifacion,
             planificacion: resultado.planificacion,
             produccion: resultado.produccion,
         });
@@ -80,7 +79,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ message: resultado.message });
     } catch (error) {
         const mensajeError =
-            error instanceof Error ? error.message : 'Error interno del servidor';
+            error instanceof Error
+                ? error.message
+                : 'Error interno del servidor';
 
         await logAudit({
             modulo: 'planificacion',
