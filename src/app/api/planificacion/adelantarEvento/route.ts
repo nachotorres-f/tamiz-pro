@@ -1,59 +1,44 @@
-import { prisma } from '@/lib/prisma';
 import { NextRequest, NextResponse } from 'next/server';
+import {
+    actualizarAdelantoPlato,
+    obtenerPlatosAdelantadosEvento,
+    setPlanificacionTimezone,
+} from '@/server/services/planificacion.service';
+import {
+    getRouteErrorMessage,
+    getRouteErrorStatus,
+    parseActualizarAdelantoPlatoInput,
+    parseObtenerAdelantoEventoInput,
+} from '@/server/planificacion/validators/planificacion.validator';
 
 export async function GET(req: NextRequest) {
-    process.env.TZ = 'America/Argentina/Buenos_Aires';
+    setPlanificacionTimezone();
 
-    const { searchParams } = req.nextUrl;
-    const id = Number(searchParams.get('id'));
+    try {
+        const input = parseObtenerAdelantoEventoInput(req.nextUrl.searchParams);
+        const resultado = await obtenerPlatosAdelantadosEvento(input);
 
-    const comanda = await prisma.comanda.findUnique({
-        where: { id },
-        select: {
-            Plato: {
-                orderBy: { nombre: 'asc' },
-                select: {
-                    cantidad: true,
-                    fecha: true,
-                    id: true,
-                    nombre: true,
-                },
-            },
-        },
-    });
-
-    return NextResponse.json(comanda);
+        return NextResponse.json(resultado);
+    } catch (error) {
+        return NextResponse.json(
+            { error: getRouteErrorMessage(error) },
+            { status: getRouteErrorStatus(error) },
+        );
+    }
 }
 
 export async function POST(req: NextRequest) {
-    process.env.TZ = 'America/Argentina/Buenos_Aires';
+    setPlanificacionTimezone();
 
-    const { id, adelantar } = await req.json();
-    if (typeof id !== 'number' || typeof adelantar !== 'boolean') {
+    try {
+        const input = parseActualizarAdelantoPlatoInput(await req.json());
+        const resultado = await actualizarAdelantoPlato(input);
+
+        return NextResponse.json(resultado);
+    } catch (error) {
         return NextResponse.json(
-            { error: 'Faltan parámetros' },
-            { status: 400 }
+            { error: getRouteErrorMessage(error) },
+            { status: getRouteErrorStatus(error) },
         );
     }
-
-    const plato = await prisma.plato.findUnique({
-        where: { id },
-        include: { comanda: true },
-    });
-
-    if (!plato) {
-        return NextResponse.json(
-            { error: 'Plato no encontrado' },
-            { status: 404 }
-        );
-    }
-
-    await prisma.plato.update({
-        where: { id },
-        data: {
-            fecha: adelantar ? plato.comanda.fecha : null,
-        },
-    });
-
-    return NextResponse.json({ success: true });
 }

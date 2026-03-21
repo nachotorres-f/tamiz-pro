@@ -88,11 +88,11 @@ model Produccion {
   observacion String? @db.Text
   observacionProduccion String? @db.Text
   cantidad Float 
-  salon String?
+  salon String @default("")
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
-  @@index([platoCodigo, platoPadreCodigo, fecha, salon])
+  @@unique([platoCodigo, platoPadreCodigo, fecha, salon])
   @@index([fecha, salon])
 }
 

@@ -293,7 +293,7 @@ export async function GET(req: NextRequest) {
                     cantidad: {
                         gt: 0,
                     },
-                    salon,
+                    salon: salon ?? '',
                 },
                 select: {
                     fecha: true,
@@ -327,7 +327,7 @@ export async function GET(req: NextRequest) {
                 cantidad: {
                     gt: 0,
                 },
-                salon,
+                salon: salon ?? '',
             },
             orderBy: {
                 platoCodigo: 'asc',
