@@ -437,6 +437,125 @@ export async function GET(req: NextRequest) {
     }
 }
 
+interface DeleteBody {
+    platoCodigo?: string;
+    platoPadreCodigo?: string;
+    fecha?: string;
+    salon?: string;
+}
+
+export async function DELETE(req: NextRequest) {
+    process.env.TZ = 'America/Argentina/Buenos_Aires';
+
+    let body: DeleteBody | null = null;
+
+    try {
+        const payload = (await req.json()) as DeleteBody;
+        body = payload;
+        const { platoCodigo, platoPadreCodigo, fecha, salon } = payload;
+
+        if (
+            !platoCodigo ||
+            typeof platoPadreCodigo !== 'string' ||
+            !fecha ||
+            !salon
+        ) {
+            await logAudit({
+                modulo: 'produccion',
+                accion: 'eliminar_produccion',
+                ruta: '/api/produccion',
+                metodo: 'DELETE',
+                estado: 'warning',
+                resumen: 'Datos incompletos para eliminar producción',
+                detalle: payload,
+            });
+
+            return NextResponse.json(
+                { error: 'Datos incompletos' },
+                { status: 400 },
+            );
+        }
+
+        const fechaBase = new Date(fecha.split('T')[0]);
+
+        if (Number.isNaN(fechaBase.getTime())) {
+            return NextResponse.json(
+                { error: 'Fecha inválida' },
+                { status: 400 },
+            );
+        }
+
+        const eliminadas = await prisma.produccion.deleteMany({
+            where: {
+                platoCodigo,
+                platoPadreCodigo,
+                fecha: fechaBase,
+                salon,
+            },
+        });
+
+        if (eliminadas.count === 0) {
+            await logAudit({
+                modulo: 'produccion',
+                accion: 'eliminar_produccion',
+                ruta: '/api/produccion',
+                metodo: 'DELETE',
+                estado: 'warning',
+                resumen: 'No se encontró producción para eliminar',
+                detalle: {
+                    platoCodigo,
+                    platoPadreCodigo,
+                    fecha,
+                    salon,
+                },
+            });
+
+            return NextResponse.json(
+                { error: 'No se encontró la producción' },
+                { status: 404 },
+            );
+        }
+
+        await logAudit({
+            modulo: 'produccion',
+            accion: 'eliminar_produccion',
+            ruta: '/api/produccion',
+            metodo: 'DELETE',
+            resumen: 'Producción eliminada',
+            detalle: {
+                platoCodigo,
+                platoPadreCodigo,
+                fecha,
+                salon,
+                eliminadas: eliminadas.count,
+            },
+        });
+
+        return NextResponse.json({
+            success: true,
+            eliminadas: eliminadas.count,
+        });
+    } catch (error) {
+        await logAudit({
+            modulo: 'produccion',
+            accion: 'eliminar_produccion',
+            ruta: '/api/produccion',
+            metodo: 'DELETE',
+            estado: 'error',
+            resumen: 'Error eliminando producción',
+            detalle: {
+                body,
+                error: error instanceof Error ? error.message : String(error),
+            },
+        });
+
+        return NextResponse.json(
+            { error: 'Error al eliminar producción' },
+            { status: 500 },
+        );
+    }
+}
+
 const updateGestionadoPlato = async (platoCodigo: string) => {
     try {
         const updatedPlato = await prisma.plato.updateMany({

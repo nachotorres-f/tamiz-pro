@@ -55,7 +55,7 @@ export const generarPDFReceta = async (
 
     const data = await response.json();
     fecha = entregaMP ? addDays(fecha, -2) : fecha;
-    console.log(entregaMP);
+    const prefijoArchivo = entregaMP ? 'entregaMP' : 'Produccion';
 
     if (modo === 'unico') {
         const doc = new jsPDF();
@@ -65,11 +65,11 @@ export const generarPDFReceta = async (
                 doc.addPage();
             }
 
-            const yPosition = renderEncabezado(doc);
+            const yPosition = renderEncabezado(doc, entregaMP);
             renderReceta(doc, plato, yPosition, fecha, entregaMP);
         });
 
-        doc.save(`Produccion_${fecha.toISOString().split('T')[0]}.pdf`);
+        doc.save(`${prefijoArchivo}_${fecha.toISOString().split('T')[0]}.pdf`);
     }
 
     if (modo === 'separado') {
@@ -78,12 +78,12 @@ export const generarPDFReceta = async (
         for (const plato of data) {
             const doc = new jsPDF();
 
-            const yPosition = renderEncabezado(doc);
+            const yPosition = renderEncabezado(doc, entregaMP);
             renderReceta(doc, plato, yPosition, fecha, entregaMP);
 
             const pdfBlob = doc.output('blob');
             zip.file(
-                `Produccion_${plato.plato}_${
+                `${prefijoArchivo}_${plato.plato}_${
                     fecha.toISOString().split('T')[0]
                 }.pdf`,
                 pdfBlob,
@@ -91,14 +91,11 @@ export const generarPDFReceta = async (
         }
 
         const content = await zip.generateAsync({ type: 'blob' });
-        saveAs(
-            content,
-            `Producciones_${fecha.toISOString().split('T')[0]}.zip`,
-        );
+        saveAs(content, `${prefijoArchivo}_${fecha.toISOString().split('T')[0]}.zip`);
     }
 };
 
-const renderEncabezado = (doc: jsPDF) => {
+const renderEncabezado = (doc: jsPDF, entregaMP: boolean) => {
     let yPosition = 40;
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
@@ -106,7 +103,7 @@ const renderEncabezado = (doc: jsPDF) => {
     doc.setFontSize(20);
     doc.setTextColor(0, 0, 0);
 
-    const title = 'Produccion';
+    const title = entregaMP ? 'Entrega MP' : 'Produccion';
     const titleWidth = doc.getTextWidth(title);
     const titleX = (pageWidth - titleWidth) / 2;
     const titleY = yPosition;
