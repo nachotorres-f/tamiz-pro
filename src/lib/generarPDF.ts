@@ -17,10 +17,45 @@ interface Plato {
     ingredientes: [string, string, string, number][];
 }
 
+interface SolicitudPDFReceta {
+    fecha: Date;
+    listaPlatos: string[];
+}
+
 const head = [['Codigo', 'Descripcion', 'Unidad', 'Porcion Bruta']];
 
 const normalizarTexto = (valor: string | null | undefined) =>
     (valor ?? '').trim();
+
+const formatearFechaArchivo = (fecha: Date) => fecha.toISOString().split('T')[0];
+
+const sanitizarNombreArchivo = (valor: string | null | undefined) => {
+    const nombreNormalizado = normalizarTexto(valor)
+        .replace(/[\\/:*?"<>|]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    return nombreNormalizado || 'Sin_nombre';
+};
+
+const construirIdentificadorFechas = (fechas: Date[]) => {
+    const fechasOrdenadas = [...fechas].sort(
+        (a, b) => a.getTime() - b.getTime(),
+    );
+
+    if (fechasOrdenadas.length === 0) {
+        return 'sin_fecha';
+    }
+
+    const primeraFecha = formatearFechaArchivo(fechasOrdenadas[0]);
+    const ultimaFecha = formatearFechaArchivo(
+        fechasOrdenadas[fechasOrdenadas.length - 1],
+    );
+
+    return primeraFecha === ultimaFecha
+        ? primeraFecha
+        : `${primeraFecha}_a_${ultimaFecha}`;
+};
 
 const construirLineaPlato = (
     etiqueta: 'Plato' | 'Elab',
@@ -69,7 +104,7 @@ export const generarPDFReceta = async (
             renderReceta(doc, plato, yPosition, fecha, entregaMP);
         });
 
-        doc.save(`${prefijoArchivo}_${fecha.toISOString().split('T')[0]}.pdf`);
+        doc.save(`${prefijoArchivo}_${formatearFechaArchivo(fecha)}.pdf`);
     }
 
     if (modo === 'separado') {
@@ -84,14 +119,115 @@ export const generarPDFReceta = async (
             const pdfBlob = doc.output('blob');
             zip.file(
                 `${prefijoArchivo}_${plato.plato}_${
-                    fecha.toISOString().split('T')[0]
+                    formatearFechaArchivo(fecha)
                 }.pdf`,
                 pdfBlob,
             );
         }
 
         const content = await zip.generateAsync({ type: 'blob' });
-        saveAs(content, `${prefijoArchivo}_${fecha.toISOString().split('T')[0]}.zip`);
+        saveAs(content, `${prefijoArchivo}_${formatearFechaArchivo(fecha)}.zip`);
+    }
+};
+
+const obtenerDatosPDFReceta = async (
+    listaPlatos: string[],
+    fecha: Date,
+    salon: string,
+) => {
+    const response = await fetch('api/pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ listaPlatos, fecha, salon }),
+    });
+
+    if (!response.ok) {
+        throw new Error('Error al obtener los datos para el PDF');
+    }
+
+    return (await response.json()) as Plato[];
+};
+
+export const generarPDFRecetasSeleccionadas = async (
+    solicitudes: SolicitudPDFReceta[],
+    salon: string,
+    modo: 'unico' | 'separado',
+    entregaMP = false,
+    nombreArchivoBase?: string,
+) => {
+    if (solicitudes.length === 0) {
+        throw new Error('No hay recetas seleccionadas para imprimir');
+    }
+
+    const prefijoArchivo = entregaMP ? 'entregaMP' : 'Produccion';
+    const fechasDocumento = solicitudes.map((solicitud) =>
+        entregaMP ? addDays(solicitud.fecha, -2) : solicitud.fecha,
+    );
+    const identificadorFechas = construirIdentificadorFechas(fechasDocumento);
+    const nombreArchivoPdf = `${prefijoArchivo}_${sanitizarNombreArchivo(
+        nombreArchivoBase,
+    )}_${identificadorFechas}`;
+    const nombreArchivoZip = `${prefijoArchivo}_${identificadorFechas}`;
+
+    if (modo === 'unico') {
+        const doc = new jsPDF();
+        let paginaActual = 0;
+
+        for (const solicitud of solicitudes) {
+            const data = await obtenerDatosPDFReceta(
+                solicitud.listaPlatos,
+                solicitud.fecha,
+                salon,
+            );
+            const fechaDocumento = entregaMP
+                ? addDays(solicitud.fecha, -2)
+                : solicitud.fecha;
+
+            for (const plato of data) {
+                if (paginaActual > 0) {
+                    doc.addPage();
+                }
+
+                const yPosition = renderEncabezado(doc, entregaMP);
+                renderReceta(doc, plato, yPosition, fechaDocumento, entregaMP);
+                paginaActual += 1;
+            }
+        }
+
+        doc.save(`${nombreArchivoPdf}.pdf`);
+    }
+
+    if (modo === 'separado') {
+        const zip = new JSZip();
+        let indiceArchivo = 1;
+
+        for (const solicitud of solicitudes) {
+            const data = await obtenerDatosPDFReceta(
+                solicitud.listaPlatos,
+                solicitud.fecha,
+                salon,
+            );
+            const fechaDocumento = entregaMP
+                ? addDays(solicitud.fecha, -2)
+                : solicitud.fecha;
+
+            for (const plato of data) {
+                const doc = new jsPDF();
+                const yPosition = renderEncabezado(doc, entregaMP);
+                renderReceta(doc, plato, yPosition, fechaDocumento, entregaMP);
+
+                zip.file(
+                    `${prefijoArchivo}_${plato.plato}_${
+                        formatearFechaArchivo(fechaDocumento)
+                    }_${indiceArchivo}.pdf`,
+                    doc.output('blob'),
+                );
+                indiceArchivo += 1;
+            }
+        }
+
+        const content = await zip.generateAsync({ type: 'blob' });
+        saveAs(content, `${nombreArchivoZip}.zip`);
     }
 };
 

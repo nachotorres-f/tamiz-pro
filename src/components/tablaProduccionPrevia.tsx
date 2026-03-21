@@ -1,10 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
+import { formatearDiaTabla } from '@/lib/formatearDiaTabla';
 import React, { useState } from 'react';
 import { Table, Form, Button } from 'react-bootstrap';
 import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 
 interface TableProduccionPreviaProps {
     diasSemana: Date[];
@@ -35,7 +35,7 @@ export const TableProduccionPrevia: React.FC<TableProduccionPreviaProps> = ({
                     <tr style={{ textAlign: 'center' }}>
                         {diasSemana.map((dia, i) => (
                             <th key={i}>
-                                {format(dia, 'EEE d-M ', { locale: es })}
+                                {formatearDiaTabla(dia)}
                             </th>
                         ))}
                     </tr>

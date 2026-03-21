@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
+import { formatearDiaTabla } from '@/lib/formatearDiaTabla';
 import React, {
     useCallback,
     useContext,
@@ -18,13 +19,12 @@ import {
     Table,
 } from 'react-bootstrap';
 import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 import {
     ArrowsFullscreen,
     ChatRightText,
     FullscreenExit,
 } from 'react-bootstrap-icons';
-import { Slide, toast } from 'react-toastify';
+import { Slide, toast, ToastContainer } from 'react-toastify';
 import type {
     EventoPlanificacion,
     ObservacionPlanificacion,
@@ -38,16 +38,6 @@ function abreviar(lugar: string) {
     if (lugar === 'La Rural') return 'RUR';
     if (lugar === 'Rüt Haus') return 'RUT';
     if (lugar === 'Origami') return 'ORI';
-}
-
-function formatFecha(dia: Date) {
-    const nombreDia = format(dia, 'EEEE', { locale: es });
-    const letraDia = nombreDia.startsWith('mi')
-        ? 'X'
-        : nombreDia.charAt(0).toUpperCase();
-    const diaNumero = format(dia, 'd');
-    const mesNumero = format(dia, 'M');
-    return `${letraDia} ${diaNumero}-${mesNumero}`;
 }
 
 function normalizarFechaInicioDia(fecha: string | Date) {
@@ -1827,6 +1817,7 @@ export function TablaPlanificacion({
     return (
         <>
             <Modal
+                container={contenedorTablasRef.current ?? undefined}
                 show={show}
                 onHide={handleClose}>
                 <Modal.Header closeButton>
@@ -1909,6 +1900,7 @@ export function TablaPlanificacion({
             </Modal>
 
             <Modal
+                container={contenedorTablasRef.current ?? undefined}
                 size="lg"
                 show={adelantarEvento != 0}
                 onHide={() => {
@@ -2037,6 +2029,7 @@ export function TablaPlanificacion({
                     overflow: 'auto',
                     backgroundColor: '#fff',
                 }}>
+                <ToastContainer />
                 <Table
                     style={{
                         width: 'max-content',
@@ -2299,7 +2292,7 @@ export function TablaPlanificacion({
                                                 textAlign: 'center',
                                             },
                                         )}>
-                                        {formatFecha(dia)}
+                                        {formatearDiaTabla(dia)}
                                     </th>
                                 ),
                             )}

@@ -1,5 +1,6 @@
 'use client';
 
+import { formatearDiaTabla } from '@/lib/formatearDiaTabla';
 import { SalonContext } from '@/components/filtroPlatos';
 import { Loading } from '@/components/loading';
 import { addDays, format } from 'date-fns';
@@ -718,12 +719,8 @@ export default function PickingPage() {
                                             key={comanda.id}
                                             style={{ minWidth: 180 }}>
                                             <div className="text-white">
-                                                {format(
+                                                {formatearDiaTabla(
                                                     new Date(comanda.fecha),
-                                                    'EEE dd/MM',
-                                                    {
-                                                        locale: es,
-                                                    },
                                                 )}
                                             </div>
                                             <small className="d-block text-white">

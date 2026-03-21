@@ -2,6 +2,7 @@
 'use client';
 
 import { NavegacionSemanal } from '@/components/navegacionSemanal';
+import { formatearDiaTabla } from '@/lib/formatearDiaTabla';
 import { addDays, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import React, {
@@ -35,12 +36,16 @@ import {
     FiletypePdf,
     Fullscreen,
     FullscreenExit,
+    Gear,
     Trash,
 } from 'react-bootstrap-icons';
 import { MoonLoader } from 'react-spinners';
 import { RolContext, SalonContext } from '@/components/filtroPlatos';
 import { Slide, toast, ToastContainer } from 'react-toastify';
-import { generarPDFReceta } from '@/lib/generarPDF';
+import {
+    generarPDFReceta,
+    generarPDFRecetasSeleccionadas,
+} from '@/lib/generarPDF';
 import AgregarPlato from '@/components/agregarPlato';
 
 interface ProduccionPageProps {
@@ -151,24 +156,14 @@ export default function ProduccionPage({ entregaMP }: ProduccionPageProps) {
     const [loading, setLoading] = useState(false);
     const [fechaImprimir, setFechaImprimir] = useState<Date | null>(null);
     const [isFullscreen, setIsFullscreen] = useState(false);
-    const [showModalProduccion, setShowModalProduccion] = useState(false);
+    const [showModalGestion, setShowModalGestion] = useState(false);
     const [observacionModal, setObservacionModal] = useState('');
-    const [showModalObservacion, setShowModalObservacion] = useState(false);
-    const [showModalEliminar, setShowModalEliminar] = useState(false);
-    const [filaEliminarProduccion, setFilaEliminarProduccion] = useState<
-        any | null
-    >(null);
-    const [fechaEliminarSeleccionada, setFechaEliminarSeleccionada] =
-        useState('');
-    const [platoModalProduccion, setPlatoModalProduccion] = useState({
-        plato: '',
-        platoCodigo: '',
-        platoPadre: '',
-        platoPadreCodigo: '',
-        comentario: undefined,
-        cantidad: 0,
-        fecha: new Date(),
-    });
+    const [filaGestionProduccion, setFilaGestionProduccion] =
+        useState<any | null>(null);
+    const [fechasSeleccionadas, setFechasSeleccionadas] = useState<string[]>(
+        [],
+    );
+    const [gestionEnCurso, setGestionEnCurso] = useState(false);
 
     const modoId = entregaMP ? 'entrega-mp' : 'produccion';
     const tituloPagina = entregaMP ? 'Entrega de MP' : 'Produccion';
@@ -194,17 +189,28 @@ export default function ProduccionPage({ entregaMP }: ProduccionPageProps) {
         [entregaMP, salon, semanaBase],
     );
 
-    const recargarDatos = useCallback(async () => {
-        setLoading(true);
+    const recargarDatos = useCallback(
+        async ({ silencioso = false }: { silencioso?: boolean } = {}) => {
+            if (!silencioso) {
+                setLoading(true);
+            }
 
-        try {
-            const res = await fetch(construirUrlConsulta());
-            const payload = await res.json();
-            setDatosApi(Array.isArray(payload?.data) ? payload.data : []);
-        } finally {
-            setLoading(false);
-        }
-    }, [construirUrlConsulta]);
+            try {
+                const res = await fetch(construirUrlConsulta());
+                const payload = await res.json();
+                const nuevosDatos = Array.isArray(payload?.data)
+                    ? payload.data
+                    : [];
+                setDatosApi(nuevosDatos);
+                return nuevosDatos;
+            } finally {
+                if (!silencioso) {
+                    setLoading(false);
+                }
+            }
+        },
+        [construirUrlConsulta],
+    );
 
     useEffect(() => {
         void recargarDatos();
@@ -332,12 +338,11 @@ export default function ProduccionPage({ entregaMP }: ProduccionPageProps) {
     };
 
     const handleClose = () => setShowModal(false);
-    const handleCloseModalProduccion = () => setShowModalProduccion(false);
-    const handleCloseModalObservacion = () => setShowModalObservacion(false);
-    const handleCloseModalEliminar = () => {
-        setShowModalEliminar(false);
-        setFilaEliminarProduccion(null);
-        setFechaEliminarSeleccionada('');
+    const handleCloseModalGestion = () => {
+        setShowModalGestion(false);
+        setFilaGestionProduccion(null);
+        setFechasSeleccionadas([]);
+        setObservacionModal('');
     };
 
     const filterPlatosPorDia = useCallback(
@@ -384,159 +389,368 @@ export default function ProduccionPage({ entregaMP }: ProduccionPageProps) {
         return produccion ? produccion.cantidad : '';
     };
 
-    function guardarComentario() {
-        if (
-            !platoModalProduccion.platoCodigo ||
-            !platoModalProduccion.fecha ||
-            !salon
-        ) {
-            toast.error('Selecciona un plato con producción para comentar', {
+    const produccionesSeleccionadas = useMemo(() => {
+        if (!filaGestionProduccion || fechasSeleccionadas.length === 0) {
+            return [];
+        }
+
+        const fechasSet = new Set(fechasSeleccionadas);
+
+        return (filaGestionProduccion.produccion || [])
+            .filter((prod: any) => fechasSet.has(prod.fecha))
+            .sort(
+                (a: any, b: any) =>
+                    new Date(a.fecha).getTime() - new Date(b.fecha).getTime(),
+            );
+    }, [fechasSeleccionadas, filaGestionProduccion]);
+
+    const abrirModalGestion = useCallback(
+        (dato: any, fechasIniciales: string[] = []) => {
+            setFilaGestionProduccion(dato);
+            setFechasSeleccionadas(fechasIniciales);
+
+            const comentarioInicial =
+                fechasIniciales.length === 1
+                    ? (dato.produccion || []).find(
+                          (prod: any) => prod.fecha === fechasIniciales[0],
+                      )?.comentario || dato.comentario || ''
+                    : dato.comentario || '';
+
+            setObservacionModal(
+                typeof comentarioInicial === 'string'
+                    ? comentarioInicial.trim()
+                    : '',
+            );
+            setShowModalGestion(true);
+        },
+        [],
+    );
+
+    const alternarFechaSeleccionada = useCallback((fecha: string) => {
+        setFechasSeleccionadas((prev) =>
+            prev.includes(fecha)
+                ? prev.filter((item) => item !== fecha)
+                : [...prev, fecha],
+        );
+    }, []);
+
+    const validarSeleccionGestion = useCallback(() => {
+        if (!filaGestionProduccion?.platoCodigo || !salon) {
+            toast.error('No hay una fila de producción seleccionada', {
                 position: 'bottom-right',
                 theme: 'colored',
                 transition: Slide,
             });
+            return false;
+        }
+
+        if (produccionesSeleccionadas.length === 0) {
+            toast.error('Selecciona al menos una fecha de producción', {
+                position: 'bottom-right',
+                theme: 'colored',
+                transition: Slide,
+            });
+            return false;
+        }
+
+        return true;
+    }, [filaGestionProduccion, produccionesSeleccionadas.length, salon]);
+
+    const esperarActualizacionVisual = useCallback(
+        () =>
+            new Promise<void>((resolve) => {
+                window.requestAnimationFrame(() => {
+                    window.setTimeout(resolve, 0);
+                });
+            }),
+        [],
+    );
+
+    const refrescarYcerrarModalGestion = useCallback(
+        async (silencioso = false) => {
+            handleCloseModalGestion();
+            await recargarDatos({ silencioso });
+        },
+        [recargarDatos],
+    );
+
+    const guardarComentariosSeleccionados = async () => {
+        if (!validarSeleccionGestion()) {
             return;
         }
 
-        toast.warn('Agregando Comentario', {
+        setGestionEnCurso(true);
+        const toastId = toast.loading('Guardando comentario', {
             position: 'bottom-right',
+            type: 'info',
             theme: 'colored',
             transition: Slide,
         });
 
-        fetch('api/produccion/comentario', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                platoCodigo: platoModalProduccion.platoCodigo,
-                platoPadreCodigo: platoModalProduccion.platoPadreCodigo,
-                cantidad: platoModalProduccion.cantidad,
-                fecha: obtenerFechaComentario(platoModalProduccion.fecha),
-                comentario: observacionModal,
-                salon,
-            }),
-        })
-            .then((res) => {
-                if (!res.ok) {
-                    throw new Error('Error al guardar comentario');
-                }
-                return res.json();
-            })
-            .then(() => {
-                toast.success('Comentario guardado', {
-                    position: 'bottom-right',
-                    theme: 'colored',
-                    transition: Slide,
-                });
-                void recargarDatos();
-            })
-            .catch(() => {
-                toast.error('Error al guardar el comentario', {
-                    position: 'bottom-right',
-                    theme: 'colored',
-                    transition: Slide,
-                });
-                setLoading(false);
-            });
-    }
+        try {
+            await Promise.all(
+                produccionesSeleccionadas.map(async (prod: any) => {
+                    const res = await fetch('api/produccion/comentario', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            platoCodigo: filaGestionProduccion.platoCodigo,
+                            platoPadreCodigo:
+                                filaGestionProduccion.platoPadreCodigo,
+                            cantidad: prod.cantidad,
+                            fecha: obtenerFechaComentario(new Date(prod.fecha)),
+                            comentario: observacionModal,
+                            salon,
+                        }),
+                    });
 
-    const pasarProduccion = async (accion: 'adelantar' | 'atrasar') => {
-        toast.warn('Pasando produccion', {
-            position: 'bottom-right',
-            theme: 'colored',
-            transition: Slide,
-        });
+                    if (!res.ok) {
+                        throw new Error('Error al guardar comentario');
+                    }
+                }),
+            );
 
-        fetch('api/produccion/' + accion, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                platoCodigo: platoModalProduccion.platoCodigo,
-                platoPadreCodigo: platoModalProduccion.platoPadreCodigo,
-                cantidad: platoModalProduccion.cantidad,
-                fecha: obtenerFechaPersistida(platoModalProduccion.fecha),
-                salon,
-            }),
-        })
-            .then(() => {
-                toast.success(`Producción ${accion.replace('r', 'ada')}`, {
-                    position: 'bottom-right',
-                    theme: 'colored',
-                    transition: Slide,
-                });
-                void recargarDatos();
-            })
-            .catch(() => {
-                toast.error(`Error al ${accion} la producción`, {
-                    position: 'bottom-right',
-                    theme: 'colored',
-                    transition: Slide,
-                });
-                setLoading(false);
+            toast.update(toastId, {
+                render: 'Comentario guardado',
+                type: 'success',
+                isLoading: false,
+                autoClose: 3000,
+                closeOnClick: true,
+                draggable: true,
             });
+            await refrescarYcerrarModalGestion();
+        } catch {
+            toast.update(toastId, {
+                render: 'Error al guardar el comentario',
+                type: 'error',
+                isLoading: false,
+                autoClose: 5000,
+                closeOnClick: true,
+                draggable: true,
+            });
+        } finally {
+            setGestionEnCurso(false);
+        }
     };
 
-    function abrirModalEliminar(dato: any) {
-        setFilaEliminarProduccion(dato);
-        setFechaEliminarSeleccionada('');
-        setShowModalEliminar(true);
-    }
-
-    function eliminarProduccionSeleccionada() {
-        if (
-            !filaEliminarProduccion?.platoCodigo ||
-            !fechaEliminarSeleccionada ||
-            !salon
-        ) {
-            toast.error('Selecciona una fecha de producción para eliminar', {
-                position: 'bottom-right',
-                theme: 'colored',
-                transition: Slide,
-            });
+    const pasarProduccionesSeleccionadas = async (
+        accion: 'adelantar' | 'atrasar',
+    ) => {
+        if (!validarSeleccionGestion()) {
             return;
         }
 
-        toast.warn('Eliminando producción', {
+        setGestionEnCurso(true);
+        const mensajeAccion =
+            accion === 'adelantar'
+                ? 'Adelantando el plato'
+                : 'Atrasando el plato';
+        const mensajeExito =
+            accion === 'adelantar' ? 'Plato adelantado' : 'Plato atrasado';
+        const mensajeError =
+            accion === 'adelantar'
+                ? 'Error al adelantar el plato'
+                : 'Error al atrasar el plato';
+
+        const toastId = toast.loading(mensajeAccion, {
             position: 'bottom-right',
+            type: 'info',
             theme: 'colored',
             transition: Slide,
         });
 
-        fetch('/api/produccion', {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                platoCodigo: filaEliminarProduccion.platoCodigo,
-                platoPadreCodigo: filaEliminarProduccion.platoPadreCodigo,
-                fecha: obtenerFechaPersistida(
-                    new Date(fechaEliminarSeleccionada),
-                ),
-                salon,
-            }),
-        })
-            .then((res) => {
-                if (!res.ok) {
-                    throw new Error('Error al eliminar producción');
-                }
-                return res.json();
-            })
-            .then(() => {
-                toast.success('Producción eliminada', {
-                    position: 'bottom-right',
-                    theme: 'colored',
-                    transition: Slide,
-                });
-                handleCloseModalEliminar();
-                void recargarDatos();
-            })
-            .catch(() => {
-                toast.error('Error al eliminar la producción', {
-                    position: 'bottom-right',
-                    theme: 'colored',
-                    transition: Slide,
-                });
+        try {
+            await Promise.all(
+                produccionesSeleccionadas.map(async (prod: any) => {
+                    const res = await fetch('api/produccion/' + accion, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            platoCodigo: filaGestionProduccion.platoCodigo,
+                            platoPadreCodigo:
+                                filaGestionProduccion.platoPadreCodigo,
+                            cantidad: prod.cantidad,
+                            fecha: obtenerFechaPersistida(
+                                new Date(prod.fecha),
+                            ),
+                            salon,
+                        }),
+                    });
+
+                    if (!res.ok) {
+                        throw new Error(`Error al ${accion} producción`);
+                    }
+                }),
+            );
+
+            const datosActualizados = await recargarDatos({ silencioso: true });
+            const filaActualizada =
+                datosActualizados.find(
+                    (dato: any) =>
+                        dato.platoCodigo === filaGestionProduccion.platoCodigo &&
+                        (dato.platoPadreCodigo ?? '') ===
+                            (filaGestionProduccion.platoPadreCodigo ?? ''),
+                ) || null;
+
+            if (!filaActualizada) {
+                setFilaGestionProduccion((prev: any) =>
+                    prev
+                        ? {
+                              ...prev,
+                              produccion: [],
+                          }
+                        : prev,
+                );
+                setFechasSeleccionadas([]);
+            } else {
+                const desplazamiento = accion === 'adelantar' ? -1 : 1;
+                const fechasDisponibles = new Set(
+                    (filaActualizada.produccion || []).map(
+                        (prod: any) => prod.fecha,
+                    ),
+                );
+                const nuevasFechasSeleccionadas = fechasSeleccionadas
+                    .map((fecha) =>
+                        addDays(new Date(fecha), desplazamiento).toISOString(),
+                    )
+                    .filter((fecha) => fechasDisponibles.has(fecha));
+
+                setFilaGestionProduccion(filaActualizada);
+                setFechasSeleccionadas(nuevasFechasSeleccionadas);
+            }
+
+            await esperarActualizacionVisual();
+
+            toast.update(toastId, {
+                render: mensajeExito,
+                type: 'success',
+                isLoading: false,
+                autoClose: 3000,
+                closeOnClick: true,
+                draggable: true,
             });
-    }
+        } catch {
+            toast.update(toastId, {
+                render: mensajeError,
+                type: 'error',
+                isLoading: false,
+                autoClose: 5000,
+                closeOnClick: true,
+                draggable: true,
+            });
+        } finally {
+            setGestionEnCurso(false);
+        }
+    };
+
+    const eliminarProduccionesSeleccionadas = async () => {
+        if (!validarSeleccionGestion()) {
+            return;
+        }
+
+        setGestionEnCurso(true);
+        const toastId = toast.loading('Eliminando producción', {
+            position: 'bottom-right',
+            type: 'info',
+            theme: 'colored',
+            transition: Slide,
+        });
+
+        try {
+            await Promise.all(
+                produccionesSeleccionadas.map(async (prod: any) => {
+                    const res = await fetch('/api/produccion', {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            platoCodigo: filaGestionProduccion.platoCodigo,
+                            platoPadreCodigo:
+                                filaGestionProduccion.platoPadreCodigo,
+                            fecha: obtenerFechaPersistida(
+                                new Date(prod.fecha),
+                            ),
+                            salon,
+                        }),
+                    });
+
+                    if (!res.ok) {
+                        throw new Error('Error al eliminar producción');
+                    }
+                }),
+            );
+
+            toast.update(toastId, {
+                render: 'Producción eliminada',
+                type: 'success',
+                isLoading: false,
+                autoClose: 3000,
+                closeOnClick: true,
+                draggable: true,
+            });
+            await refrescarYcerrarModalGestion();
+        } catch {
+            toast.update(toastId, {
+                render: 'Error al eliminar la producción',
+                type: 'error',
+                isLoading: false,
+                autoClose: 5000,
+                closeOnClick: true,
+                draggable: true,
+            });
+        } finally {
+            setGestionEnCurso(false);
+        }
+    };
+
+    const imprimirProduccionesSeleccionadas = async (
+        modo: 'unico' | 'separado',
+    ) => {
+        if (!validarSeleccionGestion()) {
+            return;
+        }
+
+        setGestionEnCurso(true);
+        const toastId = toast.loading('Imprimiendo recetas', {
+            position: 'bottom-right',
+            type: 'info',
+            theme: 'colored',
+            transition: Slide,
+        });
+
+        try {
+            await generarPDFRecetasSeleccionadas(
+                produccionesSeleccionadas.map((prod: any) => ({
+                    fecha: obtenerFechaImpresion(new Date(prod.fecha)),
+                    listaPlatos: [filaGestionProduccion.platoCodigo],
+                })),
+                salon,
+                modo,
+                entregaMP,
+                filaGestionProduccion.plato,
+            );
+
+            toast.update(toastId, {
+                render: 'Recetas impresas',
+                type: 'success',
+                isLoading: false,
+                autoClose: 3000,
+                closeOnClick: true,
+                draggable: true,
+            });
+            handleCloseModalGestion();
+        } catch {
+            toast.update(toastId, {
+                render: 'Error al imprimir recetas',
+                type: 'error',
+                isLoading: false,
+                autoClose: 5000,
+                closeOnClick: true,
+                draggable: true,
+            });
+        } finally {
+            setGestionEnCurso(false);
+        }
+    };
 
     const diasVisibles = useMemo(
         () => diasSemana.filter(filterDias),
@@ -552,7 +766,7 @@ export default function ProduccionPage({ entregaMP }: ProduccionPageProps) {
             diasVisibles.map((dia) => ({
                 clave: format(dia, 'yyyy-MM-dd'),
                 dia,
-                etiqueta: format(dia, 'EEE, dd-MM', { locale: es }),
+                etiqueta: formatearDiaTabla(dia),
                 mostrarAcciones: datosVisibles.some((dato) => {
                     const produccion = obtenerProduccionPorDia(dato, dia);
                     return Number(produccion?.cantidad ?? 0) > 0;
@@ -939,8 +1153,6 @@ export default function ProduccionPage({ entregaMP }: ProduccionPageProps) {
             <Container className="mt-5">
                 <h2 className="text-center mb-4">{tituloPagina}</h2>
 
-                <ToastContainer />
-
                 {!entregaMP && RolProvider !== 'consultor' && (
                     <Container className="mb-3">
                         <Row>
@@ -965,6 +1177,7 @@ export default function ProduccionPage({ entregaMP }: ProduccionPageProps) {
                 )}
 
                 <Modal
+                    container={ref.current ?? undefined}
                     show={showModal}
                     onHide={handleClose}>
                     <Modal.Header closeButton>
@@ -992,137 +1205,23 @@ export default function ProduccionPage({ entregaMP }: ProduccionPageProps) {
                 </Modal>
 
                 <Modal
+                    container={ref.current ?? undefined}
                     size="xl"
-                    show={showModalProduccion}
-                    onHide={handleCloseModalProduccion}>
+                    show={showModalGestion}
+                    onHide={handleCloseModalGestion}>
                     <Modal.Header closeButton>
                         <Modal.Title>
-                            {platoModalProduccion.plato}{' '}
-                            {platoModalProduccion.platoPadre
-                                ? ' - ' + platoModalProduccion.platoPadre
-                                : ''}
-                        </Modal.Title>
-                    </Modal.Header>
-                    <Modal.Body>¿Que accion quieres realizar?</Modal.Body>
-                    <Modal.Footer>
-                        {RolProvider !== 'consultor' && (
-                            <Button
-                                onClick={() => {
-                                    pasarProduccion('adelantar');
-                                    handleCloseModalProduccion();
-                                }}>
-                                <ArrowReturnLeft /> Adelantar Produccion
-                            </Button>
-                        )}
-                        {RolProvider !== 'consultor' && (
-                            <Button
-                                onClick={() => {
-                                    pasarProduccion('atrasar');
-                                    handleCloseModalProduccion();
-                                }}>
-                                <ArrowReturnRight /> Atrasar Produccion
-                            </Button>
-                        )}
-                        {RolProvider !== 'consultor' && (
-                            <Button
-                                onClick={() => {
-                                    setObservacionModal(
-                                        platoModalProduccion.comentario
-                                            ? platoModalProduccion.comentario
-                                            : '',
-                                    );
-                                    handleCloseModalProduccion();
-                                    setShowModalObservacion(true);
-                                }}>
-                                <ChatSquareTextFill /> Agregar / Editar
-                                Comentario
-                            </Button>
-                        )}
-                        <Button
-                            variant="danger"
-                            onClick={() => {
-                                handleCloseModalProduccion();
-                                void imprimirRecetas(
-                                    [platoModalProduccion.platoCodigo],
-                                    obtenerFechaImpresion(
-                                        platoModalProduccion.fecha,
-                                    ),
-                                    'separado',
-                                    'Imprimiendo receta',
-                                    'Receta impresa',
-                                );
-                            }}>
-                            <FiletypePdf /> Imprimir receta
-                        </Button>
-                    </Modal.Footer>
-                </Modal>
-
-                <Modal
-                    show={showModalObservacion}
-                    onHide={handleCloseModalObservacion}>
-                    <Modal.Header closeButton>
-                        <Modal.Title>
-                            Observacion - {platoModalProduccion.plato}{' '}
-                            {platoModalProduccion.platoPadre
-                                ? ' - ' + platoModalProduccion.platoPadre
-                                : ''}
-                        </Modal.Title>
-                    </Modal.Header>
-                    <Modal.Body>
-                        <FloatingLabel
-                            controlId="floatingTextarea"
-                            label="Observación"
-                            className="mb-3">
-                            <Form.Control
-                                as="textarea"
-                                value={observacionModal}
-                                onChange={(
-                                    e: React.ChangeEvent<
-                                        HTMLInputElement | HTMLTextAreaElement
-                                    >,
-                                ) => {
-                                    setObservacionModal(e.target.value);
-                                }}
-                                style={{ height: '200px' }}
-                            />
-                        </FloatingLabel>
-                    </Modal.Body>
-                    <Modal.Footer>
-                        <Button
-                            variant="secondary"
-                            onClick={() => {
-                                handleCloseModalObservacion();
-                            }}>
-                            Cerrar
-                        </Button>
-                        <Button
-                            variant="primary"
-                            onClick={() => {
-                                guardarComentario();
-                                handleCloseModalObservacion();
-                            }}>
-                            Guardar Cambios
-                        </Button>
-                    </Modal.Footer>
-                </Modal>
-
-                <Modal
-                    size="xl"
-                    show={showModalEliminar}
-                    onHide={handleCloseModalEliminar}>
-                    <Modal.Header closeButton>
-                        <Modal.Title>
-                            Eliminar producción -{' '}
-                            {filaEliminarProduccion?.plato || ''}
-                            {filaEliminarProduccion?.platoPadre
-                                ? ` - ${filaEliminarProduccion.platoPadre}`
+                            Gestionar producción -{' '}
+                            {filaGestionProduccion?.plato || ''}
+                            {filaGestionProduccion?.platoPadre
+                                ? ` - ${filaGestionProduccion.platoPadre}`
                                 : ''}
                         </Modal.Title>
                     </Modal.Header>
                     <Modal.Body>
                         <p className="mb-3">
-                            Selecciona la fecha de producción que quieres
-                            eliminar.
+                            Selecciona una o varias fechas de producción para
+                            operar sobre ellas.
                         </p>
 
                         <div style={{ overflowX: 'auto' }}>
@@ -1155,65 +1254,79 @@ export default function ProduccionPage({ entregaMP }: ProduccionPageProps) {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {filaEliminarProduccion && (
+                                    {filaGestionProduccion && (
                                         <tr>
                                             <td className="produccion-columna-control text-center align-middle">
-                                                <Trash className="text-danger" />
+                                                <Gear className="text-secondary" />
                                             </td>
                                             <td className="produccion-columna-texto">
                                                 <TextoProduccionTruncado
                                                     texto={
-                                                        filaEliminarProduccion.platoPadre ||
+                                                        filaGestionProduccion.platoPadre ||
                                                         ''
                                                     }
-                                                    tooltipId={`${modoId}-eliminar-plato-padre`}
+                                                    tooltipId={`${modoId}-gestion-plato-padre`}
                                                 />
                                             </td>
                                             <td className="produccion-columna-texto">
                                                 <TextoProduccionTruncado
                                                     texto={
-                                                        filaEliminarProduccion.plato ||
+                                                        filaGestionProduccion.plato ||
                                                         ''
                                                     }
-                                                    tooltipId={`${modoId}-eliminar-plato`}
+                                                    tooltipId={`${modoId}-gestion-plato`}
                                                 />
                                             </td>
                                             {diasHeaderVisibles.map(
                                                 ({ clave, dia }) => {
                                                     const produccion =
                                                         obtenerProduccionPorDia(
-                                                            filaEliminarProduccion,
+                                                            filaGestionProduccion,
                                                             dia,
                                                         );
                                                     const cantidad = produccion
                                                         ? produccion.cantidad
                                                         : 0;
+                                                    const esCantidadFueraDeCiclo =
+                                                        cantidad > 0 &&
+                                                        Boolean(
+                                                            produccion?.esAnteriorACiclo,
+                                                        );
                                                     const estaSeleccionada =
-                                                        fechaEliminarSeleccionada ===
-                                                        produccion?.fecha;
+                                                        !!produccion &&
+                                                        fechasSeleccionadas.includes(
+                                                            produccion.fecha,
+                                                        );
 
                                                     return (
                                                         <td
                                                             key={clave}
-                                                            className={
+                                                            className={[
                                                                 estaSeleccionada
-                                                                    ? 'table-danger'
-                                                                    : undefined
-                                                            }>
+                                                                    ? 'table-primary'
+                                                                    : '',
+                                                                esCantidadFueraDeCiclo
+                                                                    ? 'cantidad-fuera-ciclo'
+                                                                    : '',
+                                                            ]
+                                                                .filter(Boolean)
+                                                                .join(' ')}>
                                                             {cantidad > 0 && (
                                                                 <Button
                                                                     size="sm"
+                                                                    disabled={
+                                                                        gestionEnCurso
+                                                                    }
                                                                     variant={
                                                                         estaSeleccionada
-                                                                            ? 'danger'
-                                                                            : 'outline-danger'
+                                                                            ? 'primary'
+                                                                            : 'outline-primary'
                                                                     }
                                                                     onClick={() => {
-                                                                        setFechaEliminarSeleccionada(
+                                                                        alternarFechaSeleccionada(
                                                                             produccion.fecha,
                                                                         );
                                                                     }}>
-                                                                    <Trash className="me-1" />
                                                                     {cantidad}
                                                                 </Button>
                                                             )}
@@ -1226,20 +1339,120 @@ export default function ProduccionPage({ entregaMP }: ProduccionPageProps) {
                                 </tbody>
                             </Table>
                         </div>
+
+                        <div className="mt-3 mb-3 text-muted">
+                            Seleccionadas: {produccionesSeleccionadas.length}
+                        </div>
+
+                        <FloatingLabel
+                            controlId={`${modoId}-comentario-gestion`}
+                            label="Observación"
+                            className="mb-3">
+                            <Form.Control
+                                as="textarea"
+                                value={observacionModal}
+                                onChange={(
+                                    e: React.ChangeEvent<
+                                        HTMLInputElement | HTMLTextAreaElement
+                                    >,
+                                ) => {
+                                    setObservacionModal(e.target.value);
+                                }}
+                                style={{ height: '160px' }}
+                            />
+                        </FloatingLabel>
                     </Modal.Body>
-                    <Modal.Footer>
-                        <Button
-                            variant="secondary"
-                            onClick={handleCloseModalEliminar}>
-                            Cerrar
-                        </Button>
-                        <Button
-                            variant="danger"
-                            disabled={!fechaEliminarSeleccionada}
-                            onClick={eliminarProduccionSeleccionada}>
-                            <Trash className="me-1" />
-                            Eliminar selección
-                        </Button>
+                    <Modal.Footer className="d-flex flex-wrap gap-2 justify-content-between">
+                        <div className="d-flex flex-wrap gap-2">
+                            {RolProvider !== 'consultor' && (
+                                <Button
+                                    variant="outline-primary"
+                                    disabled={
+                                        gestionEnCurso ||
+                                        produccionesSeleccionadas.length === 0
+                                    }
+                                    onClick={() => {
+                                        void pasarProduccionesSeleccionadas(
+                                            'adelantar',
+                                        );
+                                    }}>
+                                    <ArrowReturnLeft /> Adelantar
+                                </Button>
+                            )}
+                            {RolProvider !== 'consultor' && (
+                                <Button
+                                    variant="outline-primary"
+                                    disabled={
+                                        gestionEnCurso ||
+                                        produccionesSeleccionadas.length === 0
+                                    }
+                                    onClick={() => {
+                                        void pasarProduccionesSeleccionadas(
+                                            'atrasar',
+                                        );
+                                    }}>
+                                    <ArrowReturnRight /> Atrasar
+                                </Button>
+                            )}
+                            {RolProvider !== 'consultor' && (
+                                <Button
+                                    variant="outline-secondary"
+                                    disabled={
+                                        gestionEnCurso ||
+                                        produccionesSeleccionadas.length === 0
+                                    }
+                                    onClick={() => {
+                                        void guardarComentariosSeleccionados();
+                                    }}>
+                                    <ChatSquareTextFill /> Guardar comentario
+                                </Button>
+                            )}
+                            <Button
+                                variant="outline-danger"
+                                disabled={
+                                    gestionEnCurso ||
+                                    produccionesSeleccionadas.length === 0
+                                }
+                                onClick={() => {
+                                    void eliminarProduccionesSeleccionadas();
+                                }}>
+                                <Trash /> Eliminar
+                            </Button>
+                        </div>
+
+                        <div className="d-flex flex-wrap gap-2 justify-content-end">
+                            <Button
+                                variant="outline-danger"
+                                disabled={
+                                    gestionEnCurso ||
+                                    produccionesSeleccionadas.length === 0
+                                }
+                                onClick={() => {
+                                    void imprimirProduccionesSeleccionadas(
+                                        'separado',
+                                    );
+                                }}>
+                                <FiletypePdf /> Imprimir separadas
+                            </Button>
+                            <Button
+                                variant="danger"
+                                disabled={
+                                    gestionEnCurso ||
+                                    produccionesSeleccionadas.length === 0
+                                }
+                                onClick={() => {
+                                    void imprimirProduccionesSeleccionadas(
+                                        'unico',
+                                    );
+                                }}>
+                                <FiletypePdf /> Imprimir juntas
+                            </Button>
+                            <Button
+                                variant="secondary"
+                                onClick={handleCloseModalGestion}>
+                                Cerrar
+                            </Button>
+                        </div>
                     </Modal.Footer>
                 </Modal>
 
@@ -1276,6 +1489,7 @@ export default function ProduccionPage({ entregaMP }: ProduccionPageProps) {
                     height: '100vh',
                     width: '100%',
                 }}>
+                <ToastContainer />
                 <Table
                     bordered
                     striped
@@ -1379,13 +1593,13 @@ export default function ProduccionPage({ entregaMP }: ProduccionPageProps) {
                                         {RolProvider !== 'consultor' && (
                                             <Button
                                                 size="sm"
-                                                variant="outline-danger"
-                                                title="Eliminar producción"
-                                                aria-label={`Eliminar producción de ${dato.plato || 'fila'}`}
+                                                variant="outline-secondary"
+                                                title="Gestionar producción"
+                                                aria-label={`Gestionar producción de ${dato.plato || 'fila'}`}
                                                 onClick={() => {
-                                                    abrirModalEliminar(dato);
+                                                    abrirModalGestion(dato);
                                                 }}>
-                                                <Trash />
+                                                <Gear />
                                             </Button>
                                         )}
                                     </td>
@@ -1437,26 +1651,9 @@ export default function ProduccionPage({ entregaMP }: ProduccionPageProps) {
                                                         ) {
                                                             return;
                                                         }
-                                                        setPlatoModalProduccion(
-                                                            {
-                                                                plato: dato.plato,
-                                                                platoCodigo:
-                                                                    dato.platoCodigo,
-                                                                platoPadre:
-                                                                    dato.platoPadre,
-                                                                platoPadreCodigo:
-                                                                    dato.platoPadreCodigo,
-                                                                cantidad,
-                                                                fecha: produccion.fecha,
-                                                                comentario:
-                                                                    produccion.comentario
-                                                                        ? dato.comentario
-                                                                        : '',
-                                                            },
-                                                        );
-                                                        setShowModalProduccion(
-                                                            true,
-                                                        );
+                                                        abrirModalGestion(dato, [
+                                                            produccion.fecha,
+                                                        ]);
                                                     }}>
                                                     {cantidad || ''}
                                                 </td>

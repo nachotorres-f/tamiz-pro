@@ -26,7 +26,7 @@ import React from 'react';
 // import { NavegacionSemanal } from '@/components/navegacionSemanal';
 import { TablaPlanificacion } from '@/components/tablaPlanificacion';
 // import AgregarPlato from '@/components/agregarPlato';
-import { Slide, toast, ToastContainer } from 'react-toastify';
+import { Slide, toast } from 'react-toastify';
 import { RolContext, SalonContext } from '@/components/filtroPlatos';
 import { Loading } from '@/components/loading';
 
@@ -673,7 +673,6 @@ export default function PlanificacionPage() {
 
     return (
         <div>
-            <ToastContainer />
             <Container className="mt-5 flex-grow-1">
                 <h1 className="text-center display-5 fw-bold mb-2">
                     Planificación
@@ -719,7 +718,7 @@ export default function PlanificacionPage() {
                                                     e.target.checked,
                                                 )
                                             }
-                                            label={`${format(new Date(comanda.fecha), 'dd/MM/yyyy')} - ${comanda.lugar} - ${comanda.cantidadInvitados} - ${comanda.nombre}`}
+                                            label={`${format(new Date(comanda.fecha), 'd/M')} - ${comanda.lugar} - ${comanda.cantidadInvitados} - ${comanda.nombre}`}
                                         />
                                     );
                                 })}
