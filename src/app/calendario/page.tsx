@@ -6,9 +6,9 @@ import bootstrap5Plugin from '@fullcalendar/bootstrap5';
 import esLocale from '@fullcalendar/core/locales/es';
 import '@fullcalendar/bootstrap5';
 import { useContext, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { SalonContext } from '@/components/filtroPlatos';
 import { Loading } from '@/components/loading';
+import { EventoDetalleModal } from '@/components/EventoDetalleModal';
 // import timeGridPlugin from '@fullcalendar/timegrid';
 // import interactionPlugin from '@fullcalendar/interaction';
 // import '@fullcalendar/core/index.css';
@@ -22,8 +22,9 @@ export default function CalendarioPage() {
         { semana: Date; totalInvitados: number }[]
     >([]);
     const [loading, setLoading] = useState(false);
-
-    const router = useRouter();
+    const [selectedEventoId, setSelectedEventoId] = useState<string | null>(
+        null,
+    );
 
     useEffect(() => {
         setLoading(true);
@@ -105,7 +106,7 @@ export default function CalendarioPage() {
                             headerToolbar={false}
                             events={events}
                             eventClick={(info) => {
-                                router.push('/evento/' + info.event.id);
+                                setSelectedEventoId(String(info.event.id));
                             }}
                             locales={[esLocale]}
                             locale="es"
@@ -139,13 +140,20 @@ export default function CalendarioPage() {
  */}
                 </div>
             ))}
+            <EventoDetalleModal
+                eventoId={selectedEventoId}
+                show={selectedEventoId !== null}
+                onClose={() => {
+                    setSelectedEventoId(null);
+                }}
+            />
             {/* <FullCalendar
                 plugins={[dayGridPlugin, bootstrap5Plugin]}
                 themeSystem="bootstrap5"
                 initialView="dayGridMonth"
                 events={events}
                 eventClick={(info) => {
-                    router.push('/evento/' + info.event.id);
+                    setSelectedEventoId(String(info.event.id));
                 }}
                 locales={[esLocale]}
                 locale="es"
