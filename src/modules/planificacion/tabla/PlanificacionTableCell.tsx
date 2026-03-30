@@ -74,6 +74,7 @@ export function PlanificacionTableCell({
             : String(celda.valorInput);
     const classNameDisplay = [
         'planificacion-celda-display',
+        'planificacion-celda-control',
         mostrarPlaceholder ? 'planificacion-celda-display-placeholder' : '',
         celda.updateCant ? 'planificacion-celda-display-pending' : '',
         celda.placeholderArrastrable
@@ -82,23 +83,25 @@ export function PlanificacionTableCell({
     ]
         .filter(Boolean)
         .join(' ');
+    const classNameWrapper = [
+        'planificacion-celda',
+        badgeDerecho ? 'planificacion-celda-con-badge' : '',
+    ]
+        .filter(Boolean)
+        .join(' ');
 
     return (
         <td style={styleCeldaDia}>
-            <div
-                className={
-                    badgeDerecho ? 'planificacion-celda-con-badge' : undefined
-                }>
+            <div className={classNameWrapper}>
                 {estaEditando ? (
                     <Form.Control
                         type="number"
                         autoFocus
                         disabled={!canEdit}
                         style={{
-                            width: '100%',
                             color: celda.updateCant ? '#ff0000' : undefined,
                         }}
-                        className="form-control form-control-sm input"
+                        className="form-control form-control-sm input planificacion-celda-control"
                         value={valorCeldaEditando}
                         placeholder={
                             !badgeDerecho && celda.totalConsumo

@@ -189,17 +189,21 @@ input[type='number'] {
     margin-left: 0;
 }
 
-.planificacion-celda-con-badge {
+.planificacion-celda {
     align-items: center;
     display: flex;
     gap: 0.5rem;
+}
+
+.planificacion-celda-con-badge {
     justify-content: space-between;
 }
 
-.planificacion-celda-con-badge > .form-control,
-.planificacion-celda-con-badge > .planificacion-celda-display {
+.planificacion-celda-control {
     flex: 0 0 calc(50% - 0.25rem);
     max-width: calc(50% - 0.25rem);
+    min-width: 0;
+    width: calc(50% - 0.25rem);
 }
 
 .planificacion-celda-display {
