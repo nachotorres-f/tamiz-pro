@@ -89,6 +89,7 @@ export interface ActualizarComandaPlanificacionPayload {
 
 export interface PlatoAdelantado {
     cantidad: number;
+    codigo: string;
     fecha: string | null;
     id: number;
     nombre: string;

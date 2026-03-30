@@ -1,7 +1,85 @@
 'use client';
 
-import { Button, Form, Modal, Spinner, Table } from 'react-bootstrap';
+import { Button, Form, Modal, Placeholder, Table } from 'react-bootstrap';
 import type { PlatoAdelantado } from '@/modules/planificacion/types';
+
+function PlaceholderLine({
+    width,
+}: {
+    width: string;
+}) {
+    return (
+        <Placeholder
+            as="span"
+            animation="glow"
+            className="d-inline-block align-middle"
+            style={{ width }}>
+            <Placeholder xs={12} />
+        </Placeholder>
+    );
+}
+
+function PlanificacionAdelantoSkeleton() {
+    return (
+        <>
+            <div className="d-flex justify-content-between align-items-center mb-3">
+                <div className="flex-grow-1 pe-3">
+                    <PlaceholderLine width="70%" />
+                </div>
+                <Placeholder
+                    as="span"
+                    animation="glow"
+                    className="d-inline-block"
+                    style={{ width: '8rem', height: '31px' }}>
+                    <Placeholder xs={12} />
+                </Placeholder>
+            </div>
+            <Table
+                bordered
+                striped
+                size="sm"
+                className="mb-0">
+                <thead className="table-dark">
+                    <tr>
+                        <th>Código</th>
+                        <th className="text-start">Plato</th>
+                        <th>Cantidad</th>
+                        <th className="text-center">Adelantar</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {Array.from({ length: 15 }).map((_, index) => (
+                        <tr key={index}>
+                            <td>
+                                <PlaceholderLine width="55%" />
+                            </td>
+                            <td className="text-start">
+                                <PlaceholderLine width="80%" />
+                            </td>
+                            <td>
+                                <PlaceholderLine width="35%" />
+                            </td>
+                            <td className="text-center">
+                                <div className="d-flex justify-content-center">
+                                    <Placeholder
+                                        as="span"
+                                        animation="glow"
+                                        className="d-inline-block rounded"
+                                        style={{
+                                            width: '1rem',
+                                            height: '1rem',
+                                        }}>
+                                        <Placeholder xs={12} />
+                                    </Placeholder>
+                                </div>
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </Table>
+        </>
+    );
+}
 
 export function PlanificacionAdelantoModal({
     accionMasivaAdelanto,
@@ -39,7 +117,9 @@ export function PlanificacionAdelantoModal({
 
     return (
         <Modal
+            centered
             container={container}
+            scrollable
             size="lg"
             show={show}
             onHide={onClose}>
@@ -48,13 +128,7 @@ export function PlanificacionAdelantoModal({
             </Modal.Header>
             <Modal.Body>
                 {cargandoPlatos ? (
-                    <div className="d-flex align-items-center gap-2 text-muted">
-                        <Spinner
-                            animation="border"
-                            size="sm"
-                        />
-                        <span>Cargando platos...</span>
-                    </div>
+                    <PlanificacionAdelantoSkeleton />
                 ) : platos.length > 0 ? (
                     <>
                         <div className="d-flex justify-content-between align-items-center mb-3">
@@ -74,40 +148,50 @@ export function PlanificacionAdelantoModal({
                                         : 'Adelantando...'
                                     : todosAdelantados
                                       ? 'Quitar adelanto a todo'
-                                      : 'Adelantar todo'}
+                                    : 'Adelantar todo'}
                             </Button>
                         </div>
-                        <Table>
-                            <thead>
+                        <Table
+                            bordered
+                            striped
+                            size="sm"
+                            className="mb-0">
+                            <thead className="table-dark">
                                 <tr>
-                                    <th>Nombre</th>
+                                    <th>Código</th>
+                                    <th className="text-start">Plato</th>
                                     <th>Cantidad</th>
-                                    <th>Adelantar</th>
+                                    <th className="text-center">Adelantar</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {platos.map((plato) => (
                                     <tr key={plato.id}>
-                                        <td>{plato.nombre}</td>
+                                        <td>{plato.codigo || '-'}</td>
+                                        <td className="text-start">
+                                            {plato.nombre}
+                                        </td>
                                         <td>{plato.cantidad}</td>
-                                        <td>
-                                            <Form.Check
-                                                type="checkbox"
-                                                checked={!!plato.fecha}
-                                                disabled={
-                                                    bloqueado ||
-                                                    platosGuardandoIds.has(
-                                                        plato.id,
-                                                    )
-                                                }
-                                                onChange={(event) => {
-                                                    onTogglePlato(
-                                                        plato.id,
-                                                        event.target.checked,
-                                                        plato.fecha,
-                                                    );
-                                                }}
-                                            />
+                                        <td className="text-center">
+                                            <div className="d-flex justify-content-center">
+                                                <Form.Check
+                                                    type="checkbox"
+                                                    checked={!!plato.fecha}
+                                                    disabled={
+                                                        bloqueado ||
+                                                        platosGuardandoIds.has(
+                                                            plato.id,
+                                                        )
+                                                    }
+                                                    onChange={(event) => {
+                                                        onTogglePlato(
+                                                            plato.id,
+                                                            event.target.checked,
+                                                            plato.fecha,
+                                                        );
+                                                    }}
+                                                />
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}

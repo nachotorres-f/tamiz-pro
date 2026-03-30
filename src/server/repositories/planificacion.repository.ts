@@ -282,6 +282,7 @@ export async function findPlatosAdelantadosPorComanda(id: number) {
                 orderBy: { nombre: 'asc' },
                 select: {
                     cantidad: true,
+                    codigo: true,
                     fecha: true,
                     id: true,
                     nombre: true,
