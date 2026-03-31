@@ -59,23 +59,29 @@ npm install
 
 2. Configurar variables de entorno (ver sección siguiente).
 
-3. Sincronizar esquema Prisma:
+3. Sincronizar esquema Prisma en `dev`:
 
 ```bash
-npm run prisma:push
+npm run prisma:push:dev
 npm run prisma:generate
 ```
 
 Si preferís migraciones versionadas:
 
 ```bash
-npm run prisma:migrate
+npm run prisma:migrate:dev -- --name <nombre_del_cambio>
 ```
 
 4. Ejecutar en desarrollo:
 
 ```bash
 npm run dev
+```
+
+Si necesitás levantar la app local apuntando a la base de `prod` sin editar `.env`:
+
+```bash
+npm run dev:prod
 ```
 
 5. Abrir en navegador:
@@ -93,27 +99,41 @@ npx tsx scripts/seed.ts
 Crear `.env` con al menos:
 
 ```env
-DATABASE_URL="mysql://USER:PASSWORD@HOST:3306/DB_NAME"
+DATABASE_URL="mysql://USER:PASSWORD@HOST:3306/DB_NAME_DEV"
+DATABASE_URL_DEV="mysql://USER:PASSWORD@HOST:3306/DB_NAME_DEV"
+DATABASE_URL_PROD="mysql://USER:PASSWORD@HOST:3306/DB_NAME_PROD"
 JWT_SECRET="tu_clave_jwt"
 API_KEY="clave_para_ingesta_externa_comandas"
 ```
 
 Notas:
-- `DATABASE_URL` lo usa Prisma.
+- `DATABASE_URL` lo usa la app en runtime. En local conviene que apunte a `dev`.
+- `DATABASE_URL_DEV` lo usan los scripts seguros de Prisma para desarrollo.
+- `DATABASE_URL_PROD` lo usan los scripts seguros de Prisma para producción.
 - `JWT_SECRET` se usa para firmar/verificar sesión.
 - `API_KEY` protege la ingesta externa (`/api/comanda`).
 - La app trabaja en zona horaria `America/Argentina/Buenos_Aires` en rutas API.
 
 ## Scripts disponibles
-- `npm run dev`: inicia entorno de desarrollo (Turbopack).
+- `npm run dev`: inicia entorno de desarrollo (Turbopack) contra `dev`.
+- `npm run dev:dev`: inicia la app local usando `DATABASE_URL_DEV`.
+- `npm run dev:prod`: inicia la app local usando `DATABASE_URL_PROD`.
 - `npm run build`: genera cliente Prisma y build productivo.
 - `npm run start`: levanta build en modo producción.
 - `npm run lint`: análisis estático (ESLint).
-- `npm run prisma:migrate`: crea/aplica migraciones.
-- `npm run prisma:push`: sincroniza esquema Prisma contra DB.
+- `npm run prisma:migrate:dev -- --name <cambio>`: crea/aplica migraciones en `dev`.
+- `npm run prisma:migrate:prod`: aplica migraciones pendientes en `prod`.
+- `npm run prisma:status:dev`: muestra el estado de migraciones en `dev`.
+- `npm run prisma:status:prod`: muestra el estado de migraciones en `prod`.
+- `npm run prisma:push:dev`: sincroniza esquema Prisma contra la DB de `dev`.
+- `npm run prisma:push:prod`: sincroniza esquema Prisma contra la DB de `prod`.
 - `npm run prisma:generate`: genera cliente Prisma.
-- `npm run prisma:refresh`: `db push + generate`.
-- `npm run prisma:studio`: abre Prisma Studio.
+- `npm run prisma:refresh`: `db push:dev + generate`.
+- `npm run prisma:studio:dev`: abre Prisma Studio sobre `dev`.
+- `npm run prisma:studio:prod`: abre Prisma Studio sobre `prod`.
+- `npm run prisma:migrate`: alias seguro a `prisma:migrate:dev`.
+- `npm run prisma:push`: alias seguro a `prisma:push:dev`.
+- `npm run prisma:studio`: alias seguro a `prisma:studio:dev`.
 
 ## Modelo de datos (resumen)
 Definido en `prisma/schema.prisma`.

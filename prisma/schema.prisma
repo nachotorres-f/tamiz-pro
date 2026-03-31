@@ -109,6 +109,16 @@ model Expedicion {
   comandaId Int
 }
 
+model MateriaPrima {
+  id           Int    @id
+  codigo       String
+  descripcion  String
+  unidadMedida String @map("unidad_medida")
+  estado       String
+
+  @@map("materia_prima")
+}
+
 model AuditLog {
   id Int @id @default(autoincrement())
   modulo String

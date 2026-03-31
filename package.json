@@ -3,15 +3,25 @@
     "version": "0.1.0",
     "private": true,
     "scripts": {
-        "dev": "next dev --turbopack",
+        "dev": "npm run dev:dev",
+        "dev:dev": "node scripts/app-env.cjs dev next dev --turbopack",
+        "dev:prod": "node scripts/app-env.cjs prod next dev --turbopack",
         "build": "prisma generate && next build",
         "start": "next start",
         "lint": "next lint",
-        "prisma:migrate": "prisma migrate dev",
-        "prisma:push": "prisma db push",
+        "prisma:migrate": "npm run prisma:migrate:dev --",
+        "prisma:migrate:dev": "node scripts/prisma-env.cjs dev migrate dev",
+        "prisma:migrate:prod": "node scripts/prisma-env.cjs prod migrate deploy",
+        "prisma:status:dev": "node scripts/prisma-env.cjs dev migrate status",
+        "prisma:status:prod": "node scripts/prisma-env.cjs prod migrate status",
+        "prisma:push": "npm run prisma:push:dev",
+        "prisma:push:dev": "node scripts/prisma-env.cjs dev db push",
+        "prisma:push:prod": "node scripts/prisma-env.cjs prod db push",
         "prisma:generate": "prisma generate",
-        "prisma:refresh": "prisma db push && prisma generate",
-        "prisma:studio": "prisma studio"
+        "prisma:refresh": "npm run prisma:push:dev && npm run prisma:generate",
+        "prisma:studio": "npm run prisma:studio:dev",
+        "prisma:studio:dev": "node scripts/prisma-env.cjs dev studio",
+        "prisma:studio:prod": "node scripts/prisma-env.cjs prod studio"
     },
     "resolutions": {
         "webpack": "^5.88.2"
