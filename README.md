@@ -176,6 +176,8 @@ Todas las rutas viven en `src/app/api`.
 - `GET /api/recetas`
 - `POST /api/importar/recetas`
 - `GET|POST /api/entregaMP`
+- `POST|PUT /api/materiaPrima`
+- `POST|PUT /api/productoTerminado`
 - `POST /api/pdf`
 - `GET /api/generarPDF`
 - `GET|POST|DELETE /api/ocultos`
