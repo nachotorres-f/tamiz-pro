@@ -65,8 +65,9 @@ export function usePlanificacionEventosCiclo({
         const finCiclo = addDays(inicioCiclo, 6);
         finCiclo.setHours(0, 0, 0, 0);
 
-        const fechaFinal = format(addDays(diasSemana[4], 6), 'yyyy-MM-dd');
+        const ultimoDiaVisible = diasSemana[diasSemana.length - 1];
         const fechaInicio = format(diasSemana[4], 'yyyy-MM-dd');
+        const fechaFinal = format(ultimoDiaVisible, 'yyyy-MM-dd');
 
         Promise.all([
             fetchEventosPlanificacion({
@@ -85,15 +86,11 @@ export function usePlanificacionEventosCiclo({
                 const eventosCicloTodos = todos.eventos.filter((evento) =>
                     eventoDentroDeCiclo(evento, inicioCiclo, finCiclo),
                 );
-                const eventosCicloHabilitados = filtrados.eventos.filter(
-                    (evento) => eventoDentroDeCiclo(evento, inicioCiclo, finCiclo),
-                );
+                const eventosVisiblesHabilitados = filtrados.eventos;
 
                 setComandasCiclo(eventosCicloTodos);
-                setEventos(eventosCicloHabilitados);
-                setMaxCantidadEventosDia(
-                    maxEventosPorDia(eventosCicloHabilitados),
-                );
+                setEventos(eventosVisiblesHabilitados);
+                setMaxCantidadEventosDia(maxEventosPorDia(eventosVisiblesHabilitados));
             })
             .catch(() => {
                 setComandasCiclo([]);
