@@ -14,7 +14,7 @@ interface Plato {
     unidadMedida: string;
     fecha: Date;
     salon: string | null;
-    ingredientes: [string, string, string, number][];
+    ingredientes: [string, string, string, number, string][];
 }
 
 interface SolicitudPDFReceta {
@@ -22,12 +22,14 @@ interface SolicitudPDFReceta {
     listaPlatos: string[];
 }
 
-const head = [['Codigo', 'Descripcion', 'Unidad', 'Porcion Bruta']];
+const head = [['Codigo', 'Descripcion', 'Unidad', 'Porcion Bruta', 'Lote']];
+const CAMPO_FECHA_VACIO = '____/____/________';
 
 const normalizarTexto = (valor: string | null | undefined) =>
     (valor ?? '').trim();
 
-const formatearFechaArchivo = (fecha: Date) => fecha.toISOString().split('T')[0];
+const formatearFechaArchivo = (fecha: Date) =>
+    fecha.toISOString().split('T')[0];
 
 const sanitizarNombreArchivo = (valor: string | null | undefined) => {
     const nombreNormalizado = normalizarTexto(valor)
@@ -118,15 +120,18 @@ export const generarPDFReceta = async (
 
             const pdfBlob = doc.output('blob');
             zip.file(
-                `${prefijoArchivo}_${plato.plato}_${
-                    formatearFechaArchivo(fecha)
-                }.pdf`,
+                `${prefijoArchivo}_${plato.plato}_${formatearFechaArchivo(
+                    fecha,
+                )}.pdf`,
                 pdfBlob,
             );
         }
 
         const content = await zip.generateAsync({ type: 'blob' });
-        saveAs(content, `${prefijoArchivo}_${formatearFechaArchivo(fecha)}.zip`);
+        saveAs(
+            content,
+            `${prefijoArchivo}_${formatearFechaArchivo(fecha)}.zip`,
+        );
     }
 };
 
@@ -217,9 +222,9 @@ export const generarPDFRecetasSeleccionadas = async (
                 renderReceta(doc, plato, yPosition, fechaDocumento, entregaMP);
 
                 zip.file(
-                    `${prefijoArchivo}_${plato.plato}_${
-                        formatearFechaArchivo(fechaDocumento)
-                    }_${indiceArchivo}.pdf`,
+                    `${prefijoArchivo}_${plato.plato}_${formatearFechaArchivo(
+                        fechaDocumento,
+                    )}_${indiceArchivo}.pdf`,
                     doc.output('blob'),
                 );
                 indiceArchivo += 1;
@@ -334,6 +339,14 @@ const renderReceta = (
         14,
         yPosition,
     );
+
+    yPosition += 5;
+
+    doc.text(`Fecha de envasado: ${CAMPO_FECHA_VACIO}`, 14, yPosition);
+
+    yPosition += 5;
+
+    doc.text(`Fecha de generacion: ${CAMPO_FECHA_VACIO}`, 14, yPosition);
 
     const tableData = {
         head,

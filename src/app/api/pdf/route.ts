@@ -23,6 +23,8 @@ function normalizarTexto(valor: string | null | undefined): string {
     return (valor ?? '').trim();
 }
 
+const CAMPO_LOTE_VACIO = '__________';
+
 const ordenProduccion = {
     platoCodigo: 'asc' as const,
 };
@@ -180,6 +182,7 @@ const buscarReceta = async ({
                 descripcion,
                 unidadMedida,
                 (porcionBruta * cantidad).toFixed(4),
+                CAMPO_LOTE_VACIO,
             ],
         ),
     };
