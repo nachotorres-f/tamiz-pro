@@ -1,4 +1,5 @@
 import { logAudit } from '@/lib/audit';
+import { requireAnyPageKeyAccess } from '@/lib/page-guard';
 import { prisma } from '@/lib/prisma';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -149,6 +150,14 @@ const sumarCantidades = (
 
 export async function POST(req: NextRequest) {
     process.env.TZ = 'America/Argentina/Buenos_Aires';
+    const accessResult = await requireAnyPageKeyAccess(req, [
+        'produccion',
+        'entregaMP',
+    ]);
+
+    if (accessResult instanceof NextResponse) {
+        return accessResult;
+    }
 
     let body: Body | null = null;
 

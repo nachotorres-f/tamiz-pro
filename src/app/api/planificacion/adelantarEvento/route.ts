@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requirePageKeyAccess } from '@/lib/page-guard';
 import {
     actualizarAdelantoPlato,
     obtenerPlatosAdelantadosEvento,
@@ -13,6 +14,11 @@ import {
 
 export async function GET(req: NextRequest) {
     setPlanificacionTimezone();
+    const accessResult = await requirePageKeyAccess(req, 'planificacion');
+
+    if (accessResult instanceof NextResponse) {
+        return accessResult;
+    }
 
     try {
         const input = parseObtenerAdelantoEventoInput(req.nextUrl.searchParams);
@@ -29,6 +35,11 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
     setPlanificacionTimezone();
+    const accessResult = await requirePageKeyAccess(req, 'planificacion');
+
+    if (accessResult instanceof NextResponse) {
+        return accessResult;
+    }
 
     try {
         const input = parseActualizarAdelantoPlatoInput(await req.json());

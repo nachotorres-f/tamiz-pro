@@ -1,9 +1,15 @@
 import { prisma } from '@/lib/prisma';
+import { requirePageKeyAccess } from '@/lib/page-guard';
 import { addWeeks, endOfWeek, isWithinInterval, startOfWeek } from 'date-fns';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(req: NextRequest) {
     process.env.TZ = 'America/Argentina/Buenos_Aires';
+    const accessResult = await requirePageKeyAccess(req, 'calendario');
+
+    if (accessResult instanceof NextResponse) {
+        return accessResult;
+    }
 
     const { searchParams } = req.nextUrl;
     const salon = searchParams.get('salon');

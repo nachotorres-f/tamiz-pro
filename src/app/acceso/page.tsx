@@ -47,7 +47,7 @@ export default function LoginPage() {
             }
 
             setErrors({});
-            router.push('/calendario');
+            router.push(data.redirectPath || '/');
         } catch {
             setErrors({ auth: 'Error de conexión con el servidor' });
         } finally {

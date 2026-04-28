@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { addDays } from 'date-fns';
 import { logAudit } from '@/lib/audit';
+import { requireAnyPageKeyAccess } from '@/lib/page-guard';
 
 function normalizarTexto(valor: string | null | undefined): string {
     return (valor ?? '').trim();
@@ -120,6 +121,14 @@ function resolverNombrePadre(
 
 export async function POST(req: NextRequest) {
     process.env.TZ = 'America/Argentina/Buenos_Aires';
+    const accessResult = await requireAnyPageKeyAccess(req, [
+        'produccion',
+        'entregaMP',
+    ]);
+
+    if (accessResult instanceof NextResponse) {
+        return accessResult;
+    }
 
     let platoCodigo = '';
 
@@ -264,6 +273,14 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
     process.env.TZ = 'America/Argentina/Buenos_Aires';
+    const accessResult = await requireAnyPageKeyAccess(req, [
+        'produccion',
+        'entregaMP',
+    ]);
+
+    if (accessResult instanceof NextResponse) {
+        return accessResult;
+    }
 
     try {
         const { searchParams } = req.nextUrl;
@@ -446,6 +463,14 @@ interface DeleteBody {
 
 export async function DELETE(req: NextRequest) {
     process.env.TZ = 'America/Argentina/Buenos_Aires';
+    const accessResult = await requireAnyPageKeyAccess(req, [
+        'produccion',
+        'entregaMP',
+    ]);
+
+    if (accessResult instanceof NextResponse) {
+        return accessResult;
+    }
 
     let body: DeleteBody | null = null;
 

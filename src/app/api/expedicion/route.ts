@@ -1,10 +1,16 @@
 import { prisma } from '@/lib/prisma';
-import { NextResponse } from 'next/server';
+import { requirePageKeyAccess } from '@/lib/page-guard';
 import { startOfWeek, addDays } from 'date-fns';
 import { logAudit } from '@/lib/audit';
+import { NextRequest, NextResponse } from 'next/server';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
     process.env.TZ = 'America/Argentina/Buenos_Aires';
+    const accessResult = await requirePageKeyAccess(req, 'expedicion');
+
+    if (accessResult instanceof NextResponse) {
+        return accessResult;
+    }
 
     try {
         const eventos = await prisma.comanda.findMany({

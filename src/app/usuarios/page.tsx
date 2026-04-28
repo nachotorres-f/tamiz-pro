@@ -4,6 +4,10 @@ import { Loading } from '@/components/loading';
 import { obtenerNombreSalon } from '@/lib/nameSalon';
 import { useEffect, useMemo, useState } from 'react';
 import {
+    PAGE_ACCESS_CATALOG,
+    getDefaultPageAccessByRole,
+} from '@/lib/page-access';
+import {
     Accordion,
     Badge,
     Button,
@@ -32,6 +36,7 @@ interface User {
     username: string;
     salon: string;
     rol: string;
+    allowedPageKeys: string[];
 }
 
 interface SelectOption {
@@ -44,6 +49,7 @@ const userEmpty: User = {
     username: '',
     salon: '',
     rol: '',
+    allowedPageKeys: [],
 };
 
 const showToast = (
@@ -85,6 +91,8 @@ export default function UsuariosPage() {
     const [salonSelected, setSalonSelected] = useState('');
     const [rolSelected, setRolSelected] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
+    const [manualPermissionsTouched, setManualPermissionsTouched] =
+        useState(false);
 
     const [currentPass, setCurrentPass] = useState('');
     const [newPass, setNewPass] = useState('');
@@ -140,6 +148,7 @@ export default function UsuariosPage() {
         setUser(nextUser);
         setSalonSelected('');
         setRolSelected('');
+        setManualPermissionsTouched(false);
         limpiarPasswordState();
     };
 
@@ -176,7 +185,29 @@ export default function UsuariosPage() {
         setEditarUser(false);
         setEliminarUser(false);
         setEditarPassUser(false);
-        resetFormulario(userEmpty);
+        resetFormulario({
+            ...userEmpty,
+            allowedPageKeys: getDefaultPageAccessByRole('consultor'),
+        });
+        setRolSelected('consultor');
+        setUser((currentUser) => ({
+            ...currentUser,
+            rol: 'consultor',
+        }));
+    };
+
+    const handleAllowedPageChange = (pageKey: string, checked: boolean) => {
+        setManualPermissionsTouched(true);
+        setUser((currentUser) => {
+            const nextAllowedPageKeys = checked
+                ? [...currentUser.allowedPageKeys, pageKey]
+                : currentUser.allowedPageKeys.filter((item) => item !== pageKey);
+
+            return {
+                ...currentUser,
+                allowedPageKeys: Array.from(new Set(nextAllowedPageKeys)),
+            };
+        });
     };
 
     const editarUsuario = async () => {
@@ -239,7 +270,7 @@ export default function UsuariosPage() {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    ...user,
+                    id: user.id,
                     currentPassword: currentPass,
                     newPassword: newPass,
                 }),
@@ -362,6 +393,7 @@ export default function UsuariosPage() {
     const rolValue = roles.find((o) => o.value === (rolSelected || user.rol)) || null;
 
     const isAdmin = userRequest.rol === 'admin';
+    const selectedAllowedPageKeys = new Set(user.allowedPageKeys);
 
     const usuariosVisibles = useMemo(() => {
         const termino = searchTerm.trim().toLowerCase();
@@ -430,16 +462,48 @@ export default function UsuariosPage() {
                                         onChange={(opcion) => {
                                             const selected = opcion?.value || '';
                                             setRolSelected(selected);
-                                            setUser({
-                                                ...user,
+                                            setUser((currentUser) => ({
+                                                ...currentUser,
                                                 rol: selected,
-                                            });
+                                                allowedPageKeys:
+                                                    manualPermissionsTouched
+                                                        ? currentUser.allowedPageKeys
+                                                        : getDefaultPageAccessByRole(
+                                                              selected,
+                                                          ),
+                                            }));
                                         }}
                                         placeholder="Selecciona un rol"
                                         styles={selectStyles}
                                     />
                                 </Form.Group>
                             </Col>
+                            {isAdmin && (
+                                <Col xs={12}>
+                                    <Form.Group>
+                                        <Form.Label>Acceso a páginas</Form.Label>
+                                        <div className="d-flex flex-wrap gap-3">
+                                            {PAGE_ACCESS_CATALOG.map((page) => (
+                                                <Form.Check
+                                                    key={page.key}
+                                                    id={`edit-page-${page.key}`}
+                                                    type="checkbox"
+                                                    label={page.label}
+                                                    checked={selectedAllowedPageKeys.has(
+                                                        page.key,
+                                                    )}
+                                                    onChange={(e) =>
+                                                        handleAllowedPageChange(
+                                                            page.key,
+                                                            e.target.checked,
+                                                        )
+                                                    }
+                                                />
+                                            ))}
+                                        </div>
+                                    </Form.Group>
+                                </Col>
+                            )}
                         </Row>
                     )}
 
@@ -718,14 +782,51 @@ export default function UsuariosPage() {
                                                         setRolSelected(
                                                             selected,
                                                         );
-                                                        setUser({
-                                                            ...user,
-                                                            rol: selected,
-                                                        });
+                                                        setUser(
+                                                            (currentUser) => ({
+                                                                ...currentUser,
+                                                                rol: selected,
+                                                                allowedPageKeys:
+                                                                    manualPermissionsTouched
+                                                                        ? currentUser.allowedPageKeys
+                                                                        : getDefaultPageAccessByRole(
+                                                                              selected,
+                                                                          ),
+                                                            }),
+                                                        );
                                                     }}
                                                     placeholder="Selecciona un rol"
                                                     styles={selectStyles}
                                                 />
+                                            </Form.Group>
+                                        </Col>
+                                        <Col xs={12}>
+                                            <Form.Group>
+                                                <Form.Label>
+                                                    Acceso a páginas
+                                                </Form.Label>
+                                                <div className="d-flex flex-wrap gap-3">
+                                                    {PAGE_ACCESS_CATALOG.map(
+                                                        (page) => (
+                                                            <Form.Check
+                                                                key={page.key}
+                                                                id={`create-page-${page.key}`}
+                                                                type="checkbox"
+                                                                label={page.label}
+                                                                checked={selectedAllowedPageKeys.has(
+                                                                    page.key,
+                                                                )}
+                                                                onChange={(e) =>
+                                                                    handleAllowedPageChange(
+                                                                        page.key,
+                                                                        e.target
+                                                                            .checked,
+                                                                    )
+                                                                }
+                                                            />
+                                                        ),
+                                                    )}
+                                                </div>
                                             </Form.Group>
                                         </Col>
                                         <Col md={4}>
@@ -779,14 +880,21 @@ export default function UsuariosPage() {
                             <thead className="table-dark">
                                 <tr>
                                     <th style={{ width: 80 }}>Acciones</th>
-                                    <th>Usuario</th>
-                                    <th>Salón</th>
-                                    <th>Rol</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {usuariosVisibles.map((usuario) => {
-                                    const { id, username, salon, rol } =
+                                                    <th>Usuario</th>
+                                                    <th>Salón</th>
+                                                    <th>Rol</th>
+                                                    <th>Páginas</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {usuariosVisibles.map((usuario) => {
+                                    const {
+                                        id,
+                                        username,
+                                        salon,
+                                        rol,
+                                        allowedPageKeys,
+                                    } =
                                         usuario;
 
                                     return (
@@ -854,13 +962,41 @@ export default function UsuariosPage() {
                                                     {capitalizar(rol)}
                                                 </Badge>
                                             </td>
+                                            <td>
+                                                <div className="d-flex flex-wrap gap-1">
+                                                    {allowedPageKeys.length ===
+                                                    0 ? (
+                                                        <Badge
+                                                            bg="warning"
+                                                            text="dark"
+                                                            className="fw-normal">
+                                                            Sin acceso
+                                                        </Badge>
+                                                    ) : (
+                                                        PAGE_ACCESS_CATALOG.filter(
+                                                            (page) =>
+                                                                allowedPageKeys.includes(
+                                                                    page.key,
+                                                                ),
+                                                        ).map((page) => (
+                                                            <Badge
+                                                                key={`${id}-${page.key}`}
+                                                                bg="light"
+                                                                text="dark"
+                                                                className="border fw-normal">
+                                                                {page.label}
+                                                            </Badge>
+                                                        ))
+                                                    )}
+                                                </div>
+                                            </td>
                                         </tr>
                                     );
                                 })}
                                 {usuariosVisibles.length === 0 && (
                                     <tr>
                                         <td
-                                            colSpan={4}
+                                            colSpan={5}
                                             className="text-center text-muted py-4">
                                             No se encontraron usuarios.
                                         </td>

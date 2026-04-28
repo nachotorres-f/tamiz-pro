@@ -5,6 +5,11 @@ import logo from '../../public/logo_white.png'; // Adjust the path as necessary
 import { Slide, toast } from 'react-toastify';
 import { obtenerNombreSalon } from '@/lib/nameSalon';
 import { useEffect, useState } from 'react';
+import {
+    PAGE_ACCESS_CATALOG,
+    getAccessibleRoutes,
+    getDefaultRedirectPath,
+} from '@/lib/page-access';
 
 interface Route {
     path: string;
@@ -12,9 +17,11 @@ interface Route {
 }
 
 interface User {
+    id: number;
     rol: string;
     username: string;
     salon: string;
+    allowedPageKeys: string[];
 }
 
 export default function AppNavbar({
@@ -30,9 +37,11 @@ export default function AppNavbar({
 }) {
     const router = useRouter();
     const [user, setUser] = useState<User>({
+        id: 0,
         rol: '',
         username: '',
         salon: '',
+        allowedPageKeys: [],
     });
 
     const handleLogout = async () => {
@@ -70,37 +79,16 @@ export default function AppNavbar({
         setSalon(salon === 'A' ? 'B' : 'A');
     }
 
-    const routeList: Route[] = [
-        // {
-        //     path: '/importar',
-        //     title: 'Importar',
-        // },
-        {
-            path: '/calendario',
-            title: 'Calendario',
-        },
-        {
-            path: '/planificacion',
-            title: 'Planificacion',
-        },
-        {
-            path: '/produccion',
-            title: 'Produccion',
-        },
-        {
-            path: '/entregaMP',
-            title: 'Entrega de MP',
-        },
-        {
-            path: '/expedicion',
-            title: 'Expedicion',
-        },
-        {
-            path: '/picking',
-            title: 'Picking',
-        },
-        { path: 'usuarios', title: 'Usuarios' },
-    ];
+    const routeList: Route[] = getAccessibleRoutes(user.allowedPageKeys).map(
+        (route) => ({
+            path: route.path,
+            title: route.label,
+        }),
+    );
+    const defaultPath =
+        getDefaultRedirectPath(user.allowedPageKeys) ||
+        PAGE_ACCESS_CATALOG[0]?.path ||
+        '/acceso';
 
     return (
         <Navbar
@@ -119,7 +107,7 @@ export default function AppNavbar({
                         width: 'auto',
                     }}
                     className="d-inline-block align-top ms-3"
-                    onClick={() => router.push('/calendario')}
+                    onClick={() => router.push(defaultPath)}
                 />
             </Navbar.Brand>
             <Navbar.Toggle aria-controls="basic-navbar-nav" />

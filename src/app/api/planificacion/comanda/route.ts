@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requirePageKeyAccess } from '@/lib/page-guard';
 import {
     actualizarComandaPlanificacion,
     setPlanificacionTimezone,
@@ -11,6 +12,11 @@ import {
 
 export async function PATCH(req: NextRequest) {
     setPlanificacionTimezone();
+    const accessResult = await requirePageKeyAccess(req, 'planificacion');
+
+    if (accessResult instanceof NextResponse) {
+        return accessResult;
+    }
 
     try {
         const input = parseActualizarComandaPlanificacionInput(await req.json());

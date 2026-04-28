@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { logAudit } from '@/lib/audit';
+import { requirePageKeyAccess } from '@/lib/page-guard';
 import {
     guardarPlanificacion,
     obtenerPlanificacion,
@@ -14,6 +15,11 @@ import {
 
 export async function GET(req: NextRequest) {
     setPlanificacionTimezone();
+    const accessResult = await requirePageKeyAccess(req, 'planificacion');
+
+    if (accessResult instanceof NextResponse) {
+        return accessResult;
+    }
 
     try {
         const input = parseObtenerPlanificacionInput(req.nextUrl.searchParams);
@@ -58,6 +64,11 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
     setPlanificacionTimezone();
+    const accessResult = await requirePageKeyAccess(req, 'planificacion');
+
+    if (accessResult instanceof NextResponse) {
+        return accessResult;
+    }
 
     try {
         const input = parseGuardarPlanificacionInput(await req.json());

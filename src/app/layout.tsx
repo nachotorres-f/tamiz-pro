@@ -42,7 +42,8 @@ export default function RootLayout({
                 className={`${geistSans.variable} ${geistMono.variable}`}>
                 <RolProvider rol={rol}>
                     <SalonContext.Provider value={salon}>
-                        {pathname !== '/acceso' && (
+                        {pathname !== '/acceso' &&
+                            pathname !== '/acceso-denegado' && (
                             <AppNavbar
                                 pathname={pathname}
                                 salon={salon}

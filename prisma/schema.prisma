@@ -13,8 +13,10 @@ model User {
   password String
   rol String @default("")
   salon String @default("")
+  pageAccessConfigured Boolean @default(false)
   createdAt DateTime @default(now())
   roles Role[] @relation("UserRoles")
+  pageAccess UserPageAccess[]
   
   @@map("users")
 }
@@ -25,6 +27,17 @@ model Role {
   users User[] @relation("UserRoles")
 
   @@map("roles")
+}
+
+model UserPageAccess {
+  id      Int    @id @default(autoincrement())
+  userId  Int
+  pageKey String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, pageKey])
+  @@index([userId])
+  @@map("user_page_access")
 }
 
 model Receta {
