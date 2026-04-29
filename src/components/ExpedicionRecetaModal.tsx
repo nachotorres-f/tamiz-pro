@@ -393,6 +393,7 @@ export function ExpedicionRecetaModal({
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     comandaId,
+                    platoId: detalle.plato.id,
                     codigo,
                     subCodigo,
                 }),
@@ -460,6 +461,7 @@ export function ExpedicionRecetaModal({
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             comandaId,
+                            platoId: detalle.plato.id,
                             codigo: ingrediente.codigo,
                             subCodigo: ingrediente.subCodigo,
                         }),

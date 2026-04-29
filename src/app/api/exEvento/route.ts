@@ -3,12 +3,14 @@ import { requirePageKeyAccess } from '@/lib/page-guard';
 import { prisma } from '@/lib/prisma';
 import {
     obtenerResumenesExpedicionPlatos,
+    resolverCodigoExpedicionPlato,
     type ExpedicionPlatoResumen,
 } from '@/server/expedicion/receta';
 import { NextRequest, NextResponse } from 'next/server';
 
 interface Body {
     comandaId: number;
+    platoId?: number;
     codigo: string;
     subCodigo: string;
 }
@@ -124,6 +126,7 @@ export async function POST(req: NextRequest) {
         const payload = (await req.json()) as Body;
         body = payload;
         const comandaId = Number(payload.comandaId);
+        const platoId = Number(payload.platoId);
         const codigo = normalizarTexto(payload.codigo);
         const subCodigo = normalizarTexto(payload.subCodigo);
 
@@ -164,6 +167,7 @@ export async function POST(req: NextRequest) {
 
         const resumenPlato = await obtenerResumenPlatoDesdePayload(
             comandaId,
+            platoId,
             codigo,
         );
 
@@ -223,6 +227,7 @@ export async function DELETE(req: NextRequest) {
         const payload = (await req.json()) as Body;
         body = payload;
         const comandaId = Number(payload.comandaId);
+        const platoId = Number(payload.platoId);
         const codigo = normalizarTexto(payload.codigo);
         const subCodigo = normalizarTexto(payload.subCodigo);
 
@@ -253,6 +258,7 @@ export async function DELETE(req: NextRequest) {
 
         const resumenPlato = await obtenerResumenPlatoDesdePayload(
             comandaId,
+            platoId,
             codigo,
         );
 
@@ -300,23 +306,28 @@ export async function DELETE(req: NextRequest) {
 
 async function obtenerResumenPlatoDesdePayload(
     comandaId: number,
+    platoId: number,
     platoCodigo: string,
 ): Promise<ExpedicionPlatoResumen | null> {
-    if (!comandaId || !platoCodigo) {
+    if (!comandaId || (!platoId && !platoCodigo)) {
         return null;
     }
 
-    const platos = await prisma.plato.findMany({
+    const plato = await prisma.plato.findFirst({
         where: {
             comandaId,
-            codigo: platoCodigo,
+            ...(platoId
+                ? { id: platoId }
+                : {
+                      codigo: platoCodigo,
+                  }),
         },
         orderBy: {
             id: 'asc',
         },
     });
 
-    if (platos.length === 0) {
+    if (!plato) {
         return null;
     }
 
@@ -324,10 +335,12 @@ async function obtenerResumenPlatoDesdePayload(
         comandaId,
         [
             {
-                id: platos[0].id,
-                codigo: platos[0].codigo,
-                nombre: platos[0].nombre,
-                cantidad: platos[0].cantidad,
+                id: plato.id,
+                codigo:
+                    plato.codigo ||
+                    resolverCodigoExpedicionPlato(plato.id, plato.codigo),
+                nombre: plato.nombre,
+                cantidad: plato.cantidad,
             },
         ],
     );

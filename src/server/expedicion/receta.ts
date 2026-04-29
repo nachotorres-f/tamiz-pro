@@ -50,6 +50,22 @@ const normalizarTexto = (valor: string | null | undefined) =>
 const crearClaveExpedicion = (codigo: string, subCodigo: string) =>
     `${codigo}|||${subCodigo}`;
 
+const SUBCODIGO_SIN_RECETA = '__SIN_RECETA__';
+const CODIGO_SINTETICO_PREFIX = '__PLATO__';
+
+export const resolverCodigoExpedicionPlato = (
+    platoId: number,
+    codigo: string | null | undefined,
+) => {
+    const codigoNormalizado = normalizarTexto(codigo);
+
+    if (codigoNormalizado) {
+        return codigoNormalizado;
+    }
+
+    return platoId > 0 ? `${CODIGO_SINTETICO_PREFIX}${platoId}` : '';
+};
+
 const obtenerChecksComanda = async (comandaId: number) => {
     const checks = await prisma.expedicion.findMany({
         where: { comandaId },
@@ -206,7 +222,7 @@ export async function obtenerResumenesExpedicionPlatos(
 
     return Promise.all(
         platos.map(async (plato) => {
-            const codigo = normalizarTexto(plato.codigo);
+            const codigo = resolverCodigoExpedicionPlato(plato.id, plato.codigo);
             const recetaDirecta = await construirNodoReceta(
                 codigo,
                 plato.nombre,
@@ -214,7 +230,38 @@ export async function obtenerResumenesExpedicionPlatos(
                 checks,
                 new Set(codigo ? [codigo] : []),
             );
-            const resumen = resumirNodoReceta(recetaDirecta);
+            const recetaFinal =
+                recetaDirecta ??
+                (codigo
+                    ? {
+                          codigo,
+                          nombre:
+                              normalizarTexto(plato.nombre) || codigo || 'Sin nombre',
+                          cantidad: Number(plato.cantidad.toFixed(4)),
+                          ingredientes: [
+                              {
+                                  codigo,
+                                  subCodigo: SUBCODIGO_SIN_RECETA,
+                                  descripcion:
+                                      normalizarTexto(plato.nombre) ||
+                                      codigo ||
+                                      'Sin nombre',
+                                  tipo: 'MP',
+                                  unidadMedida: '-',
+                                  porcionBruta: Number(plato.cantidad.toFixed(4)),
+                                  check: checks.has(
+                                      crearClaveExpedicion(
+                                          codigo,
+                                          SUBCODIGO_SIN_RECETA,
+                                      ),
+                                  ),
+                                  puedeExpedir: true,
+                              },
+                          ],
+                          subrecetas: [],
+                      }
+                    : null);
+            const resumen = resumirNodoReceta(recetaFinal);
 
             return {
                 platoId: plato.id,
@@ -250,7 +297,7 @@ export async function obtenerDetalleRecetaExpedicion(
     }
 
     const checks = await obtenerChecksComanda(comandaId);
-    const codigo = normalizarTexto(plato.codigo);
+    const codigo = resolverCodigoExpedicionPlato(plato.id, plato.codigo);
     const recetaDirecta = await construirNodoReceta(
         codigo,
         plato.nombre,
@@ -258,6 +305,31 @@ export async function obtenerDetalleRecetaExpedicion(
         checks,
         new Set(codigo ? [codigo] : []),
     );
+    const recetaFinal =
+        recetaDirecta ??
+        (codigo
+            ? {
+                  codigo,
+                  nombre: normalizarTexto(plato.nombre) || codigo || 'Sin nombre',
+                  cantidad: Number(plato.cantidad.toFixed(4)),
+                  ingredientes: [
+                      {
+                          codigo,
+                          subCodigo: SUBCODIGO_SIN_RECETA,
+                          descripcion:
+                              normalizarTexto(plato.nombre) || codigo || 'Sin nombre',
+                          tipo: 'MP',
+                          unidadMedida: '-',
+                          porcionBruta: Number(plato.cantidad.toFixed(4)),
+                          check: checks.has(
+                              crearClaveExpedicion(codigo, SUBCODIGO_SIN_RECETA),
+                          ),
+                          puedeExpedir: true,
+                      },
+                  ],
+                  subrecetas: [],
+              }
+            : null);
 
     return {
         comandaId,
@@ -267,7 +339,7 @@ export async function obtenerDetalleRecetaExpedicion(
             nombre: normalizarTexto(plato.nombre) || codigo || 'Sin nombre',
             cantidad: plato.cantidad,
         },
-        recetaDirecta,
-        resumen: resumirNodoReceta(recetaDirecta),
+        recetaDirecta: recetaFinal,
+        resumen: resumirNodoReceta(recetaFinal),
     };
 }

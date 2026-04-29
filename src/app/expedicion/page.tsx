@@ -15,6 +15,7 @@ import { RolContext, SalonContext } from '@/components/filtroPlatos';
 import { ExpedicionRecetaModal } from '@/components/ExpedicionRecetaModal';
 import { Loading } from '@/components/loading';
 import type { ExpedicionPlatoResumen } from '@/server/expedicion/receta';
+import type { CellObject, CellStyle, WorkSheet } from 'xlsx-js-style';
 
 interface EventoSemana {
     id: number;
@@ -44,6 +45,209 @@ const formatearFechaTitulo = (fecha: string) =>
 const formatearCantidad = (valor: number) =>
     Number(valor.toFixed(4)).toString();
 
+const estiloHeaderOscuro: CellStyle = {
+    alignment: {
+        horizontal: 'center',
+        vertical: 'center',
+        wrapText: true,
+    },
+    fill: {
+        patternType: 'solid',
+        fgColor: {
+            rgb: '404040',
+        },
+    },
+    font: {
+        bold: true,
+        color: {
+            rgb: 'FFFFFF',
+        },
+    },
+};
+
+const estiloNumeroCentrado: CellStyle = {
+    alignment: {
+        horizontal: 'center',
+        vertical: 'center',
+    },
+};
+
+const estiloExpedidosPendiente: CellStyle = {
+    alignment: {
+        horizontal: 'center',
+        vertical: 'center',
+    },
+    fill: {
+        patternType: 'solid',
+        fgColor: {
+            rgb: 'FDECEC',
+        },
+    },
+    font: {
+        color: {
+            rgb: 'B71C1C',
+        },
+    },
+};
+
+const estiloExpedidosParcial: CellStyle = {
+    alignment: {
+        horizontal: 'center',
+        vertical: 'center',
+    },
+    fill: {
+        patternType: 'solid',
+        fgColor: {
+            rgb: 'FFF4CC',
+        },
+    },
+    font: {
+        color: {
+            rgb: '8A6D00',
+        },
+    },
+};
+
+const estiloExpedidosCompleto: CellStyle = {
+    alignment: {
+        horizontal: 'center',
+        vertical: 'center',
+    },
+    fill: {
+        patternType: 'solid',
+        fgColor: {
+            rgb: 'E8F5E9',
+        },
+    },
+    font: {
+        color: {
+            rgb: '1B5E20',
+        },
+    },
+};
+
+function calcularAnchoColumna(valores: Array<string | number>): number {
+    const maximoCaracteres = valores.reduce<number>((maximo, valor) => {
+        const largo = String(valor ?? '')
+            .split('\n')
+            .reduce((maxLinea, linea) => Math.max(maxLinea, linea.length), 0);
+
+        return Math.max(maximo, largo);
+    }, 0);
+
+    return maximoCaracteres + 2;
+}
+
+function construirHojaExpedicion(
+    comandas: ExpedicionComandaDetalle[],
+    XLSX: typeof import('xlsx-js-style'),
+): WorkSheet {
+    const encabezado: Array<string | number> = [
+        'Comanda',
+        'Lugar',
+        'Salon',
+        'Fecha',
+        'Codigo',
+        'PT / MP',
+        'Cantidad',
+        'Tiene receta',
+        'Expedidos',
+        'Ingredientes',
+    ];
+
+    const filas = comandas.flatMap((detalle) =>
+        detalle.platos.map((item) => [
+            detalle.comanda.nombre,
+            detalle.comanda.lugar,
+            detalle.comanda.salon,
+            format(new Date(detalle.comanda.fecha), 'dd/MM/yyyy'),
+            item.codigo || '',
+            item.nombre,
+            item.cantidad,
+            item.tieneReceta ? 'Sí' : 'No',
+            item.ingredientesExpedidos,
+            item.ingredientesTotales,
+        ]),
+    );
+
+    const worksheet = XLSX.utils.aoa_to_sheet([encabezado, ...filas]);
+    worksheet['!rows'] = [{ hpt: 28 }];
+    worksheet['!cols'] = encabezado.map((columna, indice) => {
+        const valores =
+            indice === 6 || indice === 8 || indice === 9
+                ? [
+                      columna,
+                      ...filas.map((fila) => {
+                          const valor = fila[indice] ?? '';
+                          return typeof valor === 'number'
+                              ? formatearCantidad(valor)
+                              : valor;
+                      }),
+                  ]
+                : [columna, ...filas.map((fila) => fila[indice] ?? '')];
+
+        const anchoBase = calcularAnchoColumna(valores);
+
+        return {
+            wch: Math.max(
+                indice === 5 ? 24 : indice === 0 ? 20 : 10,
+                Math.min(indice === 5 ? 48 : indice === 0 ? 32 : 20, anchoBase),
+            ),
+        };
+    });
+
+    const rango = worksheet['!ref']
+        ? XLSX.utils.decode_range(worksheet['!ref'])
+        : null;
+
+    if (!rango) {
+        return worksheet;
+    }
+
+    for (let c = 0; c <= rango.e.c; c += 1) {
+        const headerCell = worksheet[XLSX.utils.encode_cell({ r: 0, c })] as
+            | CellObject
+            | undefined;
+
+        if (headerCell) {
+            headerCell.s = estiloHeaderOscuro;
+        }
+    }
+
+    for (let r = 1; r <= rango.e.r; r += 1) {
+        for (const c of [6, 8, 9]) {
+            const cell = worksheet[XLSX.utils.encode_cell({ r, c })] as
+                | CellObject
+                | undefined;
+
+            if (cell) {
+                cell.s = estiloNumeroCentrado;
+            }
+        }
+
+        const expedidosCell = worksheet[XLSX.utils.encode_cell({ r, c: 8 })] as
+            | CellObject
+            | undefined;
+        const ingredientesCell = worksheet[
+            XLSX.utils.encode_cell({ r, c: 9 })
+        ] as CellObject | undefined;
+
+        if (expedidosCell && ingredientesCell) {
+            const expedidos = Number(expedidosCell.v ?? 0);
+            const ingredientes = Number(ingredientesCell.v ?? 0);
+
+            expedidosCell.s =
+                expedidos <= 0
+                    ? estiloExpedidosPendiente
+                    : expedidos >= ingredientes && ingredientes > 0
+                      ? estiloExpedidosCompleto
+                      : estiloExpedidosParcial;
+        }
+    }
+
+    return worksheet;
+}
+
 export default function ExpedicionPage() {
     const rol = useContext(RolContext);
     const salon = useContext(SalonContext);
@@ -68,7 +272,9 @@ export default function ExpedicionPage() {
                 const response = await fetch('/api/expedicion?salon=' + salon);
 
                 if (!response.ok) {
-                    throw new Error('No se pudo cargar la agenda de expedición.');
+                    throw new Error(
+                        'No se pudo cargar la agenda de expedición.',
+                    );
                 }
 
                 const eventos = (await response.json()) as EventoSemana[];
@@ -104,7 +310,9 @@ export default function ExpedicionPage() {
 
                 console.error('Error fetching expedition data:', fetchError);
                 setComandas([]);
-                setError('No se pudo cargar la lista de comandas de expedición.');
+                setError(
+                    'No se pudo cargar la lista de comandas de expedición.',
+                );
             } finally {
                 if (active) {
                     setLoading(false);
@@ -120,27 +328,17 @@ export default function ExpedicionPage() {
     }, [salon]);
 
     const exportToExcel = () => {
-        const flatData = comandas.flatMap((detalle) =>
-            detalle.platos.map((item) => ({
-                'Comanda ID': detalle.comanda.id,
-                Comanda: detalle.comanda.nombre,
-                Lugar: detalle.comanda.lugar,
-                Salon: detalle.comanda.salon,
-                Fecha: format(new Date(detalle.comanda.fecha), 'dd/MM/yyyy'),
-                Codigo: item.codigo || '',
-                PT: item.nombre,
-                Cantidad: item.cantidad,
-                'Tiene receta': item.tieneReceta ? 'Sí' : 'No',
-                Expedidos: item.ingredientesExpedidos,
-                Ingredientes: item.ingredientesTotales,
-            })),
-        );
-
-        import('xlsx').then((XLSX) => {
-            const worksheet = XLSX.utils.json_to_sheet(flatData);
+        import('xlsx-js-style').then((xlsxModule) => {
+            const XLSX: typeof import('xlsx-js-style') =
+                'default' in xlsxModule
+                    ? (xlsxModule.default as typeof import('xlsx-js-style'))
+                    : xlsxModule;
+            const worksheet = construirHojaExpedicion(comandas, XLSX);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, 'Expedicion');
-            XLSX.writeFile(workbook, 'expedicion.xlsx');
+            XLSX.writeFile(workbook, 'expedicion.xlsx', {
+                cellStyles: true,
+            });
         });
     };
 
@@ -217,7 +415,9 @@ export default function ExpedicionPage() {
                     semana.
                 </Alert>
             ) : (
-                <Accordion alwaysOpen className="mb-3">
+                <Accordion
+                    alwaysOpen
+                    className="mb-3">
                     {comandas.map((detalle, index) => (
                         <Accordion.Item
                             eventKey={String(index)}
@@ -227,8 +427,11 @@ export default function ExpedicionPage() {
                                     {detalle.comanda.nombre}
                                 </span>
                                 <span className="text-body-secondary">
-                                    {detalle.comanda.lugar} | {detalle.comanda.salon}{' '}
-                                    | {formatearFechaTitulo(detalle.comanda.fecha)}
+                                    {detalle.comanda.lugar} |{' '}
+                                    {detalle.comanda.salon} |{' '}
+                                    {formatearFechaTitulo(
+                                        detalle.comanda.fecha,
+                                    )}
                                 </span>
                             </Accordion.Header>
                             <Accordion.Body>
@@ -237,23 +440,29 @@ export default function ExpedicionPage() {
                                         Comanda #{detalle.comanda.id}
                                     </Badge>
                                     <Badge bg="secondary">
-                                        Invitados {detalle.comanda.cantidadInvitados}
+                                        Invitados{' '}
+                                        {detalle.comanda.cantidadInvitados}
                                     </Badge>
                                     <Badge bg="info">
-                                        PT {detalle.platos.length}
+                                        PT / MP {detalle.platos.length}
                                     </Badge>
                                 </div>
 
                                 {detalle.platos.length === 0 ? (
-                                    <Alert variant="warning" className="mb-0">
+                                    <Alert
+                                        variant="warning"
+                                        className="mb-0">
                                         Esta comanda no tiene PT cargados.
                                     </Alert>
                                 ) : (
-                                    <Table responsive hover className="mb-0 align-middle">
+                                    <Table
+                                        responsive
+                                        hover
+                                        className="mb-0 align-middle">
                                         <thead>
                                             <tr>
                                                 <th>Código</th>
-                                                <th>PT</th>
+                                                <th>PT / MP</th>
                                                 <th>Cantidad</th>
                                                 <th>Receta</th>
                                                 <th>Expedición</th>
@@ -262,17 +471,25 @@ export default function ExpedicionPage() {
                                         <tbody>
                                             {detalle.platos.map((plato) => (
                                                 <tr key={plato.platoId}>
-                                                    <td>{plato.codigo || '-'}</td>
+                                                    <td>
+                                                        {plato.codigo || '-'}
+                                                    </td>
                                                     <td>
                                                         <Button
                                                             variant="link"
                                                             className="p-0 text-start fw-semibold text-decoration-none"
                                                             onClick={() => {
                                                                 setSelectedComandaId(
-                                                                    detalle.comanda.id,
+                                                                    detalle
+                                                                        .comanda
+                                                                        .id,
                                                                 );
-                                                                setSelectedPlato(plato);
-                                                                setShowModal(true);
+                                                                setSelectedPlato(
+                                                                    plato,
+                                                                );
+                                                                setShowModal(
+                                                                    true,
+                                                                );
                                                             }}>
                                                             {plato.nombre}
                                                         </Button>
