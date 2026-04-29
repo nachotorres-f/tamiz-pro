@@ -1,68 +1,141 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import React, { useContext, useState } from 'react';
-import { useEffect } from 'react';
-
-import { Accordion, Button, Container, Form, Table } from 'react-bootstrap';
-
-import FullCalendar from '@fullcalendar/react';
-import dayGridPlugin from '@fullcalendar/daygrid';
-import bootstrap5Plugin from '@fullcalendar/bootstrap5';
-import esLocale from '@fullcalendar/core/locales/es';
-import { addDays, format } from 'date-fns';
+import React, { useContext, useEffect, useState } from 'react';
+import {
+    Accordion,
+    Alert,
+    Badge,
+    Button,
+    Container,
+    Table,
+} from 'react-bootstrap';
+import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { RolContext, SalonContext } from '@/components/filtroPlatos';
+import { ExpedicionRecetaModal } from '@/components/ExpedicionRecetaModal';
 import { Loading } from '@/components/loading';
+import type { ExpedicionPlatoResumen } from '@/server/expedicion/receta';
+
+interface EventoSemana {
+    id: number;
+    lugar: string;
+    salon: string;
+    fecha: string;
+    nombre: string;
+}
+
+interface ExpedicionComandaDetalle {
+    comanda: {
+        id: number;
+        nombre: string;
+        lugar: string;
+        salon: string;
+        fecha: string;
+        cantidadInvitados: number;
+    };
+    platos: ExpedicionPlatoResumen[];
+}
+
+const formatearFechaTitulo = (fecha: string) =>
+    format(new Date(fecha), 'EEEE dd/MM/yyyy', {
+        locale: es,
+    });
+
+const formatearCantidad = (valor: number) =>
+    Number(valor.toFixed(4)).toString();
 
 export default function ExpedicionPage() {
+    const rol = useContext(RolContext);
     const salon = useContext(SalonContext);
-    const RolProvider = useContext(RolContext);
-
-    const [events, setEvents] = React.useState<any[]>([]);
-    const [, setData] = React.useState<any[]>([]);
-    const [title, setTitle] = React.useState('');
-    const [id, setId] = React.useState(0);
+    const [comandas, setComandas] = useState<ExpedicionComandaDetalle[]>([]);
+    const [selectedPlato, setSelectedPlato] =
+        useState<ExpedicionPlatoResumen | null>(null);
+    const [selectedComandaId, setSelectedComandaId] = useState<number | null>(
+        null,
+    );
+    const [showModal, setShowModal] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        if (salon) {
-        }
+        let active = true;
+
+        const cargarComandas = async () => {
+            setLoading(true);
+            setError(null);
+
+            try {
+                const response = await fetch('/api/expedicion?salon=' + salon);
+
+                if (!response.ok) {
+                    throw new Error('No se pudo cargar la agenda de expedición.');
+                }
+
+                const eventos = (await response.json()) as EventoSemana[];
+
+                const detalles = await Promise.all(
+                    eventos.map(async (evento) => {
+                        const detalleResponse = await fetch(
+                            '/api/exEvento?id=' + evento.id,
+                        );
+
+                        if (!detalleResponse.ok) {
+                            throw new Error(
+                                `No se pudo cargar la comanda ${evento.id}.`,
+                            );
+                        }
+
+                        return (await detalleResponse.json()) as ExpedicionComandaDetalle;
+                    }),
+                );
+
+                if (!active) {
+                    return;
+                }
+
+                setComandas(detalles);
+                setSelectedComandaId(null);
+                setSelectedPlato(null);
+                setShowModal(false);
+            } catch (fetchError: unknown) {
+                if (!active) {
+                    return;
+                }
+
+                console.error('Error fetching expedition data:', fetchError);
+                setComandas([]);
+                setError('No se pudo cargar la lista de comandas de expedición.');
+            } finally {
+                if (active) {
+                    setLoading(false);
+                }
+            }
+        };
+
+        void cargarComandas();
+
+        return () => {
+            active = false;
+        };
     }, [salon]);
 
-    type InfoItem = {
-        id: number;
-        codigo: string;
-        nombreProducto: string;
-        subCodigo: string;
-        descripcion: string;
-        tipo: string;
-        unidadMedida: string;
-        porcionBruta: number;
-        check: boolean;
-        cantidadPadre: number;
-        puedeExpedir?: boolean;
-    };
-
-    type InfoArray = InfoItem[];
-
-    const [info, setInfo] = React.useState<InfoArray[]>([]);
-
-    // Exportar a Excel
     const exportToExcel = () => {
-        // aplanar info
-        const flatData = info.flat().map((item) => ({
-            Codigo: item.codigo,
-            Producto: item.nombreProducto,
-            'Sub Codigo': item.subCodigo,
-            'Sub Producto': item.descripcion,
-            Tipo: item.tipo,
-            'Unidad Medida': item.unidadMedida,
-            'Porcion Bruta': item.porcionBruta,
-            Expedido: item.check ? 'Sí' : 'No',
-        }));
+        const flatData = comandas.flatMap((detalle) =>
+            detalle.platos.map((item) => ({
+                'Comanda ID': detalle.comanda.id,
+                Comanda: detalle.comanda.nombre,
+                Lugar: detalle.comanda.lugar,
+                Salon: detalle.comanda.salon,
+                Fecha: format(new Date(detalle.comanda.fecha), 'dd/MM/yyyy'),
+                Codigo: item.codigo || '',
+                PT: item.nombre,
+                Cantidad: item.cantidad,
+                'Tiene receta': item.tieneReceta ? 'Sí' : 'No',
+                Expedidos: item.ingredientesExpedidos,
+                Ingredientes: item.ingredientesTotales,
+            })),
+        );
 
-        // importar xlsx dinámicamente
         import('xlsx').then((XLSX) => {
             const worksheet = XLSX.utils.json_to_sheet(flatData);
             const workbook = XLSX.utils.book_new();
@@ -71,111 +144,41 @@ export default function ExpedicionPage() {
         });
     };
 
-    useEffect(() => {
-        setLoading(true);
-
-        fetch('/api/expedicion')
-            .then((res) => res.json())
-            .then((data) => {
-                setData(data);
-                setEvents(
-                    data.map((evento: any) => ({
-                        title: evento.lugar + ' - ' + evento.salon,
-                        date: evento.fecha.split('T')[0],
-                        id: evento.id,
-                    }))
-                );
-                setTitle(
-                    data[0].lugar +
-                        ' - ' +
-                        data[0].salon +
-                        ' - ' +
-                        format(data[0].fecha, 'EEEE dd/MM/yyyy', {
-                            locale: es,
-                        })
-                );
-                setId(data[0].id);
-            });
-    }, []);
-
-    useEffect(() => {
-        if (id === 0) return;
-
-        setLoading(true);
-
-        fetch('/api/exEvento?id=' + id)
-            .then((res) => res.json())
-            .then((data) => {
-                setInfo(data);
-            })
-            .finally(() => {
-                setLoading(false);
-            });
-    }, [id]);
-
-    const checkExpedicion = async (
-        checked: boolean,
-        codigo: string,
-        subCodigo: string
+    const updatePlatoResumen = (
+        comandaId: number,
+        platoId: number,
+        resumen: Pick<
+            ExpedicionPlatoResumen,
+            'ingredientesTotales' | 'ingredientesExpedidos'
+        >,
     ) => {
-        if (!codigo || !subCodigo) {
-            return;
-        }
-
-        fetch('/api/exEvento', {
-            method: checked ? 'POST' : 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                codigo,
-                subCodigo,
-                comandaId: id,
-            }),
-        });
-    };
-
-    const updateCheck = (i: number, j: number, checked: boolean) => {
-        const nuevoInfo = [...info];
-        nuevoInfo[i] = info[i].map((ingrediente, k) =>
-            k === j ? { ...ingrediente, check: checked } : ingrediente
+        setComandas((actual) =>
+            actual.map((detalle) =>
+                detalle.comanda.id === comandaId
+                    ? {
+                          ...detalle,
+                          platos: detalle.platos.map((plato) =>
+                              plato.platoId === platoId
+                                  ? {
+                                        ...plato,
+                                        ...resumen,
+                                    }
+                                  : plato,
+                          ),
+                      }
+                    : detalle,
+            ),
         );
 
-        setInfo(nuevoInfo);
-    };
-
-    const checkAllExpedicion = async (checked: boolean, i: number) => {
-        const ingredientesExpedibles = info[i].filter(
-            (ingrediente) =>
-                ingrediente.puedeExpedir !== false &&
-                ingrediente.codigo &&
-                ingrediente.subCodigo
+        setSelectedPlato((actual) =>
+            actual?.platoId === platoId
+                ? {
+                      ...actual,
+                      ...resumen,
+                  }
+                : actual,
         );
-
-        if (ingredientesExpedibles.length === 0) {
-            return;
-        }
-
-        // actualizar en backend todas las filas
-        await Promise.all(
-            ingredientesExpedibles.map((ingrediente) =>
-                checkExpedicion(
-                    checked,
-                    ingrediente.codigo,
-                    ingrediente.subCodigo
-                )
-            )
-        );
-
-        // crear nueva copia del estado
-        const nuevoInfo = [...info];
-        nuevoInfo[i] = info[i].map((ingrediente) => ({
-            ...ingrediente,
-            check: checked,
-        }));
-
-        setInfo(nuevoInfo);
     };
-
-    const weekStart = new Date();
 
     if (loading) {
         return <Loading />;
@@ -185,176 +188,157 @@ export default function ExpedicionPage() {
         <Container className="mt-5">
             <h2 className="text-center mb-4">Expedicion</h2>
 
-            <FullCalendar
-                plugins={[dayGridPlugin, bootstrap5Plugin]}
-                themeSystem="bootstrap5"
-                initialView="dayGridWeek"
-                initialDate={weekStart}
-                headerToolbar={false}
-                events={events}
-                eventClick={(info) => {
-                    setId(Number(info.event.id));
-                    setTitle(
-                        info.event.title +
-                            ' - ' +
-                            format(
-                                addDays(info.event.startStr, 1),
-                                'EEEE dd/MM/yyyy',
-                                {
-                                    locale: es,
-                                }
-                            )
-                    );
-                }}
-                locales={[esLocale]}
-                locale="es"
-                height="10rem"
-                dayHeaderFormat={{
-                    // weekday: 'long',
-                    day: '2-digit',
-                    month: 'long',
-                }}
-            />
+            {error && <Alert variant="danger">{error}</Alert>}
 
-            <h2 className="text-center mt-5">{title}</h2>
+            <div className="d-flex justify-content-between align-items-center mt-3 mb-4 gap-3 flex-wrap">
+                <Button
+                    className="btn-success"
+                    disabled={comandas.length === 0}
+                    onClick={exportToExcel}>
+                    Exportar a Excel
+                </Button>
 
-            <Button
-                className="mb-3 btn-success"
-                onClick={exportToExcel}>
-                Exportar a Excel
-            </Button>
+                <div className="d-flex gap-2 flex-wrap">
+                    <Badge bg="dark">Comandas {comandas.length}</Badge>
+                    <Badge bg="info">
+                        PT{' '}
+                        {comandas.reduce(
+                            (acumulado, detalle) =>
+                                acumulado + detalle.platos.length,
+                            0,
+                        )}
+                    </Badge>
+                </div>
+            </div>
 
-            {info.map((data, i) => {
-                if (data.length === 0) return;
-                return (
-                    <Accordion
-                        defaultActiveKey="0"
-                        className="mb-3"
-                        key={i}>
-                        <Accordion.Item eventKey={i.toString()}>
+            {comandas.length === 0 ? (
+                <Alert variant="warning">
+                    No hay comandas de expedición desde hoy hasta la próxima
+                    semana.
+                </Alert>
+            ) : (
+                <Accordion alwaysOpen className="mb-3">
+                    {comandas.map((detalle, index) => (
+                        <Accordion.Item
+                            eventKey={String(index)}
+                            key={detalle.comanda.id}>
                             <Accordion.Header>
-                                {data[0].nombreProducto} -{' '}
-                                {data[0].cantidadPadre}
+                                <span className="me-2 fw-semibold">
+                                    {detalle.comanda.nombre}
+                                </span>
+                                <span className="text-body-secondary">
+                                    {detalle.comanda.lugar} | {detalle.comanda.salon}{' '}
+                                    | {formatearFechaTitulo(detalle.comanda.fecha)}
+                                </span>
                             </Accordion.Header>
                             <Accordion.Body>
-                                <Form.Check
-                                    className="ms-2 fw-bold"
-                                    type="checkbox"
-                                    id={`${i}`}
-                                    label={`Marcar todas`}
-                                    disabled={
-                                        RolProvider === 'consultor' ||
-                                        data.filter(
-                                            (ingrediente) =>
-                                                ingrediente.puedeExpedir !==
-                                                    false &&
-                                                ingrediente.codigo &&
-                                                ingrediente.subCodigo
-                                        ).length === 0
-                                    }
-                                    checked={
-                                        data.filter(
-                                            (ingrediente) =>
-                                                ingrediente.puedeExpedir !==
-                                                    false &&
-                                                ingrediente.codigo &&
-                                                ingrediente.subCodigo
-                                        ).length > 0 &&
-                                        data
-                                            .filter(
-                                                (ingrediente) =>
-                                                    ingrediente.puedeExpedir !==
-                                                        false &&
-                                                    ingrediente.codigo &&
-                                                    ingrediente.subCodigo
-                                            )
-                                            .every(
-                                                (ingrediente) =>
-                                                    ingrediente.check
-                                            )
-                                    }
-                                    onChange={(e) => {
-                                        checkAllExpedicion(e.target.checked, i);
-                                    }}
-                                />
-                                <Table>
-                                    <thead>
-                                        <tr>
-                                            <th></th>
-                                            <th>Codigo</th>
-                                            <th>Producto</th>
-                                            <th>Sub Codigo</th>
-                                            <th>Sub Producto</th>
-                                            <th>Tipo</th>
-                                            <th>Unidad Medida</th>
-                                            <th>Porcion Bruta</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {data.map((item, j) => {
-                                            return (
-                                                <tr key={i + ' ' + j}>
+                                <div className="d-flex gap-2 flex-wrap mb-3">
+                                    <Badge bg="dark">
+                                        Comanda #{detalle.comanda.id}
+                                    </Badge>
+                                    <Badge bg="secondary">
+                                        Invitados {detalle.comanda.cantidadInvitados}
+                                    </Badge>
+                                    <Badge bg="info">
+                                        PT {detalle.platos.length}
+                                    </Badge>
+                                </div>
+
+                                {detalle.platos.length === 0 ? (
+                                    <Alert variant="warning" className="mb-0">
+                                        Esta comanda no tiene PT cargados.
+                                    </Alert>
+                                ) : (
+                                    <Table responsive hover className="mb-0 align-middle">
+                                        <thead>
+                                            <tr>
+                                                <th>Código</th>
+                                                <th>PT</th>
+                                                <th>Cantidad</th>
+                                                <th>Receta</th>
+                                                <th>Expedición</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {detalle.platos.map((plato) => (
+                                                <tr key={plato.platoId}>
+                                                    <td>{plato.codigo || '-'}</td>
                                                     <td>
-                                                        <Form.Check
-                                                            type="checkbox"
-                                                            id={`${item.codigo || 'sin-codigo'}-${item.subCodigo || 'sin-subcodigo'}-${i}-${j}`}
-                                                            label={``}
-                                                            disabled={
-                                                                RolProvider ===
-                                                                    'consultor' ||
-                                                                item.puedeExpedir ===
-                                                                    false ||
-                                                                !item.codigo ||
-                                                                !item.subCodigo
+                                                        <Button
+                                                            variant="link"
+                                                            className="p-0 text-start fw-semibold text-decoration-none"
+                                                            onClick={() => {
+                                                                setSelectedComandaId(
+                                                                    detalle.comanda.id,
+                                                                );
+                                                                setSelectedPlato(plato);
+                                                                setShowModal(true);
+                                                            }}>
+                                                            {plato.nombre}
+                                                        </Button>
+                                                    </td>
+                                                    <td>
+                                                        {formatearCantidad(
+                                                            plato.cantidad,
+                                                        )}
+                                                    </td>
+                                                    <td>
+                                                        <Badge
+                                                            bg={
+                                                                plato.tieneReceta
+                                                                    ? 'success'
+                                                                    : 'warning'
                                                             }
-                                                            checked={item.check}
-                                                            onChange={(e) => {
-                                                                checkExpedicion(
-                                                                    e.target
-                                                                        .checked,
-                                                                    item.codigo,
-                                                                    item.subCodigo
-                                                                );
-                                                                updateCheck(
-                                                                    i,
-                                                                    j,
-                                                                    e.target
-                                                                        .checked
-                                                                );
-                                                            }}
-                                                        />
+                                                            text={
+                                                                plato.tieneReceta
+                                                                    ? undefined
+                                                                    : 'dark'
+                                                            }>
+                                                            {plato.tieneReceta
+                                                                ? 'Disponible'
+                                                                : 'Sin receta'}
+                                                        </Badge>
                                                     </td>
-                                                    <td>{item.codigo || '-'}</td>
                                                     <td>
-                                                        {item.nombreProducto}
+                                                        <Badge bg="secondary">
+                                                            {
+                                                                plato.ingredientesExpedidos
+                                                            }
+                                                            /
+                                                            {
+                                                                plato.ingredientesTotales
+                                                            }
+                                                        </Badge>
                                                     </td>
-                                                    <td>{item.subCodigo || '-'}</td>
-                                                    <td>{item.descripcion}</td>
-                                                    <td>{item.tipo}</td>
-                                                    <td>{item.unidadMedida}</td>
-                                                    <td>{item.porcionBruta}</td>
                                                 </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </Table>
+                                            ))}
+                                        </tbody>
+                                    </Table>
+                                )}
                             </Accordion.Body>
                         </Accordion.Item>
-                    </Accordion>
-                );
-                // <tr key={i}>
-                //     <td>{data.codigo}</td>
-                //     <td>{data.nombreProducto}</td>
-                //     <td>{data.subCodigo}</td>
-                //     <td>{data.descripcion}</td>
-                //     <td>{data.tipo}</td>
-                //     <td>{data.unidadMedida}</td>
-                //     <td>{data.porcionBruta.toFixed(2)}</td>
-                //     <td>
-                //         <InputGroup.Checkbox aria-label="Checkbox for following text input" />
-                //     </td>
-                // </tr>
-            })}
+                    ))}
+                </Accordion>
+            )}
+
+            <ExpedicionRecetaModal
+                comandaId={selectedComandaId}
+                plato={selectedPlato}
+                readOnly={rol === 'consultor'}
+                show={showModal}
+                onClose={() => {
+                    setShowModal(false);
+                    setSelectedPlato(null);
+                    setSelectedComandaId(null);
+                }}
+                onResumenActualizado={(platoId, resumen) => {
+                    if (!selectedComandaId) {
+                        return;
+                    }
+
+                    updatePlatoResumen(selectedComandaId, platoId, resumen);
+                }}
+            />
         </Container>
     );
 }

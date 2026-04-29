@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { requirePageKeyAccess } from '@/lib/page-guard';
-import { startOfWeek, addDays } from 'date-fns';
+import { addDays, startOfDay } from 'date-fns';
 import { logAudit } from '@/lib/audit';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -13,13 +13,26 @@ export async function GET(req: NextRequest) {
     }
 
     try {
+        const { searchParams } = req.nextUrl;
+        const salon = searchParams.get('salon') || 'A';
+        const lugaresGrupoB = ['El Central', 'La Rural'];
+        const usarNotIn = salon === 'A';
+        const hoy = startOfDay(new Date());
+        const hasta = addDays(hoy, 7);
+
         const eventos = await prisma.comanda.findMany({
             where: {
                 fecha: {
-                    gte: startOfWeek(new Date(), { weekStartsOn: 1 }),
-                    lt: addDays(startOfWeek(new Date(), { weekStartsOn: 1 }), 7),
+                    gte: hoy,
+                    lt: hasta,
                 },
+                lugar: usarNotIn ? { notIn: lugaresGrupoB } : { in: lugaresGrupoB },
             },
+            orderBy: [
+                { fecha: 'asc' },
+                { horarioInicio: 'asc' },
+                { id: 'asc' },
+            ],
         });
 
         await logAudit({
@@ -27,9 +40,12 @@ export async function GET(req: NextRequest) {
             accion: 'consultar_expedicion_semana',
             ruta: '/api/expedicion',
             metodo: 'GET',
-            resumen: 'Consulta semanal de expedición',
+            resumen: 'Consulta de expedición desde hoy a una semana',
             detalle: {
+                salon,
                 eventos: eventos.length,
+                desde: hoy.toISOString(),
+                hasta: hasta.toISOString(),
             },
         });
 
@@ -58,8 +74,9 @@ export async function GET(req: NextRequest) {
             ruta: '/api/expedicion',
             metodo: 'GET',
             estado: 'error',
-            resumen: 'Error consultando expedición semanal',
+            resumen: 'Error consultando expedición desde hoy a una semana',
             detalle: {
+                salon: req.nextUrl.searchParams.get('salon') || 'A',
                 error: error instanceof Error ? error.message : String(error),
             },
         });

@@ -1,90 +1,68 @@
-import { prisma } from '@/lib/prisma';
-import { NextRequest, NextResponse } from 'next/server';
 import { logAudit } from '@/lib/audit';
+import { requirePageKeyAccess } from '@/lib/page-guard';
+import { prisma } from '@/lib/prisma';
+import {
+    obtenerResumenesExpedicionPlatos,
+    type ExpedicionPlatoResumen,
+} from '@/server/expedicion/receta';
+import { NextRequest, NextResponse } from 'next/server';
 
-export interface Receta {
-    id: string;
-    nombreProducto: string;
-    descripcion: string;
-    // otras propiedades...
+interface Body {
+    comandaId: number;
+    codigo: string;
+    subCodigo: string;
 }
 
-export interface IngredienteConRuta {
-    ingrediente: string;
-    ruta: string[];
-    nivel: number;
-}
+const normalizarTexto = (valor: string | null | undefined) =>
+    String(valor ?? '').trim();
 
 export async function GET(req: NextRequest) {
     process.env.TZ = 'America/Argentina/Buenos_Aires';
+    const accessResult = await requirePageKeyAccess(req, 'expedicion');
+
+    if (accessResult instanceof NextResponse) {
+        return accessResult;
+    }
 
     const { searchParams } = req.nextUrl;
-    const id = searchParams.get('id');
+    const id = Number(searchParams.get('id'));
+
+    if (!Number.isFinite(id) || id <= 0) {
+        return NextResponse.json(
+            { error: 'Comanda inválida' },
+            { status: 400 },
+        );
+    }
 
     try {
         const evento = await prisma.comanda.findFirst({
             where: {
-                id: id ? Number(id) : undefined,
+                id,
             },
             include: {
-                Plato: true,
+                Plato: {
+                    orderBy: {
+                        id: 'asc',
+                    },
+                },
             },
         });
 
-        const platos = await Promise.all(
-            evento?.Plato.map(async ({ codigo, nombre, cantidad }) => {
-                const codigoNormalizado = (codigo ?? '').trim();
-                const recetas = await prisma.receta.findMany({
-                    where: {
-                        ...(codigoNormalizado
-                            ? { codigo: codigoNormalizado }
-                            : { nombreProducto: nombre }),
-                    },
-                });
+        if (!evento) {
+            return NextResponse.json(
+                { error: 'Comanda no encontrada' },
+                { status: 404 },
+            );
+        }
 
-                if (recetas.length === 0) {
-                    return [
-                        {
-                            codigo: codigoNormalizado,
-                            subCodigo: '',
-                            nombreProducto: nombre,
-                            descripcion: nombre,
-                            tipo: 'SIN_RECETA',
-                            unidadMedida: '',
-                            porcionBruta: cantidad,
-                            check: false,
-                            cantidadPadre: cantidad,
-                            puedeExpedir: false,
-                        },
-                    ];
-                }
-
-                return await Promise.all(
-                    recetas.map(
-                        async ({ codigo, subCodigo, porcionBruta, ...receta }) => {
-                            const checkExpedicion =
-                                await prisma.expedicion.findFirst({
-                                    select: { id: true },
-                                    where: {
-                                        comandaId: Number(id),
-                                        codigo,
-                                        subCodigo,
-                                    },
-                                });
-
-                            return {
-                                codigo,
-                                subCodigo,
-                                ...receta,
-                                porcionBruta: porcionBruta * cantidad,
-                                check: !!checkExpedicion,
-                                cantidadPadre: cantidad,
-                                puedeExpedir: Boolean(codigo && subCodigo),
-                            };
-                        },
-                    ),
-                );
-            }) ?? [],
+        const platos = await obtenerResumenesExpedicionPlatos(
+            evento.id,
+            evento.Plato.map((plato) => ({
+                id: plato.id,
+                codigo: plato.codigo,
+                nombre: plato.nombre,
+                cantidad: plato.cantidad,
+            })),
         );
 
         await logAudit({
@@ -92,14 +70,25 @@ export async function GET(req: NextRequest) {
             accion: 'consultar_expedicion_evento',
             ruta: '/api/exEvento',
             metodo: 'GET',
-            resumen: `Consulta de expedición para comanda ${id || 'sin_id'}`,
+            resumen: `Consulta de expedición para comanda ${id}`,
             detalle: {
-                comandaId: id ? Number(id) : null,
+                comandaId: id,
                 platos: platos.length,
             },
         });
 
-        return NextResponse.json(platos);
+        return NextResponse.json({
+            comanda: {
+                id: evento.id,
+                nombre: evento.nombre,
+                lugar: evento.lugar,
+                salon: evento.salon,
+                fecha: evento.fecha,
+                cantidadInvitados:
+                    evento.cantidadMayores + evento.cantidadMenores,
+            },
+            platos,
+        });
     } catch (error) {
         await logAudit({
             modulo: 'expedicion',
@@ -109,7 +98,7 @@ export async function GET(req: NextRequest) {
             estado: 'error',
             resumen: 'Error consultando expedición por evento',
             detalle: {
-                comandaId: id ? Number(id) : null,
+                comandaId: id,
                 error: error instanceof Error ? error.message : String(error),
             },
         });
@@ -121,20 +110,22 @@ export async function GET(req: NextRequest) {
     }
 }
 
-interface Body {
-    comandaId: number;
-    codigo: string;
-    subCodigo: string;
-}
-
 export async function POST(req: NextRequest) {
     process.env.TZ = 'America/Argentina/Buenos_Aires';
+    const accessResult = await requirePageKeyAccess(req, 'expedicion');
+
+    if (accessResult instanceof NextResponse) {
+        return accessResult;
+    }
+
     let body: Body | null = null;
 
     try {
         const payload = (await req.json()) as Body;
         body = payload;
-        const { comandaId, codigo, subCodigo } = payload;
+        const comandaId = Number(payload.comandaId);
+        const codigo = normalizarTexto(payload.codigo);
+        const subCodigo = normalizarTexto(payload.subCodigo);
 
         if (!comandaId || !codigo || !subCodigo) {
             await logAudit({
@@ -171,6 +162,11 @@ export async function POST(req: NextRequest) {
             });
         }
 
+        const resumenPlato = await obtenerResumenPlatoDesdePayload(
+            comandaId,
+            codigo,
+        );
+
         await logAudit({
             modulo: 'expedicion',
             accion: 'marcar_expedicion',
@@ -185,7 +181,13 @@ export async function POST(req: NextRequest) {
             },
         });
 
-        return NextResponse.json({ success: true }, { status: 201 });
+        return NextResponse.json(
+            {
+                success: true,
+                resumenPlato,
+            },
+            { status: 201 },
+        );
     } catch (error) {
         await logAudit({
             modulo: 'expedicion',
@@ -209,12 +211,20 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
     process.env.TZ = 'America/Argentina/Buenos_Aires';
+    const accessResult = await requirePageKeyAccess(req, 'expedicion');
+
+    if (accessResult instanceof NextResponse) {
+        return accessResult;
+    }
+
     let body: Body | null = null;
 
     try {
         const payload = (await req.json()) as Body;
         body = payload;
-        const { comandaId, codigo, subCodigo } = payload;
+        const comandaId = Number(payload.comandaId);
+        const codigo = normalizarTexto(payload.codigo);
+        const subCodigo = normalizarTexto(payload.subCodigo);
 
         if (!comandaId || !codigo || !subCodigo) {
             await logAudit({
@@ -241,6 +251,11 @@ export async function DELETE(req: NextRequest) {
             },
         });
 
+        const resumenPlato = await obtenerResumenPlatoDesdePayload(
+            comandaId,
+            codigo,
+        );
+
         await logAudit({
             modulo: 'expedicion',
             accion: 'desmarcar_expedicion',
@@ -255,7 +270,13 @@ export async function DELETE(req: NextRequest) {
             },
         });
 
-        return NextResponse.json({ success: true }, { status: 201 });
+        return NextResponse.json(
+            {
+                success: true,
+                resumenPlato,
+            },
+            { status: 201 },
+        );
     } catch (error) {
         await logAudit({
             modulo: 'expedicion',
@@ -275,4 +296,41 @@ export async function DELETE(req: NextRequest) {
             { status: 500 },
         );
     }
+}
+
+async function obtenerResumenPlatoDesdePayload(
+    comandaId: number,
+    platoCodigo: string,
+): Promise<ExpedicionPlatoResumen | null> {
+    if (!comandaId || !platoCodigo) {
+        return null;
+    }
+
+    const platos = await prisma.plato.findMany({
+        where: {
+            comandaId,
+            codigo: platoCodigo,
+        },
+        orderBy: {
+            id: 'asc',
+        },
+    });
+
+    if (platos.length === 0) {
+        return null;
+    }
+
+    const [resumen] = await obtenerResumenesExpedicionPlatos(
+        comandaId,
+        [
+            {
+                id: platos[0].id,
+                codigo: platos[0].codigo,
+                nombre: platos[0].nombre,
+                cantidad: platos[0].cantidad,
+            },
+        ],
+    );
+
+    return resumen ?? null;
 }
