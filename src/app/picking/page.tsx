@@ -32,7 +32,7 @@ interface FilaPicking {
     subPlatoCodigo: string;
     cantidadesPorComanda: Record<string, number>;
     cantidadesPorFechaPedido?: Record<string, number>;
-    cantidadesPorFechaProduccion?: Record<string, number>;
+    cantidadesPorFechaProduccionReal?: Record<string, number>;
 }
 
 interface PickingResponse {
@@ -112,6 +112,59 @@ const estiloNumeroProduccionNegrita: CellStyle = {
     },
 };
 
+const estiloNumeroSaldoNegativo: CellStyle = {
+    alignment: {
+        horizontal: 'center',
+        vertical: 'center',
+    },
+    fill: {
+        patternType: 'solid',
+        fgColor: {
+            rgb: 'FDECEC',
+        },
+    },
+    font: {
+        color: {
+            rgb: 'B71C1C',
+        },
+    },
+};
+
+const estiloNumeroSaldoNegativoNegrita: CellStyle = {
+    ...estiloNumeroSaldoNegativo,
+    font: {
+        bold: true,
+        color: {
+            rgb: 'B71C1C',
+        },
+    },
+};
+
+const estiloTextoNegrita: CellStyle = {
+    font: {
+        bold: true,
+    },
+    alignment: {
+        vertical: 'center',
+        wrapText: true,
+    },
+};
+
+const estiloCeldaVaciaSinBorde: CellStyle = {
+    border: {
+        top: { style: 'none' },
+        bottom: { style: 'none' },
+        left: { style: 'none' },
+        right: { style: 'none' },
+    },
+    fill: {
+        patternType: 'solid',
+        fgColor: {
+            rgb: 'FFFFFF',
+        },
+    },
+};
+
 const estiloHeaderOscuro: CellStyle = {
     alignment: {
         horizontal: 'center',
@@ -175,7 +228,7 @@ function obtenerClaveFecha(fecha: string | Date): string {
 function obtenerTituloComandaExcel(comanda: Comanda): string {
     return `${format(new Date(comanda.fecha), 'EEE dd/MM', {
         locale: es,
-    })}\n${comanda.lugar}\n${comanda.salon}`;
+    })}\n${comanda.lugar}\n${comanda.salon}\n${comanda.nombre}`;
 }
 
 function obtenerEtiquetaFechaExcel(fecha: string): string {
@@ -184,11 +237,76 @@ function obtenerEtiquetaFechaExcel(fecha: string): string {
     });
 }
 
-function construirFilasExcelPicking(
+function obtenerResumenComanda(comanda: Comanda): string {
+    return `${format(new Date(comanda.fecha), 'dd/MM/yyyy')} | ${comanda.lugar} | ${comanda.salon} | ${comanda.nombre}`;
+}
+
+function sumarCantidades(cantidades?: Record<string, number>): number {
+    return Object.values(cantidades ?? {}).reduce(
+        (acumulado, cantidad) => acumulado + cantidad,
+        0,
+    );
+}
+
+function sumarCantidadesEnVentana(
+    cantidades: Record<string, number> | undefined,
+    fechaInicio: string,
+    fechaFin: string,
+): number {
+    return Object.entries(cantidades ?? {}).reduce(
+        (acumulado, [fecha, cantidad]) =>
+            fecha >= fechaInicio && fecha <= fechaFin
+                ? acumulado + cantidad
+                : acumulado,
+        0,
+    );
+}
+
+function obtenerInicioVentanaProduccion(fechaLimite: string): string {
+    return format(addDays(new Date(`${fechaLimite}T00:00:00`), -6), 'yyyy-MM-dd');
+}
+
+function obtenerProduccionAcumuladaHastaFecha(
+    fila: FilaPicking,
+    fechaLimite: string,
+): number {
+    return sumarCantidadesEnVentana(
+        fila.cantidadesPorFechaProduccionReal,
+        obtenerInicioVentanaProduccion(fechaLimite),
+        fechaLimite,
+    );
+}
+
+function obtenerEstiloSaldo(valor: unknown, bold = false): CellStyle {
+    if (typeof valor === 'number' && valor < 0) {
+        return bold
+            ? estiloNumeroSaldoNegativoNegrita
+            : estiloNumeroSaldoNegativo;
+    }
+
+    return bold ? estiloNumeroCentradoNegrita : estiloNumeroCentrado;
+}
+
+function construirNombreHojaComanda(comanda: Comanda): string {
+    const base = `${format(new Date(comanda.fecha), 'dd-MM')} #${comanda.id} ${comanda.nombre}`;
+    return (
+        base.replace(/[:\\/?*\[\]]/g, ' ').slice(0, 31).trim() ||
+        `Comanda ${comanda.id}`
+    );
+}
+
+function construirMatrizExcelPicking(
     filas: FilaPicking[],
     comandas: Comanda[],
-): Array<Record<string, string | number>> {
-    return filas.map((fila) => {
+): Array<Array<string | number>> {
+    const encabezado: Array<string | number> = [
+        'Plato',
+        'Elaboracion',
+        'Total',
+        ...comandas.map((comanda) => obtenerTituloComandaExcel(comanda)),
+    ];
+
+    const filasExcel = filas.map((fila) => {
         const total = comandas.reduce(
             (acumulado, comanda) =>
                 acumulado +
@@ -199,20 +317,18 @@ function construirFilasExcelPicking(
             (comanda) => fila.cantidadesPorComanda[String(comanda.id)] !== undefined,
         );
 
-        const filaExportacion: Record<string, string | number> = {
-            Plato: fila.platoPrincipal,
-            Elaboracion: fila.subPlato,
-            Total: tieneAlgunaCantidad ? total : '',
-        };
-
-        comandas.forEach((comanda) => {
-            const cantidad = fila.cantidadesPorComanda[String(comanda.id)];
-            filaExportacion[obtenerTituloComandaExcel(comanda)] =
-                cantidad === undefined ? '' : cantidad;
-        });
-
-        return filaExportacion;
+        return [
+            fila.platoPrincipal,
+            fila.subPlato,
+            tieneAlgunaCantidad ? total : '',
+            ...comandas.map((comanda) => {
+                const cantidad = fila.cantidadesPorComanda[String(comanda.id)];
+                return cantidad === undefined ? '' : cantidad;
+            }),
+        ];
     });
+
+    return [encabezado, ...filasExcel];
 }
 
 function construirHojaPicking(
@@ -220,18 +336,20 @@ function construirHojaPicking(
     comandas: Comanda[],
     XLSX: typeof import('xlsx-js-style'),
 ): WorkSheet {
-    const filasExcel = construirFilasExcelPicking(filas, comandas);
-    const worksheet = XLSX.utils.json_to_sheet(filasExcel);
-    worksheet['!rows'] = [{ hpt: 48 }];
+    const matrizExcel = construirMatrizExcelPicking(filas, comandas);
+    const worksheet = XLSX.utils.aoa_to_sheet(matrizExcel);
+    const encabezado = matrizExcel[0] ?? [];
+    const filasExcel = matrizExcel.slice(1);
 
-    const columnas = Object.keys(filasExcel[0] ?? {});
-    worksheet['!cols'] = columnas.map((columna, indice) => {
+    worksheet['!rows'] = [{ hpt: 64 }];
+
+    worksheet['!cols'] = encabezado.map((columna, indice) => {
         const valoresColumna =
             indice < 3
                 ? [
                       columna,
                       ...filasExcel.map((fila) => {
-                          const valor = fila[columna] ?? '';
+                          const valor = fila[indice] ?? '';
                           return typeof valor === 'number'
                               ? formatearCantidad(valor)
                               : valor;
@@ -310,39 +428,45 @@ function construirHojaComparativa(
         'Plato',
         'Elaboración',
         'Total Picking',
-        'Total Producción',
+        'Producción acum.',
+        'Saldo',
     ];
-    const encabezadoInferior: Array<string | number> = ['', '', '', ''];
+    const encabezadoInferior: Array<string | number> = ['', '', '', '', ''];
+    const ultimaFechaExportacion =
+        fechasExportacion[fechasExportacion.length - 1] ?? '';
 
     fechasExportacion.forEach((fecha) => {
-        encabezadoSuperior.push(obtenerEtiquetaFechaExcel(fecha), '');
-        encabezadoInferior.push('Pedido', 'Producción');
+        encabezadoSuperior.push(obtenerEtiquetaFechaExcel(fecha), '', '');
+        encabezadoInferior.push('Pedido', 'Prod. acum.', 'Saldo');
     });
 
     const filasExcel = filas.map((fila) => {
-        const totalPicking = fechasExportacion.reduce(
-            (acumulado, fecha) =>
-                acumulado + (fila.cantidadesPorFechaPedido?.[fecha] ?? 0),
-            0,
-        );
-        const totalProduccion = fechasExportacion.reduce(
-            (acumulado, fecha) =>
-                acumulado + (fila.cantidadesPorFechaProduccion?.[fecha] ?? 0),
-            0,
-        );
+        const totalPicking = sumarCantidades(fila.cantidadesPorFechaPedido);
+        const totalProduccion = ultimaFechaExportacion
+            ? obtenerProduccionAcumuladaHastaFecha(fila, ultimaFechaExportacion)
+            : 0;
+        const totalSaldo = totalProduccion - totalPicking;
+        let pedidoAcumulado = 0;
         const filaExcel: Array<string | number> = [
             fila.platoPrincipal,
             fila.subPlato,
             totalPicking > 0 ? totalPicking : '',
             totalProduccion > 0 ? totalProduccion : '',
+            totalSaldo || '',
         ];
 
         fechasExportacion.forEach((fecha) => {
             const pedido = fila.cantidadesPorFechaPedido?.[fecha] ?? 0;
-            const produccion = fila.cantidadesPorFechaProduccion?.[fecha] ?? 0;
+            pedidoAcumulado += pedido;
+            const produccionAcumulada = obtenerProduccionAcumuladaHastaFecha(
+                fila,
+                fecha,
+            );
+            const saldo = produccionAcumulada - pedidoAcumulado;
 
             filaExcel.push(pedido > 0 ? pedido : '');
-            filaExcel.push(produccion > 0 ? produccion : '');
+            filaExcel.push(produccionAcumulada > 0 ? produccionAcumulada : '');
+            filaExcel.push(saldo || '');
         });
 
         return filaExcel;
@@ -360,9 +484,10 @@ function construirHojaComparativa(
         { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } },
         { s: { r: 0, c: 2 }, e: { r: 1, c: 2 } },
         { s: { r: 0, c: 3 }, e: { r: 1, c: 3 } },
+        { s: { r: 0, c: 4 }, e: { r: 1, c: 4 } },
         ...fechasExportacion.map((_, indice) => ({
-            s: { r: 0, c: 4 + indice * 2 },
-            e: { r: 0, c: 5 + indice * 2 },
+            s: { r: 0, c: 5 + indice * 3 },
+            e: { r: 0, c: 7 + indice * 3 },
         })),
     ];
     worksheet['!cols'] = [
@@ -403,11 +528,22 @@ function construirHojaComparativa(
         },
         {
             wch: Math.max(
-                16,
+                18,
                 calcularAnchoColumna([
-                    'Total Producción',
+                    'Producción acum.',
                     ...filasExcel.map((fila) =>
                         typeof fila[3] === 'number' ? formatearCantidad(fila[3]) : '',
+                    ),
+                ]),
+            ),
+        },
+        {
+            wch: Math.max(
+                12,
+                calcularAnchoColumna([
+                    'Saldo',
+                    ...filasExcel.map((fila) =>
+                        typeof fila[4] === 'number' ? formatearCantidad(fila[4]) : '',
                     ),
                 ]),
             ),
@@ -419,10 +555,26 @@ function construirHojaComparativa(
                     calcularAnchoColumna([
                         'Pedido',
                         ...filasExcel.map((fila) =>
-                            typeof fila[4 + fechasExportacion.indexOf(fecha) * 2] ===
+                            typeof fila[5 + fechasExportacion.indexOf(fecha) * 3] ===
                             'number'
                                 ? formatearCantidad(
-                                      fila[4 + fechasExportacion.indexOf(fecha) * 2] as number,
+                                      fila[5 + fechasExportacion.indexOf(fecha) * 3] as number,
+                                  )
+                                : '',
+                        ),
+                    ]),
+                ),
+            },
+            {
+                wch: Math.max(
+                    14,
+                    calcularAnchoColumna([
+                        'Prod. acum.',
+                        ...filasExcel.map((fila) =>
+                            typeof fila[6 + fechasExportacion.indexOf(fecha) * 3] ===
+                            'number'
+                                ? formatearCantidad(
+                                      fila[6 + fechasExportacion.indexOf(fecha) * 3] as number,
                                   )
                                 : '',
                         ),
@@ -433,12 +585,12 @@ function construirHojaComparativa(
                 wch: Math.max(
                     12,
                     calcularAnchoColumna([
-                        'Producción',
+                        'Saldo',
                         ...filasExcel.map((fila) =>
-                            typeof fila[5 + fechasExportacion.indexOf(fecha) * 2] ===
+                            typeof fila[7 + fechasExportacion.indexOf(fecha) * 3] ===
                             'number'
                                 ? formatearCantidad(
-                                      fila[5 + fechasExportacion.indexOf(fecha) * 2] as number,
+                                      fila[7 + fechasExportacion.indexOf(fecha) * 3] as number,
                                   )
                                 : '',
                         ),
@@ -474,6 +626,9 @@ function construirHojaComparativa(
         const totalProduccionCell = worksheet[
             XLSX.utils.encode_cell({ r, c: 3 })
         ] as CellObject | undefined;
+        const totalSaldoCell = worksheet[
+            XLSX.utils.encode_cell({ r, c: 4 })
+        ] as CellObject | undefined;
 
         if (totalPickingCell) {
             totalPickingCell.s = estiloNumeroCentradoNegrita;
@@ -487,12 +642,19 @@ function construirHojaComparativa(
                     : estiloNumeroCentradoNegrita;
         }
 
-        for (let c = 4; c <= rango.e.c; c += 2) {
+        if (totalSaldoCell) {
+            totalSaldoCell.s = obtenerEstiloSaldo(totalSaldoCell.v, true);
+        }
+
+        for (let c = 5; c <= rango.e.c; c += 3) {
             const pedidoCell = worksheet[
                 XLSX.utils.encode_cell({ r, c })
             ] as CellObject | undefined;
             const produccionCell = worksheet[
                 XLSX.utils.encode_cell({ r, c: c + 1 })
+            ] as CellObject | undefined;
+            const saldoCell = worksheet[
+                XLSX.utils.encode_cell({ r, c: c + 2 })
             ] as CellObject | undefined;
 
             if (pedidoCell) {
@@ -505,6 +667,157 @@ function construirHojaComparativa(
                         ? estiloNumeroProduccion
                         : estiloNumeroCentrado;
             }
+
+            if (saldoCell) {
+                saldoCell.s = obtenerEstiloSaldo(saldoCell.v);
+            }
+        }
+    }
+
+    return worksheet;
+}
+
+function construirHojaComanda(
+    filas: FilaPicking[],
+    comanda: Comanda,
+    XLSX: typeof import('xlsx-js-style'),
+): WorkSheet {
+    const fechaComanda = obtenerClaveFecha(comanda.fecha);
+    const filasComanda = filas
+        .map((fila) => {
+            const pedido = fila.cantidadesPorComanda[String(comanda.id)] ?? 0;
+
+            if (pedido <= 0) {
+                return null;
+            }
+
+            const produccionAcumulada = obtenerProduccionAcumuladaHastaFecha(
+                fila,
+                fechaComanda,
+            );
+            const saldo = produccionAcumulada - pedido;
+
+            return [
+                fila.platoPrincipal,
+                fila.subPlato,
+                pedido,
+                produccionAcumulada > 0 ? produccionAcumulada : '',
+                saldo || '',
+            ];
+        })
+        .filter((fila): fila is Array<string | number> => fila !== null);
+
+    const matriz: Array<Array<string | number>> = [
+        ['Comanda', obtenerResumenComanda(comanda)],
+        [
+            'Criterio producción',
+            'Producción compartida acumulada hasta la fecha de la comanda. No está atribuida a esta comanda.',
+        ],
+        [],
+        [
+            'Plato',
+            'Elaboración',
+            'Pedido comanda',
+            'Producción acum.',
+            'Saldo',
+        ],
+        ...filasComanda,
+    ];
+
+    const worksheet = XLSX.utils.aoa_to_sheet(matriz);
+    worksheet['!rows'] = [{ hpt: 22 }, { hpt: 34 }, { hpt: 10 }, { hpt: 24 }];
+    worksheet['!merges'] = [
+        { s: { r: 0, c: 1 }, e: { r: 0, c: 4 } },
+        { s: { r: 1, c: 1 }, e: { r: 1, c: 4 } },
+        { s: { r: 2, c: 0 }, e: { r: 2, c: 4 } },
+    ];
+    worksheet['!cols'] = [
+        {
+            wch: Math.max(
+                14,
+                Math.min(
+                    48,
+                    calcularAnchoColumna([
+                        'Plato',
+                        ...filasComanda.map((fila) => fila[0] ?? ''),
+                    ]),
+                ),
+            ),
+        },
+        {
+            wch: Math.max(
+                16,
+                Math.min(
+                    42,
+                    calcularAnchoColumna([
+                        'Elaboración',
+                        ...filasComanda.map((fila) => fila[1] ?? ''),
+                    ]),
+                ),
+            ),
+        },
+        { wch: 16 },
+        { wch: 18 },
+        { wch: 12 },
+    ];
+
+    const rango = worksheet['!ref']
+        ? XLSX.utils.decode_range(worksheet['!ref'])
+        : null;
+
+    if (!rango) {
+        return worksheet;
+    }
+
+    const metaA1 = worksheet['A1'] as CellObject | undefined;
+    const metaA2 = worksheet['A2'] as CellObject | undefined;
+    const metaB1 = worksheet['B1'] as CellObject | undefined;
+    const metaB2 = worksheet['B2'] as CellObject | undefined;
+
+    if (metaA1) metaA1.s = estiloTextoNegrita;
+    if (metaA2) metaA2.s = estiloTextoNegrita;
+    if (metaB1) metaB1.s = { alignment: { vertical: 'center', wrapText: true } };
+    if (metaB2) metaB2.s = { alignment: { vertical: 'center', wrapText: true } };
+
+    const separadorCell = worksheet['A3'] as CellObject | undefined;
+    if (separadorCell) {
+        separadorCell.s = estiloCeldaVaciaSinBorde;
+    }
+
+    for (let c = 0; c <= 4; c += 1) {
+        const headerCell = worksheet[
+            XLSX.utils.encode_cell({ r: 3, c })
+        ] as CellObject | undefined;
+
+        if (headerCell) {
+            headerCell.s = estiloHeaderOscuro;
+        }
+    }
+
+    for (let r = 4; r <= rango.e.r; r += 1) {
+        const pedidoCell = worksheet[
+            XLSX.utils.encode_cell({ r, c: 2 })
+        ] as CellObject | undefined;
+        const produccionCell = worksheet[
+            XLSX.utils.encode_cell({ r, c: 3 })
+        ] as CellObject | undefined;
+        const saldoCell = worksheet[
+            XLSX.utils.encode_cell({ r, c: 4 })
+        ] as CellObject | undefined;
+
+        if (pedidoCell) {
+            pedidoCell.s = estiloNumeroCentrado;
+        }
+
+        if (produccionCell) {
+            produccionCell.s =
+                typeof produccionCell.v === 'number' && produccionCell.v > 0
+                    ? estiloNumeroProduccion
+                    : estiloNumeroCentrado;
+        }
+
+        if (saldoCell) {
+            saldoCell.s = obtenerEstiloSaldo(saldoCell.v);
         }
     }
 
@@ -647,6 +960,19 @@ export default function PickingPage() {
                 hojaComparativa,
                 'Picking vs Producción',
             );
+            comandasExportacion.forEach((comanda) => {
+                const hojaComanda = construirHojaComanda(
+                    filasExportacion,
+                    comanda,
+                    XLSX,
+                );
+
+                XLSX.utils.book_append_sheet(
+                    workbook,
+                    hojaComanda,
+                    construirNombreHojaComanda(comanda),
+                );
+            });
             XLSX.writeFile(workbook, 'picking.xlsx', {
                 cellStyles: true,
             });

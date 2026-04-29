@@ -58,7 +58,7 @@ interface FilaPicking {
     subPlatoCodigo: string;
     cantidadesPorComanda: Record<string, number>;
     cantidadesPorFechaPedido?: Record<string, number>;
-    cantidadesPorFechaProduccion?: Record<string, number>;
+    cantidadesPorFechaProduccionReal?: Record<string, number>;
 }
 
 const SUBPLATOS_EXCLUIDOS_POR_PLATO: Record<string, Set<string>> = {
@@ -110,12 +110,6 @@ function normalizarFechaInicioDia(fecha: string | Date): Date {
 
 function obtenerClaveFecha(fecha: string | Date): string {
     return format(normalizarFechaInicioDia(fecha), 'yyyy-MM-dd');
-}
-
-function obtenerClaveFechaProduccion(fecha: string | Date): string {
-    const normalizada = normalizarFechaInicioDia(fecha);
-    normalizada.setDate(normalizada.getDate() + 1);
-    return format(normalizada, 'yyyy-MM-dd');
 }
 
 function acumularCantidadPorClave(
@@ -260,8 +254,6 @@ export async function GET(req: NextRequest) {
         const fechasExportacion = Array.from(
             new Set(comandasTipadas.map((comanda) => obtenerClaveFecha(comanda.fecha))),
         ).sort();
-        const fechasExportacionSet = new Set(fechasExportacion);
-
         const grafoRecetas = await construirGrafoRecetas(
             codigosPlatosComanda,
             nombrePorCodigo,
@@ -386,24 +378,43 @@ export async function GET(req: NextRequest) {
         let filasRespuesta = filas;
 
         if (incluirProduccion) {
-            const clavesFila = new Set(
-                filas.map(
-                    (fila) =>
-                        `${fila.platoPrincipalCodigo}|||${fila.subPlatoCodigo}`,
+            const clavesFila = Array.from(
+                new Set(
+                    filas.map(
+                        (fila) =>
+                            `${fila.platoPrincipalCodigo}|||${fila.subPlatoCodigo}`,
+                    ),
                 ),
             );
-            const produccionDesde = addDays(inicioRango, -1);
-            const produccionHastaExclusivo = addDays(finRangoExclusivo, -1);
+            const clavesFilaSet = new Set(clavesFila);
+            const minFechaComanda = normalizarFechaInicioDia(
+                comandasTipadas[0]?.fecha ?? inicioRango,
+            );
+            const minFechaProduccion = addDays(minFechaComanda, -6);
+            minFechaProduccion.setHours(0, 0, 0, 0);
+            const maxFechaComanda = normalizarFechaInicioDia(
+                comandasTipadas[comandasTipadas.length - 1]?.fecha ?? finRangoExclusivo,
+            );
+            maxFechaComanda.setHours(23, 59, 59, 999);
             const producciones = await prisma.produccion.findMany({
                 where: {
                     fecha: {
-                        gte: produccionDesde,
-                        lt: produccionHastaExclusivo,
+                        gte: minFechaProduccion,
+                        lte: maxFechaComanda,
                     },
                     cantidad: {
                         gt: 0,
                     },
                     salon,
+                    OR: clavesFila.map((claveFila) => {
+                        const [platoPadreCodigo, platoCodigo] =
+                            claveFila.split('|||');
+
+                        return {
+                            platoCodigo,
+                            platoPadreCodigo,
+                        };
+                    }),
                 },
                 select: {
                     fecha: true,
@@ -412,7 +423,7 @@ export async function GET(req: NextRequest) {
                     platoPadreCodigo: true,
                 },
             });
-            const produccionPorFila = new Map<string, Record<string, number>>();
+            const produccionPorFilaReal = new Map<string, Record<string, number>>();
 
             for (const produccion of producciones) {
                 const platoCodigo = normalizarTexto(produccion.platoCodigo);
@@ -421,22 +432,18 @@ export async function GET(req: NextRequest) {
                 );
                 const claveFila = `${platoPadreCodigo}|||${platoCodigo}`;
 
-                if (!clavesFila.has(claveFila)) {
+                if (!clavesFilaSet.has(claveFila)) {
                     continue;
                 }
 
-                const claveFecha = obtenerClaveFechaProduccion(produccion.fecha);
+                const claveFecha = obtenerClaveFecha(produccion.fecha);
 
-                if (!fechasExportacionSet.has(claveFecha)) {
-                    continue;
-                }
-
-                if (!produccionPorFila.has(claveFila)) {
-                    produccionPorFila.set(claveFila, {});
+                if (!produccionPorFilaReal.has(claveFila)) {
+                    produccionPorFilaReal.set(claveFila, {});
                 }
 
                 acumularCantidadPorClave(
-                    produccionPorFila.get(claveFila)!,
+                    produccionPorFilaReal.get(claveFila)!,
                     claveFecha,
                     produccion.cantidad,
                 );
@@ -448,8 +455,8 @@ export async function GET(req: NextRequest) {
                 return {
                     ...fila,
                     cantidadesPorFechaPedido: fila.cantidadesPorFechaPedido ?? {},
-                    cantidadesPorFechaProduccion:
-                        produccionPorFila.get(claveFila) ?? {},
+                    cantidadesPorFechaProduccionReal:
+                        produccionPorFilaReal.get(claveFila) ?? {},
                 };
             });
         }
